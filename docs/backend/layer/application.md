@@ -84,6 +84,7 @@ Application層の入力モデルは、Presentation層のリクエストスキー
 出力ポートの引数、戻り値、送出する可能性のある例外には、SDK、ORM、DBドライバーなどの実装固有の型を使用しない。
 
 RepositoryのProtocolは、読み取りを行うQuery Repository Protocolと、状態変更を行うCommand Repository Protocolに分けて定義する。
+Query Repository ProtocolはApplication層に定義し、Command Repository ProtocolはDomain層に定義する。
 ※Infrastructure層のRepository実装を同様に分割するかどうかはInfrastructure層の都合で判断する。
 
 ## トランザクション境界
@@ -133,6 +134,8 @@ Application層では自らが関係しない事柄に合わせたエラー変換
 Domain層から送出された例外は、原則としてApplication層では捕捉せず、そのまま上位層へ送出する。
 
 Domain例外は業務ルール違反を表しており、Application層でも意味のある例外である。そのため、同じ意味を持つApplication例外への不要な変換は行わない。
+
+Application層で対応が必要な場合は、共通基底例外`DomainError`ではなく、対応する具体的な派生例外を捕捉する。
 
 ただし、以下の場合はApplication層でDomain例外を捕捉してよい。
 

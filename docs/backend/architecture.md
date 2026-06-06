@@ -37,8 +37,7 @@
 ├── infrastructure/
 │   ├── repositories/
 │   │   └── [domain]/
-│   │       ├── [domain]_command_repository.py  # Commandリポジトリ 実装
-│   │       └── [domain]_query_repository.py    # Queryリポジトリ 実装
+│   │       └── [domain]_repository.py  # Query・Commandリポジトリ 実装。必要に応じて分割する
 │   ├── llm/
 │   │   ├── gemini_client.py
 │   │   └── claude_client.py
