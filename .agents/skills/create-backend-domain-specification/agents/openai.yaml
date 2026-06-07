@@ -1,0 +1,4 @@
+interface:
+  display_name: "バックエンドドメイン仕様書作成"
+  short_description: "ドメインモデルやDomain Serviceの仕様書を新規作成する"
+  default_prompt: "$create-backend-domain-specification を使って、バックエンドのドメインモデルまたはDomain Serviceの仕様書を作成してください。"
