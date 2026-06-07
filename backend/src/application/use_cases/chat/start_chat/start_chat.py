@@ -1,0 +1,66 @@
+from collections.abc import Callable
+from datetime import datetime, timezone
+
+from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationClientProtocol,
+)
+from src.application.use_cases.chat.start_chat.start_chat_dto import (
+    StartChatInput,
+    StartChatOutput,
+)
+from src.domain.entities.chat.chat import Chat, ChatMessage
+from src.domain.repositories.chat_command_repository_protocol import (
+    ChatCommandRepositoryProtocol,
+)
+from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
+from src.domain.value_objects.chat.message_sender import MessageSender
+from src.domain.value_objects.chat.prompt import Prompt
+
+
+class StartChatUseCase:
+    def __init__(
+        self,
+        chat_generation_client: ChatGenerationClientProtocol,
+        chat_repository: ChatCommandRepositoryProtocol,
+        now: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._chat_generation_client = chat_generation_client
+        self._chat_repository = chat_repository
+        self._now = now or (lambda: datetime.now(timezone.utc))
+
+    async def execute(self, command: StartChatInput) -> StartChatOutput:
+        prompt = Prompt(command.prompt)
+        user_sent_at = self._now()
+
+        generated = await self._chat_generation_client.start_chat(prompt.value)
+        answered_at = self._now()
+
+        chat = Chat.create(
+            chat_id=generated.chat_id,
+            title=generated.title,
+            user_id=command.user_id,
+            answered_at=answered_at,
+        )
+        turn_id = ChatTurnId.generate()
+        user_message = ChatMessage(
+            chat_id=chat.chat_id,
+            turn_id=turn_id,
+            sender=MessageSender.USER,
+            content=prompt,
+            sent_at=user_sent_at,
+        )
+        llm_message = ChatMessage(
+            chat_id=chat.chat_id,
+            turn_id=turn_id,
+            sender=MessageSender.LLM,
+            content=generated.answer,
+            sent_at=answered_at,
+        )
+        chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
+
+        await self._chat_repository.save_started_chat(chat, user_message, llm_message)
+        return StartChatOutput(
+            chat_id=generated.chat_id,
+            answer=generated.answer,
+            title=generated.title,
+        )
