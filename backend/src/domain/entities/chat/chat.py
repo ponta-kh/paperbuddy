@@ -39,6 +39,7 @@ class Chat:
     user_id: UUID
     created_at: datetime
     last_updated_at: datetime
+    version: int
 
     @classmethod
     def create(
@@ -59,6 +60,7 @@ class Chat:
             user_id=user_id,
             created_at=answered_at,
             last_updated_at=answered_at,
+            version=0,
         )
 
     def validate_started_turn(
@@ -88,6 +90,7 @@ class Chat:
         if llm_message.sent_at < user_message.sent_at:
             raise MessageSentAtOutOfOrderError
         self.last_updated_at = llm_message.sent_at
+        self.version += 1
 
     def _validate_turn_pair(
         self,

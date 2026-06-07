@@ -5,7 +5,11 @@ from uuid import UUID
 from src.application.exceptions import RepositoryNotFoundError
 from src.application.ports.out.chat import ChatMessageRecord, ChatSummary
 from src.domain.entities.chat.chat import Chat, ChatMessage
-from src.domain.repositories.chat_command_repository_protocol import ChatSaveError
+from src.domain.repositories.chat_command_repository_protocol import (
+    ChatConflictError,
+    ChatNotFoundError,
+    ChatSaveError,
+)
 from src.domain.value_objects.chat.prompt import Prompt
 
 
@@ -34,15 +38,18 @@ class InMemoryChatRepository:
         llm_message: ChatMessage,
     ) -> None:
         async with self._lock:
-            if chat.chat_id not in self.chats:
+            persisted_chat = self.chats.get(chat.chat_id)
+            if persisted_chat is None:
                 raise ChatSaveError
+            if persisted_chat.version != chat.version - 1:
+                raise ChatConflictError
             self.chats[chat.chat_id] = replace(chat)
             self.messages.extend((user_message, llm_message))
 
-    async def get_chat_by_id_for_user(self, *, chat_id: str, user_id: UUID) -> Chat:
+    async def get_chat_for_continuation(self, *, chat_id: str, user_id: UUID) -> Chat:
         chat = self.chats.get(chat_id)
         if chat is None or chat.user_id != user_id:
-            raise RepositoryNotFoundError
+            raise ChatNotFoundError
         return replace(chat)
 
     async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:

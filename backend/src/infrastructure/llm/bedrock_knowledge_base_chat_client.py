@@ -136,6 +136,8 @@ class BedrockKnowledgeBaseChatClient:
     async def _generate_title_or_fallback(self, prompt: str) -> str:
         try:
             return await self._generate_title(prompt)
+        except BotoCoreError, ClientError, InvalidChatGenerationResponseError:
+            return self._fallback_title(prompt)
         except Exception:
             return self._fallback_title(prompt)
 

@@ -61,7 +61,7 @@ def get_chat_generation_client() -> BedrockKnowledgeBaseChatClient:
 @lru_cache
 def get_continue_chat_use_case() -> ContinueChatProtocol:
     repository = get_chat_repository()
-    return ContinueChatUseCase(get_chat_generation_client(), repository, repository)
+    return ContinueChatUseCase(get_chat_generation_client(), repository)
 
 
 @lru_cache

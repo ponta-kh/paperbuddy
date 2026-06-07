@@ -1,4 +1,5 @@
 import pytest
+from botocore.exceptions import ClientError
 
 from src.application.ports.out.chat_generation_client_protocol import (
     InvalidChatGenerationResponseError,
@@ -87,6 +88,23 @@ async def test_start_chat_uses_fallback_when_title_generation_fails() -> None:
     result = await _client(knowledge_base, model).start_chat("1234567890abcdef")
 
     assert result.title == "1234567890..."
+
+
+@pytest.mark.asyncio
+async def test_start_chat_uses_fallback_when_title_sdk_call_fails() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {"sessionId": "session-1", "output": {"text": "answer"}}
+    )
+    model = StubModelClient(
+        error=ClientError(
+            {"Error": {"Code": "ServiceUnavailable", "Message": "unavailable"}},
+            "Converse",
+        )
+    )
+
+    result = await _client(knowledge_base, model).start_chat("question")
+
+    assert result.title == "question..."
 
 
 @pytest.mark.asyncio

@@ -73,9 +73,7 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
     repository = await _started_repository(last_updated_at)
     client = StubGenerationClient()
     times = iter((user_sent_at, answered_at))
-    use_case = ContinueChatUseCase(
-        client, repository, repository, now=lambda: next(times)
-    )
+    use_case = ContinueChatUseCase(client, repository, now=lambda: next(times))
 
     output = await use_case.execute(
         ContinueChatInput(user_id=USER_ID, chat_id="session-1", prompt="  next  ")
@@ -97,7 +95,6 @@ async def test_continue_chat_rejects_exactly_24_hours_without_side_effects() -> 
     client = StubGenerationClient()
     use_case = ContinueChatUseCase(
         client,
-        repository,
         repository,
         now=lambda: last_updated_at + timedelta(hours=24),
     )

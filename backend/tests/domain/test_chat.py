@@ -64,3 +64,22 @@ def test_started_turn_rejects_user_message_after_llm_answer() -> None:
 
     with pytest.raises(MessageSentAtOutOfOrderError):
         chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
+
+
+def test_record_exchange_updates_last_updated_at_and_version() -> None:
+    answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    next_answered_at = answered_at + timedelta(seconds=2)
+    chat = Chat.create(
+        chat_id="chat-1",
+        title="title",
+        user_id=UUID("00000000-0000-0000-0000-000000000001"),
+        answered_at=answered_at,
+    )
+    user_message, llm_message = _message_pair(
+        "chat-1", answered_at + timedelta(seconds=1), next_answered_at
+    )
+
+    chat.record_exchange(user_message=user_message, llm_message=llm_message)
+
+    assert chat.last_updated_at == next_answered_at
+    assert chat.version == 1

@@ -5,6 +5,10 @@ import pytest
 
 from src.application.exceptions import RepositoryNotFoundError
 from src.domain.entities.chat.chat import Chat, ChatMessage
+from src.domain.repositories.chat_command_repository_protocol import (
+    ChatConflictError,
+    ChatNotFoundError,
+)
 from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
@@ -96,26 +100,62 @@ async def test_list_messages_hides_other_users_chat() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_chat_by_id_for_user_returns_detached_copy() -> None:
+async def test_get_chat_for_continuation_returns_detached_copy() -> None:
     repository = InMemoryChatRepository()
     answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     chat = _chat("chat-1", USER_ID, answered_at)
     user_message, llm_message = _messages("chat-1", answered_at, answered_at)
     await repository.save_started_chat(chat, user_message, llm_message)
 
-    loaded = await repository.get_chat_by_id_for_user(chat_id="chat-1", user_id=USER_ID)
+    loaded = await repository.get_chat_for_continuation(
+        chat_id="chat-1", user_id=USER_ID
+    )
     loaded.last_updated_at = answered_at + timedelta(hours=1)
 
     assert repository.chats["chat-1"].last_updated_at == answered_at
 
 
 @pytest.mark.asyncio
-async def test_get_chat_by_id_for_user_hides_other_users_chat() -> None:
+async def test_get_chat_for_continuation_hides_other_users_chat() -> None:
     repository = InMemoryChatRepository()
     answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     chat = _chat("chat-1", OTHER_USER_ID, answered_at)
     user_message, llm_message = _messages("chat-1", answered_at, answered_at)
     await repository.save_started_chat(chat, user_message, llm_message)
 
-    with pytest.raises(RepositoryNotFoundError):
-        await repository.get_chat_by_id_for_user(chat_id="chat-1", user_id=USER_ID)
+    with pytest.raises(ChatNotFoundError):
+        await repository.get_chat_for_continuation(chat_id="chat-1", user_id=USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_save_exchange_rejects_stale_chat_version() -> None:
+    repository = InMemoryChatRepository()
+    answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    chat = _chat("chat-1", USER_ID, answered_at)
+    initial_user_message, initial_llm_message = _messages(
+        "chat-1", answered_at, answered_at
+    )
+    await repository.save_started_chat(chat, initial_user_message, initial_llm_message)
+
+    first = await repository.get_chat_for_continuation(
+        chat_id="chat-1", user_id=USER_ID
+    )
+    stale = await repository.get_chat_for_continuation(
+        chat_id="chat-1", user_id=USER_ID
+    )
+    first_messages = _messages(
+        "chat-1", answered_at + timedelta(seconds=1), answered_at + timedelta(seconds=2)
+    )
+    stale_messages = _messages(
+        "chat-1", answered_at + timedelta(seconds=1), answered_at + timedelta(seconds=3)
+    )
+    first.record_exchange(user_message=first_messages[0], llm_message=first_messages[1])
+    stale.record_exchange(user_message=stale_messages[0], llm_message=stale_messages[1])
+
+    await repository.save_exchange(first, *first_messages)
+    with pytest.raises(ChatConflictError):
+        await repository.save_exchange(stale, *stale_messages)
+
+    assert repository.chats["chat-1"].last_updated_at == first_messages[1].sent_at
+    assert repository.chats["chat-1"].version == 1
+    assert len(repository.messages) == 4

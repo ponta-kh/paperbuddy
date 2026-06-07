@@ -26,6 +26,7 @@ from src.dependencies.chat_deps import (
     get_list_chats_use_case,
     get_start_chat_use_case,
 )
+from src.domain.repositories.chat_command_repository_protocol import ChatConflictError
 
 
 class StubStartChatUseCase:
@@ -48,6 +49,11 @@ class StubContinueChatUseCase:
 class StubExpiredContinueChatUseCase:
     async def execute(self, command: object) -> ContinueChatOutput:
         raise ChatContinuationExpiredError
+
+
+class StubConflictContinueChatUseCase:
+    async def execute(self, command: object) -> ContinueChatOutput:
+        raise ChatConflictError
 
 
 class StubListChatsUseCase:
@@ -189,6 +195,23 @@ def test_continue_chat_endpoint_returns_conflict_when_expired() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 409
     assert response.json()["code"] == "chat_continuation_expired"
+
+
+def test_continue_chat_endpoint_returns_conflict_when_stale() -> None:
+    app.dependency_overrides[get_continue_chat_use_case] = lambda: (
+        StubConflictContinueChatUseCase()
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/chats/session-1/messages",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+        json={"prompt": "next question"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 409
+    assert response.json()["code"] == "chat_conflict"
 
 
 def test_start_chat_endpoint() -> None:

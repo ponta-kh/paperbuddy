@@ -2,9 +2,6 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from src.application.exceptions import ChatContinuationExpiredError
-from src.application.ports.out.chat.chat_query_repository_protocol import (
-    ChatQueryRepositoryProtocol,
-)
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
 )
@@ -27,18 +24,16 @@ class ContinueChatUseCase:
     def __init__(
         self,
         chat_generation_client: ChatGenerationClientProtocol,
-        chat_query_repository: ChatQueryRepositoryProtocol,
         chat_command_repository: ChatCommandRepositoryProtocol,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self._chat_generation_client = chat_generation_client
-        self._chat_query_repository = chat_query_repository
         self._chat_command_repository = chat_command_repository
         self._now = now or (lambda: datetime.now(timezone.utc))
 
     async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
         prompt = Prompt(command.prompt)
-        chat = await self._chat_query_repository.get_chat_by_id_for_user(
+        chat = await self._chat_command_repository.get_chat_for_continuation(
             chat_id=command.chat_id,
             user_id=command.user_id,
         )

@@ -10,7 +10,11 @@ from src.application.ports.out.chat_generation_client_protocol import (
     InvalidChatGenerationResponseError,
 )
 from src.domain.exceptions.chat_exception import InvalidPromptError, PromptTooLongError
-from src.domain.repositories.chat_command_repository_protocol import ChatSaveError
+from src.domain.repositories.chat_command_repository_protocol import (
+    ChatConflictError,
+    ChatNotFoundError,
+    ChatSaveError,
+)
 from src.presentation.auth import AuthenticationError
 
 
@@ -21,6 +25,22 @@ def _response(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ChatNotFoundError)
+    async def chat_not_found_handler(_: Request, __: ChatNotFoundError) -> JSONResponse:
+        return _response(
+            status.HTTP_404_NOT_FOUND,
+            "chat_not_found",
+            "指定されたチャットは存在しません",
+        )
+
+    @app.exception_handler(ChatConflictError)
+    async def chat_conflict_handler(_: Request, __: ChatConflictError) -> JSONResponse:
+        return _response(
+            status.HTTP_409_CONFLICT,
+            "chat_conflict",
+            "チャットが更新されたため、再度お試しください",
+        )
+
     @app.exception_handler(ChatContinuationExpiredError)
     async def chat_continuation_expired_handler(
         _: Request, __: ChatContinuationExpiredError
