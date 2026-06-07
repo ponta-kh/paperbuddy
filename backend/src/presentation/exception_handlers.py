@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+from src.application.exceptions import RepositoryNotFoundError
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
@@ -17,6 +18,16 @@ def _response(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RepositoryNotFoundError)
+    async def repository_not_found_handler(
+        _: Request, __: RepositoryNotFoundError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_404_NOT_FOUND,
+            "chat_not_found",
+            "指定されたチャットは存在しません",
+        )
+
     @app.exception_handler(AuthenticationError)
     async def authentication_error_handler(
         _: Request, __: AuthenticationError

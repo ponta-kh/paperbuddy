@@ -1,8 +1,12 @@
 import asyncio
 from dataclasses import replace
+from uuid import UUID
 
+from src.application.exceptions import RepositoryNotFoundError
+from src.application.ports.out.chat import ChatMessageRecord, ChatSummary
 from src.domain.entities.chat.chat import Chat, ChatMessage
 from src.domain.repositories.chat_command_repository_protocol import ChatSaveError
+from src.domain.value_objects.chat.prompt import Prompt
 
 
 class InMemoryChatRepository:
@@ -34,3 +38,51 @@ class InMemoryChatRepository:
                 raise ChatSaveError
             self.chats[chat.chat_id] = replace(chat)
             self.messages.extend((user_message, llm_message))
+
+    async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
+        chats = sorted(
+            (chat for chat in self.chats.values() if chat.user_id == user_id),
+            key=lambda chat: chat.last_updated_at,
+            reverse=True,
+        )
+        if not chats:
+            raise RepositoryNotFoundError
+        return tuple(
+            ChatSummary(
+                chat_id=chat.chat_id,
+                title=chat.title,
+                created_at=chat.created_at,
+                last_updated_at=chat.last_updated_at,
+            )
+            for chat in chats
+        )
+
+    async def list_messages_by_chat_id(
+        self,
+        *,
+        user_id: UUID,
+        chat_id: str,
+    ) -> tuple[ChatMessageRecord, ...]:
+        chat = self.chats.get(chat_id)
+        if chat is None or chat.user_id != user_id:
+            raise RepositoryNotFoundError
+
+        messages = sorted(
+            (message for message in self.messages if message.chat_id == chat_id),
+            key=lambda message: message.sent_at,
+        )
+        if not messages:
+            raise RepositoryNotFoundError
+        return tuple(
+            ChatMessageRecord(
+                turn_id=message.turn_id.value,
+                sender=message.sender.value,
+                content=(
+                    message.content.value
+                    if isinstance(message.content, Prompt)
+                    else message.content
+                ),
+                sent_at=message.sent_at,
+            )
+            for message in messages
+        )

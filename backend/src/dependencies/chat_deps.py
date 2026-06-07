@@ -3,6 +3,10 @@ from functools import lru_cache
 
 import boto3
 
+from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
+    ListChatMessagesUseCase,
+)
+from src.application.use_cases.chat.list_chats.list_chats import ListChatsUseCase
 from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
@@ -15,6 +19,16 @@ from src.infrastructure.repositories.chat.in_memory_chat_repository import (
 @lru_cache
 def get_chat_repository() -> InMemoryChatRepository:
     return InMemoryChatRepository()
+
+
+@lru_cache
+def get_list_chats_use_case() -> ListChatsUseCase:
+    return ListChatsUseCase(get_chat_repository())
+
+
+@lru_cache
+def get_list_chat_messages_use_case() -> ListChatMessagesUseCase:
+    return ListChatMessagesUseCase(get_chat_repository())
 
 
 @lru_cache
