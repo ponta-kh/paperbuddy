@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+const USER_ID = import.meta.env.VITE_USER_ID
 
 export type ChatSummary = {
   id: string
@@ -16,30 +17,48 @@ export type ChatMessage = {
 type ChatSummaryResponse = {
   chat_id: string
   title: string
-  updated_at: string
+  created_at: string
+  last_updated_at: string
 }
 
 type ChatMessageResponse = {
-  message_id: string
-  role: 'user' | 'assistant'
+  turn_id: string
+  sender: 'user' | 'llm'
   content: string
-  created_at: string
+  sent_at: string
 }
 
-type ChatDetailResponse = {
+type ListChatsResponse = {
+  chats: ChatSummaryResponse[]
+}
+
+type ListChatMessagesResponse = {
+  chat_id: string
   messages: ChatMessageResponse[]
 }
 
 type SendPromptResponse = {
   chat_id: string
+  answer: string
+  title: string
+}
+
+function getHeaders(includeContentType = false): Record<string, string> {
+  if (!USER_ID) {
+    throw new Error('VITE_USER_ID is not configured')
+  }
+
+  return {
+    Accept: 'application/json',
+    'X-User-ID': USER_ID,
+    ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
+  }
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: getHeaders(),
     signal,
   })
 
@@ -56,10 +75,7 @@ async function postJson<TResponse, TBody>(
 ): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(true),
     body: JSON.stringify(body),
   })
 
@@ -71,13 +87,13 @@ async function postJson<TResponse, TBody>(
 }
 
 export async function getChats(signal?: AbortSignal): Promise<ChatSummary[]> {
-  const chats = await getJson<ChatSummaryResponse[]>('/chats', signal)
+  const response = await getJson<ListChatsResponse>('/chats', signal)
 
-  return chats
+  return response.chats
     .map((chat) => ({
       id: chat.chat_id,
       title: chat.title,
-      updatedAt: chat.updated_at,
+      updatedAt: chat.last_updated_at,
     }))
     .sort(
       (first, second) =>
@@ -90,17 +106,17 @@ export async function getChatMessages(
   chatId: string,
   signal?: AbortSignal,
 ): Promise<ChatMessage[]> {
-  const chat = await getJson<ChatDetailResponse>(
-    `/chats/${encodeURIComponent(chatId)}`,
+  const chat = await getJson<ListChatMessagesResponse>(
+    `/chats/${encodeURIComponent(chatId)}/messages`,
     signal,
   )
 
   return chat.messages
-    .map((message) => ({
-      id: message.message_id,
-      role: message.role,
+    .map<ChatMessage>((message) => ({
+      id: `${message.turn_id}:${message.sender}`,
+      role: message.sender === 'user' ? 'user' : 'assistant',
       content: message.content,
-      createdAt: message.created_at,
+      createdAt: message.sent_at,
     }))
     .sort(
       (first, second) =>
@@ -113,7 +129,9 @@ export async function sendPrompt(
   prompt: string,
   chatId?: string,
 ): Promise<string> {
-  const path = chatId ? `/chats/${encodeURIComponent(chatId)}` : '/chats'
+  const path = chatId
+    ? `/chats/${encodeURIComponent(chatId)}/messages`
+    : '/chats'
   const response = await postJson<SendPromptResponse, { prompt: string }>(
     path,
     {
