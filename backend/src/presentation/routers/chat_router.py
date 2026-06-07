@@ -2,15 +2,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
-    ListChatMessagesUseCase,
+from src.application.ports.input.chat.list_chat_messages_protocol import (
+    ListChatMessagesProtocol,
+)
+from src.application.ports.input.chat.list_chats_protocol import ListChatsProtocol
+from src.application.ports.input.chat.start_chat_protocol import (
+    StartChatProtocol,
 )
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
     ListChatMessagesInput,
 )
-from src.application.use_cases.chat.list_chats.list_chats import ListChatsUseCase
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
-from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatInput
 from src.dependencies.chat_deps import (
     get_list_chat_messages_use_case,
@@ -33,7 +35,7 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 @router.get("", response_model=ListChatsResponse)
 async def list_chats(
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
-    use_case: Annotated[ListChatsUseCase, Depends(get_list_chats_use_case)],
+    use_case: Annotated[ListChatsProtocol, Depends(get_list_chats_use_case)],
 ) -> ListChatsResponse:
     output = await use_case.execute(ListChatsInput(user_id=user.user_id))
     return ListChatsResponse(
@@ -54,7 +56,7 @@ async def list_chat_messages(
     chat_id: str,
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[
-        ListChatMessagesUseCase, Depends(get_list_chat_messages_use_case)
+        ListChatMessagesProtocol, Depends(get_list_chat_messages_use_case)
     ],
 ) -> ListChatMessagesResponse:
     output = await use_case.execute(
@@ -78,7 +80,7 @@ async def list_chat_messages(
 async def start_chat(
     request: StartChatRequest,
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
-    use_case: Annotated[StartChatUseCase, Depends(get_start_chat_use_case)],
+    use_case: Annotated[StartChatProtocol, Depends(get_start_chat_use_case)],
 ) -> StartChatResponse:
     output = await use_case.execute(
         StartChatInput(user_id=user.user_id, prompt=request.prompt)

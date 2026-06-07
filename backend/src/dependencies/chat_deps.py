@@ -3,6 +3,13 @@ from functools import lru_cache
 
 import boto3
 
+from src.application.ports.input.chat.list_chat_messages_protocol import (
+    ListChatMessagesProtocol,
+)
+from src.application.ports.input.chat.list_chats_protocol import ListChatsProtocol
+from src.application.ports.input.chat.start_chat_protocol import (
+    StartChatProtocol,
+)
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
     ListChatMessagesUseCase,
 )
@@ -22,17 +29,17 @@ def get_chat_repository() -> InMemoryChatRepository:
 
 
 @lru_cache
-def get_list_chats_use_case() -> ListChatsUseCase:
+def get_list_chats_use_case() -> ListChatsProtocol:
     return ListChatsUseCase(get_chat_repository())
 
 
 @lru_cache
-def get_list_chat_messages_use_case() -> ListChatMessagesUseCase:
+def get_list_chat_messages_use_case() -> ListChatMessagesProtocol:
     return ListChatMessagesUseCase(get_chat_repository())
 
 
 @lru_cache
-def get_start_chat_use_case() -> StartChatUseCase:
+def get_start_chat_use_case() -> StartChatProtocol:
     region = os.environ["AWS_REGION"]
     knowledge_base_id = os.environ["BEDROCK_KNOWLEDGE_BASE_ID"]
     model_arn = os.environ["BEDROCK_MODEL_ARN"]
