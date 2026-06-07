@@ -16,6 +16,18 @@ class StartChatResponse(BaseModel):
     title: str
 
 
+class ContinueChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(description="既存チャットへ追加するプロンプト")
+
+
+class ContinueChatResponse(BaseModel):
+    chat_id: str
+    answer: str
+    title: str
+
+
 class ChatSummaryResponse(BaseModel):
     chat_id: str
     title: str

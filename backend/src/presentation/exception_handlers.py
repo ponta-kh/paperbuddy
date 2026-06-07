@@ -1,7 +1,10 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from src.application.exceptions import RepositoryNotFoundError
+from src.application.exceptions import (
+    ChatContinuationExpiredError,
+    RepositoryNotFoundError,
+)
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
@@ -18,6 +21,16 @@ def _response(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ChatContinuationExpiredError)
+    async def chat_continuation_expired_handler(
+        _: Request, __: ChatContinuationExpiredError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_409_CONFLICT,
+            "chat_continuation_expired",
+            "このチャットでは会話を継続できません",
+        )
+
     @app.exception_handler(RepositoryNotFoundError)
     async def repository_not_found_handler(
         _: Request, __: RepositoryNotFoundError
@@ -63,7 +76,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _response(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "chat_generation_unavailable",
-            "チャットを開始できませんでした",
+            "チャットの回答を生成できませんでした",
         )
 
     @app.exception_handler(InvalidChatGenerationResponseError)
@@ -73,7 +86,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _response(
             status.HTTP_502_BAD_GATEWAY,
             "invalid_chat_generation_response",
-            "チャットを開始できませんでした",
+            "チャットの回答を生成できませんでした",
         )
 
     @app.exception_handler(ChatSaveError)

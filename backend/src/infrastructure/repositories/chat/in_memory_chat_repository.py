@@ -39,6 +39,12 @@ class InMemoryChatRepository:
             self.chats[chat.chat_id] = replace(chat)
             self.messages.extend((user_message, llm_message))
 
+    async def get_chat_by_id_for_user(self, *, chat_id: str, user_id: UUID) -> Chat:
+        chat = self.chats.get(chat_id)
+        if chat is None or chat.user_id != user_id:
+            raise RepositoryNotFoundError
+        return replace(chat)
+
     async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
         chats = sorted(
             (chat for chat in self.chats.values() if chat.user_id == user_id),

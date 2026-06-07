@@ -17,5 +17,15 @@ class StartGeneratedChatResult:
     title: str
 
 
+@dataclass(frozen=True, slots=True)
+class ContinueGeneratedChatResult:
+    chat_id: str
+    answer: str
+
+
 class ChatGenerationClientProtocol(Protocol):
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult: ...
+
+    async def continue_chat(
+        self, chat_id: str, prompt: str
+    ) -> ContinueGeneratedChatResult: ...

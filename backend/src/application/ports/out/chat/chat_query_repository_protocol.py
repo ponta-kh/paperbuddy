@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from src.domain.entities.chat.chat import Chat
+
 
 @dataclass(frozen=True, slots=True)
 class ChatSummary:
@@ -21,6 +23,8 @@ class ChatMessageRecord:
 
 
 class ChatQueryRepositoryProtocol(Protocol):
+    async def get_chat_by_id_for_user(self, *, chat_id: str, user_id: UUID) -> Chat: ...
+
     async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]: ...
 
     async def list_messages_by_chat_id(

@@ -110,3 +110,41 @@ async def test_start_chat_rejects_blank_answer() -> None:
 
     with pytest.raises(InvalidChatGenerationResponseError):
         await _client(knowledge_base, model).start_chat("question")
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_uses_existing_session() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {"sessionId": "session-1", "output": {"text": "next answer"}}
+    )
+    model = StubModelClient()
+
+    result = await _client(knowledge_base, model).continue_chat(
+        "session-1", "next question"
+    )
+
+    assert result.chat_id == "session-1"
+    assert result.answer == "next answer"
+    assert knowledge_base.request == {
+        "input": {"text": "next question"},
+        "retrieveAndGenerateConfiguration": {
+            "type": "KNOWLEDGE_BASE",
+            "knowledgeBaseConfiguration": {
+                "knowledgeBaseId": "knowledge-base-id",
+                "modelArn": "model-arn",
+            },
+        },
+        "sessionId": "session-1",
+    }
+    assert model.request is None
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_rejects_changed_session_id() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {"sessionId": "other-session", "output": {"text": "next answer"}}
+    )
+    model = StubModelClient()
+
+    with pytest.raises(InvalidChatGenerationResponseError):
+        await _client(knowledge_base, model).continue_chat("session-1", "next question")

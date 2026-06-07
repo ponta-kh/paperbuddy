@@ -4,7 +4,13 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 
 from main import app
-from src.application.exceptions import RepositoryNotFoundError
+from src.application.exceptions import (
+    ChatContinuationExpiredError,
+    RepositoryNotFoundError,
+)
+from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
+    ContinueChatOutput,
+)
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
     ChatMessageOutput,
     ListChatMessagesOutput,
@@ -15,6 +21,7 @@ from src.application.use_cases.chat.list_chats.list_chats_dto import (
 )
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatOutput
 from src.dependencies.chat_deps import (
+    get_continue_chat_use_case,
     get_list_chat_messages_use_case,
     get_list_chats_use_case,
     get_start_chat_use_case,
@@ -26,6 +33,21 @@ class StubStartChatUseCase:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.prompt == "question"
         return StartChatOutput(chat_id="session-1", answer="answer", title="title")
+
+
+class StubContinueChatUseCase:
+    async def execute(self, command: object) -> ContinueChatOutput:
+        assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
+        assert command.chat_id == "session-1"
+        assert command.prompt == "next question"
+        return ContinueChatOutput(
+            chat_id="session-1", answer="next answer", title="title"
+        )
+
+
+class StubExpiredContinueChatUseCase:
+    async def execute(self, command: object) -> ContinueChatOutput:
+        raise ChatContinuationExpiredError
 
 
 class StubListChatsUseCase:
@@ -129,6 +151,44 @@ def test_list_chat_messages_endpoint_returns_not_found() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 404
     assert response.json()["code"] == "chat_not_found"
+
+
+def test_continue_chat_endpoint() -> None:
+    app.dependency_overrides[get_continue_chat_use_case] = lambda: (
+        StubContinueChatUseCase()
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/chats/session-1/messages",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+        json={"prompt": "next question"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json() == {
+        "chat_id": "session-1",
+        "answer": "next answer",
+        "title": "title",
+    }
+
+
+def test_continue_chat_endpoint_returns_conflict_when_expired() -> None:
+    app.dependency_overrides[get_continue_chat_use_case] = lambda: (
+        StubExpiredContinueChatUseCase()
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/chats/session-1/messages",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+        json={"prompt": "next question"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 409
+    assert response.json()["code"] == "chat_continuation_expired"
 
 
 def test_start_chat_endpoint() -> None:

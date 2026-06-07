@@ -93,3 +93,29 @@ async def test_list_messages_hides_other_users_chat() -> None:
 
     with pytest.raises(RepositoryNotFoundError):
         await repository.list_messages_by_chat_id(user_id=USER_ID, chat_id="chat-1")
+
+
+@pytest.mark.asyncio
+async def test_get_chat_by_id_for_user_returns_detached_copy() -> None:
+    repository = InMemoryChatRepository()
+    answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    chat = _chat("chat-1", USER_ID, answered_at)
+    user_message, llm_message = _messages("chat-1", answered_at, answered_at)
+    await repository.save_started_chat(chat, user_message, llm_message)
+
+    loaded = await repository.get_chat_by_id_for_user(chat_id="chat-1", user_id=USER_ID)
+    loaded.last_updated_at = answered_at + timedelta(hours=1)
+
+    assert repository.chats["chat-1"].last_updated_at == answered_at
+
+
+@pytest.mark.asyncio
+async def test_get_chat_by_id_for_user_hides_other_users_chat() -> None:
+    repository = InMemoryChatRepository()
+    answered_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    chat = _chat("chat-1", OTHER_USER_ID, answered_at)
+    user_message, llm_message = _messages("chat-1", answered_at, answered_at)
+    await repository.save_started_chat(chat, user_message, llm_message)
+
+    with pytest.raises(RepositoryNotFoundError):
+        await repository.get_chat_by_id_for_user(chat_id="chat-1", user_id=USER_ID)

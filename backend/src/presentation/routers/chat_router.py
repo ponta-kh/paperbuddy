@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from src.application.ports.input.chat.continue_chat_protocol import ContinueChatProtocol
 from src.application.ports.input.chat.list_chat_messages_protocol import (
     ListChatMessagesProtocol,
 )
@@ -12,9 +13,13 @@ from src.application.ports.input.chat.start_chat_protocol import (
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
     ListChatMessagesInput,
 )
+from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
+    ContinueChatInput,
+)
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatInput
 from src.dependencies.chat_deps import (
+    get_continue_chat_use_case,
     get_list_chat_messages_use_case,
     get_list_chats_use_case,
     get_start_chat_use_case,
@@ -23,6 +28,8 @@ from src.presentation.auth import AuthenticatedUser, get_authenticated_user
 from src.presentation.schemas.chat_schema import (
     ChatMessageResponse,
     ChatSummaryResponse,
+    ContinueChatRequest,
+    ContinueChatResponse,
     ListChatMessagesResponse,
     ListChatsResponse,
     StartChatRequest,
@@ -73,6 +80,27 @@ async def list_chat_messages(
             )
             for message in output.messages
         ],
+    )
+
+
+@router.post("/{chat_id}/messages", response_model=ContinueChatResponse)
+async def continue_chat(
+    chat_id: str,
+    request: ContinueChatRequest,
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    use_case: Annotated[ContinueChatProtocol, Depends(get_continue_chat_use_case)],
+) -> ContinueChatResponse:
+    output = await use_case.execute(
+        ContinueChatInput(
+            user_id=user.user_id,
+            chat_id=chat_id,
+            prompt=request.prompt,
+        )
+    )
+    return ContinueChatResponse(
+        chat_id=output.chat_id,
+        answer=output.answer,
+        title=output.title,
     )
 
 
