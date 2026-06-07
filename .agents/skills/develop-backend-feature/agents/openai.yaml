@@ -1,0 +1,4 @@
+interface:
+  display_name: "バックエンド機能開発"
+  short_description: "バックエンド設計資料に準拠して新規機能を設計・実装・テストする"
+  default_prompt: "$develop-backend-feature を使って、バックエンドの新規機能を設計・実装・テストしてください。"

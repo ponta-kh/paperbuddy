@@ -1,0 +1,2 @@
+class ChatContinuationExpiredError(Exception):
+    pass
