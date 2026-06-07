@@ -35,6 +35,16 @@
       "includes": ["src/components/shadcn/**"],
       "formatter": {
         "enabled": false
+      },
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      },
+      "assist": {
+        "enabled": false
       }
     }
   ],

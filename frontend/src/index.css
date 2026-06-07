@@ -121,10 +121,21 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
   body {
     @apply bg-background text-foreground;
+    min-height: 100%;
   }
   html {
     @apply font-sans;
+  }
+  body {
+    margin: 0;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
   }
 }
