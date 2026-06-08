@@ -46,7 +46,7 @@ class InMemoryChatRepository:
             self.chats[chat.chat_id] = replace(chat)
             self.messages.extend((user_message, llm_message))
 
-    async def get_chat_for_continuation(self, *, chat_id: str, user_id: UUID) -> Chat:
+    async def get_chat_for_continuation(self, *, chat_id: UUID, user_id: UUID) -> Chat:
         chat = self.chats.get(chat_id)
         if chat is None or chat.user_id != user_id:
             raise ChatNotFoundError
@@ -74,7 +74,7 @@ class InMemoryChatRepository:
         self,
         *,
         user_id: UUID,
-        chat_id: str,
+        chat_id: UUID,
     ) -> tuple[ChatMessageRecord, ...]:
         chat = self.chats.get(chat_id)
         if chat is None or chat.user_id != user_id:

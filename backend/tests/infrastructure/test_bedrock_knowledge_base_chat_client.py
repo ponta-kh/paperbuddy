@@ -58,7 +58,7 @@ async def test_start_chat_generates_answer_and_title() -> None:
 
     result = await _client(knowledge_base, model).start_chat("question")
 
-    assert result.chat_id == "session-1"
+    assert result.session_id == "session-1"
     assert result.answer == "answer"
     assert result.title == "generated title"
     assert knowledge_base.request == {
@@ -141,7 +141,7 @@ async def test_continue_chat_uses_existing_session() -> None:
         "session-1", "next question"
     )
 
-    assert result.chat_id == "session-1"
+    assert result.session_id == "session-1"
     assert result.answer == "next answer"
     assert knowledge_base.request == {
         "input": {"text": "next question"},

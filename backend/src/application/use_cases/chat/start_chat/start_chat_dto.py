@@ -13,6 +13,6 @@ class StartChatInput(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class StartChatOutput:
-    chat_id: str
+    chat_id: UUID
     answer: str
     title: str

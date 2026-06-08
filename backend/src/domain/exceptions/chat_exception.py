@@ -5,6 +5,10 @@ class InvalidChatIdError(DomainError):
     pass
 
 
+class InvalidSessionIdError(DomainError):
+    pass
+
+
 class InvalidPromptError(DomainError):
     pass
 

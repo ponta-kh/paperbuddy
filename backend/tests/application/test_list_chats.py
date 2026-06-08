@@ -10,6 +10,7 @@ from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsIn
 
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 
 
 class StubChatQueryRepository:
@@ -30,7 +31,7 @@ async def test_list_chats_returns_repository_results() -> None:
     repository = StubChatQueryRepository(
         (
             ChatSummary(
-                chat_id="chat-1",
+                chat_id=CHAT_ID,
                 title="title",
                 created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
                 last_updated_at=updated_at,
@@ -41,7 +42,7 @@ async def test_list_chats_returns_repository_results() -> None:
     output = await ListChatsUseCase(repository).execute(ListChatsInput(user_id=USER_ID))
 
     assert repository.user_id == USER_ID
-    assert output.chats[0].chat_id == "chat-1"
+    assert output.chats[0].chat_id == CHAT_ID
     assert output.chats[0].last_updated_at == updated_at
 
 

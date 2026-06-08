@@ -4,6 +4,7 @@ from uuid import UUID
 
 from src.domain.exceptions.chat_exception import (
     InvalidChatIdError,
+    InvalidSessionIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
     MessageSentAtOutOfOrderError,
@@ -15,14 +16,14 @@ from src.domain.value_objects.chat.prompt import Prompt
 
 @dataclass(frozen=True, slots=True)
 class ChatMessage:
-    chat_id: str
+    chat_id: UUID
     turn_id: ChatTurnId
     sender: MessageSender
     content: Prompt | str
     sent_at: datetime
 
     def __post_init__(self) -> None:
-        if not self.chat_id.strip():
+        if not isinstance(self.chat_id, UUID):
             raise InvalidChatIdError
         if self.sent_at.tzinfo is None:
             raise ValueError("sent_at must be timezone-aware")
@@ -34,7 +35,8 @@ class ChatMessage:
 
 @dataclass(slots=True)
 class Chat:
-    chat_id: str
+    chat_id: UUID
+    session_id: str
     title: str
     user_id: UUID
     created_at: datetime
@@ -45,17 +47,21 @@ class Chat:
     def create(
         cls,
         *,
-        chat_id: str,
+        chat_id: UUID,
+        session_id: str,
         title: str,
         user_id: UUID,
         answered_at: datetime,
     ) -> "Chat":
-        if not chat_id.strip():
+        if not isinstance(chat_id, UUID):
             raise InvalidChatIdError
+        if not session_id.strip():
+            raise InvalidSessionIdError
         if answered_at.tzinfo is None:
             raise ValueError("answered_at must be timezone-aware")
         return cls(
             chat_id=chat_id,
+            session_id=session_id,
             title=title,
             user_id=user_id,
             created_at=answered_at,

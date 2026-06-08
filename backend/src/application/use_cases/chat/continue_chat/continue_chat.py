@@ -42,7 +42,7 @@ class ContinueChatUseCase:
             raise ChatContinuationExpiredError
 
         generated = await self._chat_generation_client.continue_chat(
-            chat.chat_id, prompt.value
+            chat.session_id, prompt.value
         )
         answered_at = self._now()
         turn_id = ChatTurnId.generate()

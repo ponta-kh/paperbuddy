@@ -14,7 +14,7 @@ from src.application.ports.out.chat_generation_client_protocol import (
 
 @dataclass(frozen=True, slots=True)
 class _KnowledgeBaseChatResult:
-    chat_id: str
+    session_id: str
     answer: str
 
 
@@ -38,16 +38,18 @@ class BedrockKnowledgeBaseChatClient:
             self._generate_title_or_fallback(prompt),
         )
         return StartGeneratedChatResult(
-            chat_id=chat_result.chat_id,
+            session_id=chat_result.session_id,
             answer=chat_result.answer,
             title=title,
         )
 
     async def continue_chat(
-        self, chat_id: str, prompt: str
+        self, session_id: str, prompt: str
     ) -> ContinueGeneratedChatResult:
-        result = await self._continue_knowledge_base_chat(chat_id, prompt)
-        return ContinueGeneratedChatResult(chat_id=result.chat_id, answer=result.answer)
+        result = await self._continue_knowledge_base_chat(session_id, prompt)
+        return ContinueGeneratedChatResult(
+            session_id=result.session_id, answer=result.answer
+        )
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
@@ -66,19 +68,20 @@ class BedrockKnowledgeBaseChatClient:
             raise ChatGenerationUnavailableError from error
 
         try:
-            chat_id = response["sessionId"]
+            session_id = response["sessionId"]
             answer = response["output"]["text"]
             if not all(
-                isinstance(value, str) and value.strip() for value in (chat_id, answer)
+                isinstance(value, str) and value.strip()
+                for value in (session_id, answer)
             ):
                 raise ValueError
         except (KeyError, TypeError, ValueError) as error:
             raise InvalidChatGenerationResponseError from error
 
-        return _KnowledgeBaseChatResult(chat_id=chat_id, answer=answer)
+        return _KnowledgeBaseChatResult(session_id=session_id, answer=answer)
 
     async def _continue_knowledge_base_chat(
-        self, chat_id: str, prompt: str
+        self, session_id: str, prompt: str
     ) -> _KnowledgeBaseChatResult:
         try:
             response = await asyncio.to_thread(
@@ -91,16 +94,16 @@ class BedrockKnowledgeBaseChatClient:
                         "modelArn": self._model_arn,
                     },
                 },
-                sessionId=chat_id,
+                sessionId=session_id,
             )
         except (BotoCoreError, ClientError) as error:
             raise ChatGenerationUnavailableError from error
 
         try:
-            returned_chat_id = response["sessionId"]
+            returned_session_id = response["sessionId"]
             answer = response["output"]["text"]
             if (
-                returned_chat_id != chat_id
+                returned_session_id != session_id
                 or not isinstance(answer, str)
                 or not answer.strip()
             ):
@@ -108,7 +111,7 @@ class BedrockKnowledgeBaseChatClient:
         except (KeyError, TypeError, ValueError) as error:
             raise InvalidChatGenerationResponseError from error
 
-        return _KnowledgeBaseChatResult(chat_id=returned_chat_id, answer=answer)
+        return _KnowledgeBaseChatResult(session_id=returned_session_id, answer=answer)
 
     async def _generate_title(self, prompt: str) -> str:
         response = await asyncio.to_thread(

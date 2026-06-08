@@ -3,15 +3,21 @@ from fastapi.responses import JSONResponse
 
 from src.application.exceptions import (
     ChatContinuationExpiredError,
+    RepositoryAccessError,
     RepositoryNotFoundError,
 )
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
 )
-from src.domain.exceptions.chat_exception import InvalidPromptError, PromptTooLongError
+from src.domain.exceptions.chat_exception import (
+    InvalidPromptError,
+    InvalidSessionIdError,
+    PromptTooLongError,
+)
 from src.domain.repositories.chat_command_repository_protocol import (
     ChatConflictError,
+    ChatLoadError,
     ChatNotFoundError,
     ChatSaveError,
 )
@@ -89,6 +95,16 @@ def register_exception_handlers(app: FastAPI) -> None:
             "プロンプトは1000文字以内で入力してください",
         )
 
+    @app.exception_handler(InvalidSessionIdError)
+    async def invalid_session_id_handler(
+        _: Request, __: InvalidSessionIdError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_502_BAD_GATEWAY,
+            "invalid_chat_generation_response",
+            "チャットの回答を生成できませんでした",
+        )
+
     @app.exception_handler(ChatGenerationUnavailableError)
     async def generation_unavailable_handler(
         _: Request, __: ChatGenerationUnavailableError
@@ -115,4 +131,15 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "chat_save_failed",
             "チャットを保存できませんでした",
+        )
+
+    @app.exception_handler(ChatLoadError)
+    @app.exception_handler(RepositoryAccessError)
+    async def repository_access_error_handler(
+        _: Request, __: ChatLoadError | RepositoryAccessError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "repository_unavailable",
+            "チャット情報を取得できませんでした",
         )

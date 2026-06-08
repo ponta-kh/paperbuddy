@@ -21,3 +21,22 @@ paperbuddy/
 ├── infra/            # AWSインフラ定義
 └── docs/             # アーキテクチャ・設計ドキュメント
 ```
+
+## ローカル開発
+
+初回のみ、ローカル用の環境変数ファイルを作成して値を設定する。
+
+```sh
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+フロントエンドとバックエンドは、リポジトリルートから次のコマンドで同時に起動する。
+
+```sh
+mise run dev
+```
+
+- フロントエンド: `http://localhost:5173`
+- バックエンドヘルスチェック: `http://localhost:8000/api/health`
+- フロントエンドからの `/api/*` リクエストは、Viteがバックエンドへプロキシする

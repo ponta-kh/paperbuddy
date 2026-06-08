@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
@@ -60,7 +61,7 @@ async def list_chats(
 
 @router.get("/{chat_id}/messages", response_model=ListChatMessagesResponse)
 async def list_chat_messages(
-    chat_id: str,
+    chat_id: UUID,
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[
         ListChatMessagesProtocol, Depends(get_list_chat_messages_use_case)
@@ -85,7 +86,7 @@ async def list_chat_messages(
 
 @router.post("/{chat_id}/messages", response_model=ContinueChatResponse)
 async def continue_chat(
-    chat_id: str,
+    chat_id: UUID,
     request: ContinueChatRequest,
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[ContinueChatProtocol, Depends(get_continue_chat_use_case)],

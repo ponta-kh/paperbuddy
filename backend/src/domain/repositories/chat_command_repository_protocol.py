@@ -8,6 +8,10 @@ class ChatSaveError(Exception):
     pass
 
 
+class ChatLoadError(Exception):
+    pass
+
+
 class ChatConflictError(Exception):
     pass
 
@@ -20,7 +24,7 @@ class ChatCommandRepositoryProtocol(Protocol):
     async def get_chat_for_continuation(
         self,
         *,
-        chat_id: str,
+        chat_id: UUID,
         user_id: UUID,
     ) -> Chat: ...
 

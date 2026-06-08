@@ -13,6 +13,8 @@ from src.infrastructure.repositories.chat.in_memory_chat_repository import (
     InMemoryChatRepository,
 )
 
+CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
+
 
 class StubGenerationClient:
     def __init__(self) -> None:
@@ -21,7 +23,7 @@ class StubGenerationClient:
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult:
         self.prompt = prompt
         return StartGeneratedChatResult(
-            chat_id="session-1", answer="answer", title="title"
+            session_id="session-1", answer="answer", title="title"
         )
 
 
@@ -35,7 +37,12 @@ async def test_start_chat_saves_chat_and_turn() -> None:
             datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc),
         ]
     )
-    use_case = StartChatUseCase(generation_client, repository, now=lambda: next(times))
+    use_case = StartChatUseCase(
+        generation_client,
+        repository,
+        now=lambda: next(times),
+        generate_chat_id=lambda: CHAT_ID,
+    )
 
     output = await use_case.execute(
         StartChatInput(
@@ -44,10 +51,11 @@ async def test_start_chat_saves_chat_and_turn() -> None:
     )
 
     assert generation_client.prompt == "question"
-    assert output.chat_id == "session-1"
+    assert output.chat_id == CHAT_ID
+    assert repository.chats[CHAT_ID].session_id == "session-1"
     assert (
-        repository.chats["session-1"].created_at
-        == repository.chats["session-1"].last_updated_at
+        repository.chats[CHAT_ID].created_at
+        == repository.chats[CHAT_ID].last_updated_at
     )
     assert len(repository.messages) == 2
     assert repository.messages[0].turn_id == repository.messages[1].turn_id

@@ -23,6 +23,7 @@ from src.infrastructure.repositories.chat.in_memory_chat_repository import (
 
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 
 
 class StubGenerationClient:
@@ -30,16 +31,17 @@ class StubGenerationClient:
         self.request: tuple[str, str] | None = None
 
     async def continue_chat(
-        self, chat_id: str, prompt: str
+        self, session_id: str, prompt: str
     ) -> ContinueGeneratedChatResult:
-        self.request = (chat_id, prompt)
-        return ContinueGeneratedChatResult(chat_id=chat_id, answer="new answer")
+        self.request = (session_id, prompt)
+        return ContinueGeneratedChatResult(session_id=session_id, answer="new answer")
 
 
 async def _started_repository(answered_at: datetime) -> InMemoryChatRepository:
     repository = InMemoryChatRepository()
     chat = Chat.create(
-        chat_id="session-1",
+        chat_id=CHAT_ID,
+        session_id="session-1",
         title="existing title",
         user_id=USER_ID,
         answered_at=answered_at,
@@ -48,14 +50,14 @@ async def _started_repository(answered_at: datetime) -> InMemoryChatRepository:
     await repository.save_started_chat(
         chat,
         ChatMessage(
-            "session-1",
+            CHAT_ID,
             turn_id,
             MessageSender.USER,
             Prompt("first question"),
             answered_at,
         ),
         ChatMessage(
-            "session-1",
+            CHAT_ID,
             turn_id,
             MessageSender.LLM,
             "first answer",
@@ -76,14 +78,14 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
     use_case = ContinueChatUseCase(client, repository, now=lambda: next(times))
 
     output = await use_case.execute(
-        ContinueChatInput(user_id=USER_ID, chat_id="session-1", prompt="  next  ")
+        ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="  next  ")
     )
 
     assert client.request == ("session-1", "next")
-    assert output.chat_id == "session-1"
+    assert output.chat_id == CHAT_ID
     assert output.answer == "new answer"
     assert output.title == "existing title"
-    assert repository.chats["session-1"].last_updated_at == answered_at
+    assert repository.chats[CHAT_ID].last_updated_at == answered_at
     assert len(repository.messages) == 4
     assert repository.messages[-2].turn_id == repository.messages[-1].turn_id
 
@@ -101,9 +103,9 @@ async def test_continue_chat_rejects_exactly_24_hours_without_side_effects() -> 
 
     with pytest.raises(ChatContinuationExpiredError):
         await use_case.execute(
-            ContinueChatInput(user_id=USER_ID, chat_id="session-1", prompt="next")
+            ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="next")
         )
 
     assert client.request is None
-    assert repository.chats["session-1"].last_updated_at == last_updated_at
+    assert repository.chats[CHAT_ID].last_updated_at == last_updated_at
     assert len(repository.messages) == 2

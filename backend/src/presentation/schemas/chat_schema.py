@@ -11,7 +11,7 @@ class StartChatRequest(BaseModel):
 
 
 class StartChatResponse(BaseModel):
-    chat_id: str
+    chat_id: UUID
     answer: str
     title: str
 
@@ -23,13 +23,13 @@ class ContinueChatRequest(BaseModel):
 
 
 class ContinueChatResponse(BaseModel):
-    chat_id: str
+    chat_id: UUID
     answer: str
     title: str
 
 
 class ChatSummaryResponse(BaseModel):
-    chat_id: str
+    chat_id: UUID
     title: str
     created_at: datetime
     last_updated_at: datetime
@@ -47,7 +47,7 @@ class ChatMessageResponse(BaseModel):
 
 
 class ListChatMessagesResponse(BaseModel):
-    chat_id: str
+    chat_id: UUID
     messages: list[ChatMessageResponse]
 
 

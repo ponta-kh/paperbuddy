@@ -1,3 +1,7 @@
+# 基本ルール
+日本語で回答してください
+コメントやdescriptionなども日本語で記入するようにお願いします
+
 # コマンド規約
 - Pythonパッケージ管理: `uv add` / `uv run` / `uv sync`（pip使用禁止）
 - Node.jsパッケージ管理: `pnpm add` / `pnpm install`（npm・yarn使用禁止）

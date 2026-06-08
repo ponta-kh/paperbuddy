@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from main import app
 from src.application.exceptions import (
     ChatContinuationExpiredError,
+    RepositoryAccessError,
     RepositoryNotFoundError,
 )
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
@@ -28,22 +29,23 @@ from src.dependencies.chat_deps import (
 )
 from src.domain.repositories.chat_command_repository_protocol import ChatConflictError
 
+CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
+CHAT_ID_TEXT = str(CHAT_ID)
+
 
 class StubStartChatUseCase:
     async def execute(self, command: object) -> StartChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.prompt == "question"
-        return StartChatOutput(chat_id="session-1", answer="answer", title="title")
+        return StartChatOutput(chat_id=CHAT_ID, answer="answer", title="title")
 
 
 class StubContinueChatUseCase:
     async def execute(self, command: object) -> ContinueChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
-        assert command.chat_id == "session-1"
+        assert command.chat_id == CHAT_ID
         assert command.prompt == "next question"
-        return ContinueChatOutput(
-            chat_id="session-1", answer="next answer", title="title"
-        )
+        return ContinueChatOutput(chat_id=CHAT_ID, answer="next answer", title="title")
 
 
 class StubExpiredContinueChatUseCase:
@@ -63,7 +65,7 @@ class StubListChatsUseCase:
         return ListChatsOutput(
             chats=(
                 ChatSummaryOutput(
-                    chat_id="session-1",
+                    chat_id=CHAT_ID,
                     title="title",
                     created_at=created_at,
                     last_updated_at=created_at,
@@ -75,9 +77,9 @@ class StubListChatsUseCase:
 class StubListChatMessagesUseCase:
     async def execute(self, query: object) -> ListChatMessagesOutput:
         assert query.user_id == UUID("00000000-0000-0000-0000-000000000001")
-        assert query.chat_id == "session-1"
+        assert query.chat_id == CHAT_ID
         return ListChatMessagesOutput(
-            chat_id="session-1",
+            chat_id=CHAT_ID,
             messages=(
                 ChatMessageOutput(
                     turn_id=UUID("00000000-0000-0000-0000-000000000010"),
@@ -94,12 +96,17 @@ class StubNotFoundListChatMessagesUseCase:
         raise RepositoryNotFoundError
 
 
+class StubUnavailableListChatsUseCase:
+    async def execute(self, query: object) -> ListChatsOutput:
+        raise RepositoryAccessError
+
+
 def test_list_chats_endpoint() -> None:
     app.dependency_overrides[get_list_chats_use_case] = lambda: StubListChatsUseCase()
     client = TestClient(app)
 
     response = client.get(
-        "/chats",
+        "/api/chats",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
@@ -108,13 +115,29 @@ def test_list_chats_endpoint() -> None:
     assert response.json() == {
         "chats": [
             {
-                "chat_id": "session-1",
+                "chat_id": CHAT_ID_TEXT,
                 "title": "title",
                 "created_at": "2026-01-01T00:00:00Z",
                 "last_updated_at": "2026-01-01T00:00:00Z",
             }
         ]
     }
+
+
+def test_list_chats_endpoint_returns_service_unavailable_for_repository_error() -> None:
+    app.dependency_overrides[get_list_chats_use_case] = lambda: (
+        StubUnavailableListChatsUseCase()
+    )
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/chats",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 503
+    assert response.json()["code"] == "repository_unavailable"
 
 
 def test_list_chat_messages_endpoint() -> None:
@@ -124,14 +147,14 @@ def test_list_chat_messages_endpoint() -> None:
     client = TestClient(app)
 
     response = client.get(
-        "/chats/session-1/messages",
+        f"/api/chats/{CHAT_ID_TEXT}/messages",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json() == {
-        "chat_id": "session-1",
+        "chat_id": CHAT_ID_TEXT,
         "messages": [
             {
                 "turn_id": "00000000-0000-0000-0000-000000000010",
@@ -150,7 +173,7 @@ def test_list_chat_messages_endpoint_returns_not_found() -> None:
     client = TestClient(app)
 
     response = client.get(
-        "/chats/missing/messages",
+        f"/api/chats/{CHAT_ID_TEXT}/messages",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
@@ -166,7 +189,7 @@ def test_continue_chat_endpoint() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/chats/session-1/messages",
+        f"/api/chats/{CHAT_ID_TEXT}/messages",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
@@ -174,7 +197,7 @@ def test_continue_chat_endpoint() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json() == {
-        "chat_id": "session-1",
+        "chat_id": CHAT_ID_TEXT,
         "answer": "next answer",
         "title": "title",
     }
@@ -187,7 +210,7 @@ def test_continue_chat_endpoint_returns_conflict_when_expired() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/chats/session-1/messages",
+        f"/api/chats/{CHAT_ID_TEXT}/messages",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
@@ -204,7 +227,7 @@ def test_continue_chat_endpoint_returns_conflict_when_stale() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/chats/session-1/messages",
+        f"/api/chats/{CHAT_ID_TEXT}/messages",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
@@ -219,7 +242,7 @@ def test_start_chat_endpoint() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/chats",
+        "/api/chats",
         headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "question"},
     )
@@ -227,7 +250,7 @@ def test_start_chat_endpoint() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json() == {
-        "chat_id": "session-1",
+        "chat_id": CHAT_ID_TEXT,
         "answer": "answer",
         "title": "title",
     }
@@ -236,7 +259,7 @@ def test_start_chat_endpoint() -> None:
 def test_start_chat_endpoint_rejects_missing_authentication() -> None:
     client = TestClient(app)
 
-    response = client.post("/chats", json={"prompt": "question"})
+    response = client.post("/api/chats", json={"prompt": "question"})
 
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_failed"

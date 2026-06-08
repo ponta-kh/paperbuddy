@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
@@ -23,10 +24,12 @@ class StartChatUseCase:
         chat_generation_client: ChatGenerationClientProtocol,
         chat_repository: ChatCommandRepositoryProtocol,
         now: Callable[[], datetime] | None = None,
+        generate_chat_id: Callable[[], UUID] | None = None,
     ) -> None:
         self._chat_generation_client = chat_generation_client
         self._chat_repository = chat_repository
         self._now = now or (lambda: datetime.now(timezone.utc))
+        self._generate_chat_id = generate_chat_id or uuid4
 
     async def execute(self, command: StartChatInput) -> StartChatOutput:
         prompt = Prompt(command.prompt)
@@ -36,7 +39,8 @@ class StartChatUseCase:
         answered_at = self._now()
 
         chat = Chat.create(
-            chat_id=generated.chat_id,
+            chat_id=self._generate_chat_id(),
+            session_id=generated.session_id,
             title=generated.title,
             user_id=command.user_id,
             answered_at=answered_at,
@@ -60,7 +64,7 @@ class StartChatUseCase:
 
         await self._chat_repository.save_started_chat(chat, user_message, llm_message)
         return StartChatOutput(
-            chat_id=generated.chat_id,
+            chat_id=chat.chat_id,
             answer=generated.answer,
             title=generated.title,
         )

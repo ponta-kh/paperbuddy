@@ -50,7 +50,7 @@
 | フィールド名 | 型・形式 | 説明 |
 | --- | --- | --- |
 | `chats` | `tuple[ChatSummaryOutput, ...]` | 最終更新日時の降順に並んだチャット一覧。対象なしの場合は空 |
-| `ChatSummaryOutput.chat_id` | `str` | チャット識別子 |
+| `ChatSummaryOutput.chat_id` | UUID | チャット識別子 |
 | `ChatSummaryOutput.title` | `str` | チャットタイトル |
 | `ChatSummaryOutput.created_at` | タイムゾーンを含む日時 | チャット作成日時 |
 | `ChatSummaryOutput.last_updated_at` | タイムゾーンを含む日時 | チャット最終更新日時 |
@@ -70,7 +70,7 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のある例外 |
 | --- | --- | --- | --- |
-| `ChatQueryRepositoryProtocol` | `list_chats_by_user_id` | ユーザー所有のチャット一覧を最終更新日時の降順で取得する | `RepositoryNotFoundError` |
+| `ChatQueryRepositoryProtocol` | `list_chats_by_user_id` | ユーザー所有のチャット一覧を最終更新日時の降順で取得する | `RepositoryNotFoundError`, `RepositoryAccessError` |
 
 ## 9. 基本フロー
 
@@ -100,7 +100,9 @@ flowchart TD
 
 ## 11. 異常系
 
-該当なし。対象チャットが存在しない場合は代替フローとして正常終了する。
+| 例外 | 発生条件 | 副作用・ロールバック | 呼び出し元への結果 |
+| --- | --- | --- | --- |
+| `RepositoryAccessError` | Repositoryの接続障害やサービス障害によりチャット一覧を取得できない | 状態を変更しない | 例外を送出する |
 
 ## 12. ビジネスルール
 
@@ -123,13 +125,13 @@ flowchart TD
 - 正常系: 1件および複数件のチャットが最終更新日時の降順で返される
 - 境界値: 0件、1件、複数件
 - 代替系: Repositoryの対象なしを空の一覧へ変換する
-- 異常系: 該当なし
+- 異常系: Repositoryの接続障害またはサービス障害
 - トランザクション: 状態が変更されない
 
 ## 16. 関連仕様書
 
 - ドメイン仕様書: `docs/backend/specification/chat/domain.md`
-- 外部接続仕様書: 該当なし。永続化方式は本仕様の対象外
+- 外部接続仕様書: `docs/backend/specification/integrations/dynamodb_chat_repository.md`
 
 ## 17. 未確定事項
 

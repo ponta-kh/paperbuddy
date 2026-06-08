@@ -50,7 +50,7 @@
 | フィールド名 | 型・形式 | 必須 | 制約・説明 |
 | --- | --- | --- | --- |
 | `user_id` | UUID | 必須 | 認証済みユーザーを識別する値 |
-| `chat_id` | `str` | 必須 | 継続対象チャットの識別子。空文字および空白文字のみは不可 |
+| `chat_id` | UUID | 必須 | 継続対象チャットの識別子 |
 | `prompt` | `str` | 必須 | `Prompt` Value Objectへ変換し、Domainルールに従って整形・検証する |
 
 ## 5. 出力
@@ -59,7 +59,7 @@
 
 | フィールド名 | 型・形式 | 説明 |
 | --- | --- | --- |
-| `chat_id` | `str` | 継続したチャットの識別子 |
+| `chat_id` | UUID | 継続したチャットの識別子 |
 | `answer` | `str` | チャット生成サービスが返した検証済みのAI回答 |
 | `title` | `str` | 継続対象チャットの既存タイトル |
 
@@ -79,7 +79,7 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のある例外 |
 | --- | --- | --- | --- |
-| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | 所有ユーザーに紐づく更新対象チャットを取得する | `ChatNotFoundError` |
+| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | 所有ユーザーに紐づく更新対象チャットを取得する | `ChatNotFoundError`, `ChatLoadError` |
 | `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答を取得する | `ChatGenerationUnavailableError`, `InvalidChatGenerationResponseError` |
 | `ChatCommandRepositoryProtocol` | `save_exchange` | 楽観排他を適用し、更新済みチャット本体と新しいユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError`, `ChatConflictError` |
 
@@ -89,7 +89,7 @@
 2. `ChatCommandRepositoryProtocol.get_chat_for_continuation`で認証済みユーザーに紐づく更新対象チャットを取得する。
 3. 現在日時と`Chat.last_updated_at`の差が24時間未満であることを確認する。[BR-01]
 4. ユーザーメッセージの発信日時を記録する。
-5. チャットIDと整形済みプロンプトを`ChatGenerationClientProtocol.continue_chat`へ渡す。
+5. 永続化済みのセッションIDと整形済みプロンプトを`ChatGenerationClientProtocol.continue_chat`へ渡す。
 6. 検証済み回答を受領した日時を正常回答日時として記録する。
 7. 同じチャットIDと新しいチャットターンIDを持つユーザー・LLMメッセージを生成する。
 8. `Chat.record_exchange`で発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
@@ -135,10 +135,11 @@ flowchart TD
 
 | 例外 | 発生条件 | 副作用・ロールバック | 呼び出し元への結果 |
 | --- | --- | --- | --- |
-| `ValidationError` | `chat_id`が空文字または空白文字のみ | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
+| `ValidationError` | `chat_id`がUUID形式ではない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `InvalidPromptError` | 整形後のプロンプトが空文字 | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `PromptTooLongError` | 整形後のプロンプトが1,000文字を超える | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatNotFoundError` | 指定チャットが存在しない、または認証済みユーザーが所有しない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
+| `ChatLoadError` | Repositoryの接続障害やサービス障害により更新対象チャットを取得できない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatContinuationExpiredError` | 最終更新日時から現在日時までが24時間以上 | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatGenerationUnavailableError` | チャット生成サービスから応答を取得できない | 永続化しない | 例外を送出する |
 | `InvalidChatGenerationResponseError` | チャット生成サービスから有効な回答を取得できない | 永続化しない | 例外を送出する |
@@ -156,7 +157,7 @@ flowchart TD
 ## 13. 副作用
 
 - 永続化: 正常回答後、更新済みチャット本体と新しいユーザー・LLMメッセージを保存する
-- 外部サービス: チャット生成サービスへチャットIDと整形済みプロンプトを渡して会話を継続する
+- 外部サービス: チャット生成サービスへセッションIDと整形済みプロンプトを渡して会話を継続する
 - イベント・通知: 該当なし
 
 ## 14. 受け入れ条件
@@ -179,6 +180,7 @@ flowchart TD
 ## 16. 関連仕様書
 
 - ドメイン仕様書: `docs/backend/specification/chat/domain.md`
+- 外部接続仕様書: `docs/backend/specification/integrations/dynamodb_chat_repository.md`
 - 外部接続仕様書: チャット生成サービスの接続仕様書は未作成
 
 ## 17. 未確定事項

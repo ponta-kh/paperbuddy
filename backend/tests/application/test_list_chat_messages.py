@@ -15,18 +15,19 @@ from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto im
 
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 
 
 class StubChatQueryRepository:
     def __init__(self, messages: tuple[ChatMessageRecord, ...] | None) -> None:
         self.messages = messages
-        self.received: tuple[UUID, str] | None = None
+        self.received: tuple[UUID, UUID] | None = None
 
     async def list_messages_by_chat_id(
         self,
         *,
         user_id: UUID,
-        chat_id: str,
+        chat_id: UUID,
     ) -> tuple[ChatMessageRecord, ...]:
         self.received = (user_id, chat_id)
         if self.messages is None:
@@ -43,11 +44,11 @@ async def test_list_chat_messages_returns_repository_results() -> None:
     )
 
     output = await ListChatMessagesUseCase(repository).execute(
-        ListChatMessagesInput(user_id=USER_ID, chat_id="chat-1")
+        ListChatMessagesInput(user_id=USER_ID, chat_id=CHAT_ID)
     )
 
-    assert repository.received == (USER_ID, "chat-1")
-    assert output.chat_id == "chat-1"
+    assert repository.received == (USER_ID, CHAT_ID)
+    assert output.chat_id == CHAT_ID
     assert output.messages[0].turn_id == turn_id
     assert output.messages[0].content == "question"
 
@@ -58,11 +59,11 @@ async def test_list_chat_messages_propagates_not_found() -> None:
 
     with pytest.raises(RepositoryNotFoundError):
         await ListChatMessagesUseCase(repository).execute(
-            ListChatMessagesInput(user_id=USER_ID, chat_id="chat-1")
+            ListChatMessagesInput(user_id=USER_ID, chat_id=CHAT_ID)
         )
 
 
-@pytest.mark.parametrize("chat_id", ["", " ", "\n\t"])
-def test_list_chat_messages_input_rejects_blank_chat_id(chat_id: str) -> None:
+@pytest.mark.parametrize("chat_id", ["", "not-a-uuid", 1])
+def test_list_chat_messages_input_rejects_invalid_chat_id(chat_id: object) -> None:
     with pytest.raises(ValidationError):
         ListChatMessagesInput(user_id=USER_ID, chat_id=chat_id)

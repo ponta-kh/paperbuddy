@@ -1,2 +1,16 @@
 [tools]
 node = "26.3.0"
+
+[tasks.dev]
+description = "Start the frontend and backend development servers"
+depends = ["dev:backend", "dev:frontend"]
+
+[tasks."dev:backend"]
+description = "Start the FastAPI development server"
+dir = "backend"
+run = "uv run uvicorn main:app --reload --env-file .env"
+
+[tasks."dev:frontend"]
+description = "Start the Vite development server"
+dir = "frontend"
+run = "pnpm dev"

@@ -43,7 +43,7 @@
 | フィールド名 | 型・形式 | 必須 | 制約・説明 |
 | --- | --- | --- | --- |
 | `user_id` | UUID | 必須 | 認証済みユーザーを識別する値 |
-| `chat_id` | `str` | 必須 | 取得対象チャットの識別子。空文字および空白文字のみは不可 |
+| `chat_id` | UUID | 必須 | 取得対象チャットの識別子 |
 
 ## 5. 出力
 
@@ -51,7 +51,7 @@
 
 | フィールド名 | 型・形式 | 説明 |
 | --- | --- | --- |
-| `chat_id` | `str` | 取得対象チャットの識別子 |
+| `chat_id` | UUID | 取得対象チャットの識別子 |
 | `messages` | `tuple[ChatMessageOutput, ...]` | 発信日時の昇順に並んだチャットメッセージ一覧 |
 | `ChatMessageOutput.turn_id` | UUID | ユーザー質問とLLM回答を関連付ける識別子 |
 | `ChatMessageOutput.sender` | `str` | メッセージ発信者 |
@@ -74,11 +74,11 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のある例外 |
 | --- | --- | --- | --- |
-| `ChatQueryRepositoryProtocol` | `list_messages_by_chat_id` | 認証済みユーザー所有の指定チャットからメッセージ一覧を発信日時の昇順で取得する | `RepositoryNotFoundError` |
+| `ChatQueryRepositoryProtocol` | `list_messages_by_chat_id` | 認証済みユーザー所有の指定チャットからメッセージ一覧を発信日時の昇順で取得する | `RepositoryNotFoundError`, `RepositoryAccessError` |
 
 ## 9. 基本フロー
 
-1. 入力されたチャットIDが空文字または空白文字のみではないことを検証する。
+1. 入力されたチャットIDがUUID形式であることを検証する。
 2. `ChatQueryRepositoryProtocol.list_messages_by_chat_id`へユーザーIDとチャットIDを渡す。
 3. 発信日時の昇順で取得されたメッセージ一覧を出力へ変換する。
 4. チャットIDとメッセージ一覧を返す。
@@ -107,8 +107,9 @@ flowchart TD
 
 | 例外 | 発生条件 | 副作用・ロールバック | 呼び出し元への結果 |
 | --- | --- | --- | --- |
-| `ValidationError` | `chat_id`が空文字または空白文字のみ | 状態を変更しない | 例外を送出する |
+| `ValidationError` | `chat_id`がUUID形式ではない | 状態を変更しない | 例外を送出する |
 | `RepositoryNotFoundError` | 指定チャットが存在しない、認証済みユーザーが所有しない、またはメッセージが存在しない | 状態を変更しない | 例外を送出する |
+| `RepositoryAccessError` | Repositoryの接続障害やサービス障害によりメッセージを取得できない | 状態を変更しない | 例外を送出する |
 
 ## 12. ビジネスルール
 
@@ -130,15 +131,15 @@ flowchart TD
 ## 15. テスト観点
 
 - 正常系: 初回1ターンおよび複数ターンのメッセージが発信日時の昇順で返される
-- 境界値: 空文字、空白文字のみ、1文字のチャットID
+- 境界値: 有効なUUID、空文字、不正なUUID形式
 - 代替系: 該当なし
-- 異常系: 対象チャットなし、他ユーザー所有、メッセージなし
+- 異常系: 対象チャットなし、他ユーザー所有、メッセージなし、Repositoryの接続障害またはサービス障害
 - トランザクション: 状態が変更されない
 
 ## 16. 関連仕様書
 
 - ドメイン仕様書: `docs/backend/specification/chat/domain.md`
-- 外部接続仕様書: 該当なし。永続化方式は本仕様の対象外
+- 外部接続仕様書: `docs/backend/specification/integrations/dynamodb_chat_repository.md`
 
 ## 17. 未確定事項
 

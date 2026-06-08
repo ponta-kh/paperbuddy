@@ -26,6 +26,17 @@ AWS_PROFILE=your-profile aws sts get-caller-identity
 
 Set the same profile name in `.env`.
 
+The default `CHAT_REPOSITORY_TYPE=in_memory` keeps local development
+self-contained. To use the persistent DynamoDB repository, set:
+
+```dotenv
+CHAT_REPOSITORY_TYPE=dynamodb
+DYNAMODB_CHAT_TABLE_NAME=your-chat-table-name
+```
+
+The DynamoDB table and `gsi1` key schema are defined in
+`docs/backend/specification/integrations/dynamodb_chat_repository.md`.
+
 ## Run on the Host
 
 ```sh
@@ -51,7 +62,7 @@ Start the backend, then create a chat. This calls both Knowledge Base
 
 ```sh
 curl --fail-with-body \
-  -X POST http://localhost:8000/chats \
+  -X POST http://localhost:8000/api/chats \
   -H 'Content-Type: application/json' \
   -H 'X-User-ID: 00000000-0000-0000-0000-000000000001' \
   -d '{"prompt":"このナレッジベースの内容を簡潔に説明してください"}'

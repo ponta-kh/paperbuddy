@@ -25,11 +25,22 @@ from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
 from src.infrastructure.repositories.chat.in_memory_chat_repository import (
     InMemoryChatRepository,
 )
+from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
+    DynamoDbChatRepository,
+)
 
 
 @lru_cache
-def get_chat_repository() -> InMemoryChatRepository:
-    return InMemoryChatRepository()
+def get_chat_repository() -> InMemoryChatRepository | DynamoDbChatRepository:
+    repository_type = os.getenv("CHAT_REPOSITORY_TYPE", "in_memory")
+    if repository_type == "in_memory":
+        return InMemoryChatRepository()
+    if repository_type == "dynamodb":
+        region = os.environ["AWS_REGION"]
+        table_name = os.environ["DYNAMODB_CHAT_TABLE_NAME"]
+        client = boto3.client("dynamodb", region_name=region)
+        return DynamoDbChatRepository(client, table_name=table_name)
+    raise ValueError(f"Unsupported CHAT_REPOSITORY_TYPE: {repository_type}")
 
 
 @lru_cache

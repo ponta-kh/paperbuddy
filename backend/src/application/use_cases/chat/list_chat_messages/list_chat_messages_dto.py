@@ -2,21 +2,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
 
 
 class ListChatMessagesInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     user_id: UUID
-    chat_id: str
-
-    @field_validator("chat_id")
-    @classmethod
-    def validate_chat_id(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("chat_id must not be blank")
-        return value
+    chat_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,5 +22,5 @@ class ChatMessageOutput:
 
 @dataclass(frozen=True, slots=True)
 class ListChatMessagesOutput:
-    chat_id: str
+    chat_id: UUID
     messages: tuple[ChatMessageOutput, ...]

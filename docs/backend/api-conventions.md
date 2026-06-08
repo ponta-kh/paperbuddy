@@ -9,8 +9,8 @@ HTTP API全体で共通して適用する外部公開形式を定義する。
 - URLの単語区切りにはハイフンを使用する
 
 ```text
-GET /chats/{chat_id}
-POST /chats
+GET /api/chats/{chat_id}
+POST /api/chats
 ```
 
 ## HTTPメソッド
