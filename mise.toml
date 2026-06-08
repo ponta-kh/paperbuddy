@@ -20,6 +20,22 @@ description = "Build the frontend for deployment"
 dir = "frontend"
 run = "pnpm build"
 
+[tasks."backend:test:domain"]
+description = "Test domain behavior and enforce 100 percent branch coverage"
+dir = "backend"
+run = "uv run pytest tests/domain --cov=src/domain --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tasks."backend:test:application"]
+description = "Test use cases with mocked output ports"
+dir = "backend"
+run = "uv run pytest tests/application --cov=src/application/use_cases --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tasks."backend:test"]
+description = "Run all backend tests after coverage gates"
+depends = ["backend:test:domain", "backend:test:application"]
+dir = "backend"
+run = "uv run pytest"
+
 [tasks."infra:synth"]
 description = "Synthesize the development AWS infrastructure"
 depends = ["frontend:build"]

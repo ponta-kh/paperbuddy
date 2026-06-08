@@ -19,3 +19,12 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+omit = [
+    "src/domain/repositories/*",
+]
+
+[tool.coverage.report]
+show_missing = true

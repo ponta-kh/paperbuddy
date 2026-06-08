@@ -14,6 +14,14 @@ def test_prompt_trims_general_whitespace() -> None:
     assert Prompt("\n\t　 hello 　\t").value == "hello"
 
 
+def test_prompt_accepts_one_character() -> None:
+    assert Prompt("a").value == "a"
+
+
+def test_prompt_accepts_999_characters() -> None:
+    assert len(Prompt("a" * 999).value) == 999
+
+
 def test_prompt_accepts_1000_characters() -> None:
     assert len(Prompt("a" * 1000).value) == 1000
 

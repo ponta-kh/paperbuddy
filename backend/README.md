@@ -74,3 +74,15 @@ Required permissions for the AWS identity include:
 - `bedrock:InvokeModel`
 
 The Bedrock Knowledge Base and model must be available in `AWS_REGION`.
+
+## Automated Tests
+
+Run the backend test suite with the domain and use-case coverage gates:
+
+```sh
+mise run backend:test
+```
+
+- `backend:test:domain` enforces 100% statement and branch coverage for executable Domain code.
+- `backend:test:application` tests use cases with output-port mocks and enforces 100% statement and branch coverage.
+- Repository Protocol declarations are excluded from runtime coverage because they contain no executable domain behavior.
