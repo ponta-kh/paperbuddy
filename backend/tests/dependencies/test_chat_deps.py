@@ -10,9 +10,6 @@ from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
     DynamoDbChatRepository,
 )
-from src.infrastructure.repositories.chat.in_memory_chat_repository import (
-    InMemoryChatRepository,
-)
 
 
 @pytest.fixture(autouse=True)
@@ -24,20 +21,9 @@ def clear_cached_dependencies() -> Iterator[None]:
     chat_deps.get_chat_generation_client.cache_clear()
 
 
-def test_get_chat_repository_defaults_to_in_memory(
+def test_get_chat_repository_uses_dynamodb(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("CHAT_REPOSITORY_TYPE", raising=False)
-
-    repository = chat_deps.get_chat_repository()
-
-    assert isinstance(repository, InMemoryChatRepository)
-
-
-def test_get_chat_repository_uses_dynamodb_environment(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CHAT_REPOSITORY_TYPE", "dynamodb")
     monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
     dynamodb_client = Mock()
@@ -53,22 +39,12 @@ def test_get_chat_repository_uses_dynamodb_environment(
     )
 
 
-def test_get_chat_repository_rejects_unknown_type(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CHAT_REPOSITORY_TYPE", "unknown")
-
-    with pytest.raises(ValueError, match="Unsupported CHAT_REPOSITORY_TYPE"):
-        chat_deps.get_chat_repository()
-
-
 @pytest.mark.parametrize("missing_name", ["AWS_REGION", "DYNAMODB_CHAT_TABLE_NAME"])
-def test_get_chat_repository_rejects_missing_dynamodb_environment(
+def test_get_chat_repository_rejects_missing_environment(
     monkeypatch: pytest.MonkeyPatch,
     missing_name: str,
 ) -> None:
     environment = {
-        "CHAT_REPOSITORY_TYPE": "dynamodb",
         "AWS_REGION": "ap-northeast-1",
         "DYNAMODB_CHAT_TABLE_NAME": "chat-table",
     }

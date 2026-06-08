@@ -40,3 +40,6 @@ mise run dev
 - フロントエンド: `http://localhost:5173`
 - バックエンドヘルスチェック: `http://localhost:8000/api/health`
 - フロントエンドからの `/api/*` リクエストは、Viteがバックエンドへプロキシする
+
+ローカルバックエンドもAWS上の開発用DynamoDBを使用する。初回構築とAWSデプロイの手順は
+`docs/infra/application.md`を参照する。

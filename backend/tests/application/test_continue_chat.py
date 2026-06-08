@@ -17,9 +17,7 @@ from src.domain.entities.chat.chat import Chat, ChatMessage
 from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
-from src.infrastructure.repositories.chat.in_memory_chat_repository import (
-    InMemoryChatRepository,
-)
+from tests.fakes.chat_repository import RecordingChatRepository
 
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -37,8 +35,8 @@ class StubGenerationClient:
         return ContinueGeneratedChatResult(session_id=session_id, answer="new answer")
 
 
-async def _started_repository(answered_at: datetime) -> InMemoryChatRepository:
-    repository = InMemoryChatRepository()
+async def _started_repository(answered_at: datetime) -> RecordingChatRepository:
+    repository = RecordingChatRepository()
     chat = Chat.create(
         chat_id=CHAT_ID,
         session_id="session-1",

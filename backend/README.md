@@ -26,15 +26,15 @@ AWS_PROFILE=your-profile aws sts get-caller-identity
 
 Set the same profile name in `.env`.
 
-The default `CHAT_REPOSITORY_TYPE=in_memory` keeps local development
-self-contained. To use the persistent DynamoDB repository, set:
+The local and deployed backends both use the persistent DynamoDB repository.
+Deploy the development table and set:
 
 ```dotenv
-CHAT_REPOSITORY_TYPE=dynamodb
-DYNAMODB_CHAT_TABLE_NAME=your-chat-table-name
+DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
 ```
 
-The DynamoDB table and `gsi1` key schema are defined in
+See `docs/infra/dynamodb.md` for deployment, authentication, and IAM
+requirements. The table and `gsi1` key schema are defined in
 `docs/backend/specification/integrations/dynamodb_chat_repository.md`.
 
 ## Run on the Host

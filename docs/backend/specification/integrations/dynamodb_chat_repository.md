@@ -18,7 +18,6 @@
 
 ### 対象外
 
-- テーブル、GSI、IAM権限などAWSインフラストラクチャの作成
 - API利用者がページ単位を指定するページネーション
 - チャットまたはメッセージの削除
 - DynamoDB Streamsを利用したイベント処理
@@ -41,6 +40,8 @@
 - 必要なIAM操作: テーブルに対する`dynamodb:GetItem`、`dynamodb:Query`、`dynamodb:TransactWriteItems`と、`gsi1`に対する`dynamodb:Query`
 
 テーブルは単一テーブル方式とし、以下のキーを持つ。
+
+開発環境のテーブル名は`paperbuddy-dev-chat`とする。CDKでオンデマンド課金、AWS管理暗号化、PITR、削除保護、保持ポリシーを設定する。
 
 `chat_id`は初回登録時にアプリケーションが採番したUUIDであり、Bedrockが返す識別子は`session_id`属性としてチャット本体に保存する。
 
@@ -122,7 +123,6 @@
 
 | 設定項目 | 必須 | 取得元 | 説明 |
 | --- | --- | --- | --- |
-| `CHAT_REPOSITORY_TYPE` | 任意 | 環境変数 | `in_memory`または`dynamodb`。未指定時は`in_memory` |
 | `DYNAMODB_CHAT_TABLE_NAME` | DynamoDB利用時は必須 | 環境変数 | チャットテーブル名 |
 | `AWS_REGION` | DynamoDB利用時は必須 | 環境変数 | DynamoDBクライアントのリージョン |
 | AWS認証情報 | 必須 | boto3標準認証情報プロバイダーチェーン | 実値をコードや環境ファイルへ保存しない |
@@ -151,4 +151,3 @@
 
 - チャット一覧とメッセージ履歴のページネーション方式
 - DynamoDBクライアントの接続・読み取りタイムアウト値
-- テーブルの課金モード、PITR、暗号化、削除保護、バックアップ方針

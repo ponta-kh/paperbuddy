@@ -9,9 +9,7 @@ from src.application.ports.out.chat_generation_client_protocol import (
 from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatInput
 from src.domain.value_objects.chat.message_sender import MessageSender
-from src.infrastructure.repositories.chat.in_memory_chat_repository import (
-    InMemoryChatRepository,
-)
+from tests.fakes.chat_repository import RecordingChatRepository
 
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 
@@ -30,7 +28,7 @@ class StubGenerationClient:
 @pytest.mark.asyncio
 async def test_start_chat_saves_chat_and_turn() -> None:
     generation_client = StubGenerationClient()
-    repository = InMemoryChatRepository()
+    repository = RecordingChatRepository()
     times = iter(
         [
             datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),

@@ -14,3 +14,25 @@ run = "uv run uvicorn main:app --reload --env-file .env"
 description = "Start the Vite development server"
 dir = "frontend"
 run = "pnpm dev"
+
+[tasks."frontend:build"]
+description = "Build the frontend for deployment"
+dir = "frontend"
+run = "pnpm build"
+
+[tasks."infra:synth"]
+description = "Synthesize the development AWS infrastructure"
+depends = ["frontend:build"]
+dir = "infra"
+run = "pnpm cdk synth PaperBuddyDev"
+
+[tasks."infra:test"]
+description = "Test the AWS infrastructure"
+dir = "infra"
+run = "pnpm test"
+
+[tasks."infra:deploy:dev"]
+description = "Deploy the development AWS infrastructure"
+depends = ["frontend:build"]
+dir = "infra"
+run = "pnpm cdk deploy PaperBuddyDev --parameters BedrockKnowledgeBaseId=$BEDROCK_KNOWLEDGE_BASE_ID --parameters BedrockModelArn=$BEDROCK_MODEL_ARN"
