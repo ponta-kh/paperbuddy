@@ -11,11 +11,11 @@ from src.application.ports.input.chat.list_chats_protocol import ListChatsProtoc
 from src.application.ports.input.chat.start_chat_protocol import (
     StartChatProtocol,
 )
-from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
-    ListChatMessagesInput,
-)
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
     ContinueChatInput,
+)
+from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
+    ListChatMessagesInput,
 )
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatInput

@@ -11,7 +11,9 @@ def test_rejects_negative_delay() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_chat_returns_local_session_title_and_300_character_answer() -> None:
+async def test_start_chat_returns_local_session_title_and_300_character_answer() -> (
+    None
+):
     client = SimulatedChatGenerationClient(delay_seconds=0)
 
     result = await client.start_chat("ローカル検証用の質問です")

@@ -6,7 +6,7 @@
         "useIgnoreFile": true
     },
     "files": {
-        "includes": ["**", "!!**/dist"]
+        "includes": ["**", "!!**/cdk.out"]
     },
     "formatter": {
         "enabled": true,
@@ -25,29 +25,6 @@
             "semicolons": "always"
         }
     },
-    "css": {
-        "parser": {
-            "tailwindDirectives": true
-        }
-    },
-    "overrides": [
-        {
-            "includes": ["src/components/shadcn/**"],
-            "formatter": {
-                "enabled": false
-            },
-            "linter": {
-                "rules": {
-                    "style": {
-                        "useImportType": "off"
-                    }
-                }
-            },
-            "assist": {
-                "enabled": false
-            }
-        }
-    ],
     "assist": {
         "enabled": true,
         "actions": {

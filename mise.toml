@@ -39,6 +39,26 @@ description = "フロントエンドをテストする"
 dir = "frontend"
 run = "pnpm test"
 
+[tasks."frontend:lint"]
+description = "フロントエンドをLintする"
+dir = "frontend"
+run = "pnpm lint"
+
+[tasks."frontend:format"]
+description = "フロントエンドをフォーマットする"
+dir = "frontend"
+run = "pnpm format"
+
+[tasks."backend:lint"]
+description = "バックエンドをLintする"
+dir = "backend"
+run = "uv run ruff check . && uv run ruff format --check ."
+
+[tasks."backend:format"]
+description = "バックエンドをフォーマットする"
+dir = "backend"
+run = "uv run ruff check --fix . && uv run ruff format ."
+
 [tasks."backend:test:domain"]
 description = "Test domain behavior and enforce 100 percent branch coverage"
 dir = "backend"
@@ -65,6 +85,24 @@ run = "pnpm cdk synth PaperBuddyDev"
 description = "Test the AWS infrastructure"
 dir = "infra"
 run = "pnpm test"
+
+[tasks."infra:lint"]
+description = "AWSインフラストラクチャをLintする"
+dir = "infra"
+run = "pnpm lint"
+
+[tasks."infra:format"]
+description = "AWSインフラストラクチャをフォーマットする"
+dir = "infra"
+run = "pnpm format"
+
+[tasks.lint]
+description = "すべてのソースコードをLintする"
+depends = ["frontend:lint", "backend:lint", "infra:lint"]
+
+[tasks.format]
+description = "すべてのソースコードをフォーマットする"
+depends = ["frontend:format", "backend:format", "infra:format"]
 
 [tasks."infra:deploy:dev"]
 description = "Deploy the development AWS infrastructure"

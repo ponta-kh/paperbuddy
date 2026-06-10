@@ -13,7 +13,6 @@ from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto im
     ListChatMessagesInput,
 )
 
-
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 

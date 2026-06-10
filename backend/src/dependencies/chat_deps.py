@@ -2,10 +2,10 @@ from functools import lru_cache
 
 import boto3
 
+from src.application.ports.input.chat.continue_chat_protocol import ContinueChatProtocol
 from src.application.ports.input.chat.list_chat_messages_protocol import (
     ListChatMessagesProtocol,
 )
-from src.application.ports.input.chat.continue_chat_protocol import ContinueChatProtocol
 from src.application.ports.input.chat.list_chats_protocol import ListChatsProtocol
 from src.application.ports.input.chat.start_chat_protocol import (
     StartChatProtocol,
@@ -13,14 +13,15 @@ from src.application.ports.input.chat.start_chat_protocol import (
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
 )
-from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
-    ListChatMessagesUseCase,
-)
 from src.application.use_cases.chat.continue_chat.continue_chat import (
     ContinueChatUseCase,
 )
+from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
+    ListChatMessagesUseCase,
+)
 from src.application.use_cases.chat.list_chats.list_chats import ListChatsUseCase
 from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
+from src.dependencies.settings import ChatInfrastructureMode, get_settings
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
 )
@@ -30,7 +31,6 @@ from src.infrastructure.llm.simulated_chat_generation_client import (
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
     DynamoDbChatRepository,
 )
-from src.dependencies.settings import ChatInfrastructureMode, get_settings
 
 
 @lru_cache

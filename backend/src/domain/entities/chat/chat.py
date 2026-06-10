@@ -4,9 +4,9 @@ from uuid import UUID
 
 from src.domain.exceptions.chat_exception import (
     InvalidChatIdError,
-    InvalidSessionIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
+    InvalidSessionIdError,
     MessageSentAtOutOfOrderError,
 )
 from src.domain.value_objects.chat.chat_turn_id import ChatTurnId

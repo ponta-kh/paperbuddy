@@ -8,7 +8,6 @@ from src.application.ports.out.chat import ChatSummary
 from src.application.use_cases.chat.list_chats.list_chats import ListChatsUseCase
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
 
-
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 
