@@ -1,5 +1,7 @@
 # Application Deployment
 
+ネットワーク構成図は[network.md](network.md)を参照する。
+
 ## 構成
 
 CloudFrontをすべての公開トラフィックの唯一の入口とする。
@@ -9,16 +11,23 @@ Browser
   -> CloudFront
        -> default: private S3 bucket
        -> /api/*: CloudFront VPC Origin -> internal ALB -> ECS Fargate
-                                                        -> DynamoDB
-                                                        -> Amazon Bedrock
+                                                        -> Gateway VPC Endpoints
+                                                           -> S3 / DynamoDB
+                                                        -> Interface VPC Endpoints
+                                                           -> ECR / CloudWatch Logs / Amazon Bedrock
+
+RAG source PDF -> private S3 bucket
 ```
 
 - フロントエンド: 非公開S3バケットへ配置し、CloudFront Origin Access Control経由だけで配信する
 - バックエンド: プライベートサブネットのECS Fargateで起動する
 - ALB: 内部向けとしてプライベートサブネットに配置する
 - CloudFront: `/api/*`をキャッシュせず、VPC Origin経由でALBへ転送する
-- VPC: 2 Availability Zone、NAT Gateway 1台
+- VPC: 2 Availability Zoneの隔離サブネット。NAT GatewayとInternet Gatewayは作成しない
+- AWSサービス接続: S3・DynamoDBのGateway Endpointと、ECR・CloudWatch Logs・BedrockのInterface Endpointを使用する
 - 永続化: 開発用DynamoDBテーブル`paperbuddy-dev-chat`
+- ライブラリ一覧: 開発用DynamoDBテーブル`paperbuddy-dev-library`
+- RAG材料: 非公開S3バケットへPDFを配置する。Bedrock Knowledge Baseとの接続は後続実装とする
 
 固定AWSアクセスキーは使用しない。ローカルのCDK実行はAWS Profile、Fargateはタスクロールを使用する。
 
@@ -70,7 +79,8 @@ ECSタスクへ`AWS_PROFILE`や固定AWSアクセスキーは設定しない。
 
 ## 注意事項
 
-- NAT Gateway、ALB、Fargate、CloudFront、DynamoDBなどのAWS利用料金が発生する。
+- Interface VPC Endpoint、ALB、Fargate、CloudFront、DynamoDBなどのAWS利用料金が発生する。
 - DynamoDBは削除保護と保持ポリシーを有効にしているため、スタック削除だけでは削除されない。
 - S3バケットも保持ポリシーを設定しているため、スタック削除後も残る。
+- RAG材料用S3バケットはバージョニングを有効にしている。
 - 現時点では独自ドメインとACM証明書は設定していないため、CloudFront標準ドメインを使用する。

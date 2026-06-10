@@ -57,8 +57,24 @@ describe("InfraStack", () => {
         });
     });
 
-    test("creates private frontend and backend origins", () => {
-        template.hasResourceProperties("AWS::S3::Bucket", {
+    test("保護されたライブラリテーブルを作成する", () => {
+        template.hasResourceProperties("AWS::DynamoDB::Table", {
+            TableName: "paperbuddy-dev-library",
+            BillingMode: "PAY_PER_REQUEST",
+            DeletionProtectionEnabled: true,
+            PointInTimeRecoverySpecification: {
+                PointInTimeRecoveryEnabled: true,
+            },
+            KeySchema: [
+                { AttributeName: "pk", KeyType: "HASH" },
+                { AttributeName: "sk", KeyType: "RANGE" },
+            ],
+        });
+    });
+
+    test("非公開のフロントエンドバケットとRAG材料バケットを作成する", () => {
+        template.resourceCountIs("AWS::S3::Bucket", 2);
+        template.allResourcesProperties("AWS::S3::Bucket", {
             BucketEncryption: {
                 ServerSideEncryptionConfiguration: Match.anyValue(),
             },
@@ -69,6 +85,14 @@ describe("InfraStack", () => {
                 RestrictPublicBuckets: true,
             },
         });
+        template.hasResourceProperties("AWS::S3::Bucket", {
+            VersioningConfiguration: {
+                Status: "Enabled",
+            },
+        });
+    });
+
+    test("creates private frontend and backend origins", () => {
         template.hasResourceProperties(
             "AWS::ElasticLoadBalancingV2::LoadBalancer",
             {
@@ -130,6 +154,45 @@ describe("InfraStack", () => {
             Name: "CHAT_INFRASTRUCTURE_MODE",
             Value: "aws",
         });
+        expect(environments).toContainEqual({
+            Name: "DYNAMODB_LIBRARY_TABLE_NAME",
+            Value: expect.objectContaining({
+                Ref: expect.stringMatching("LibraryTable"),
+            }),
+        });
+    });
+
+    test("NATとインターネット接続を作成せずVPC Endpointを使用する", () => {
+        template.resourceCountIs("AWS::EC2::NatGateway", 0);
+        template.resourceCountIs("AWS::EC2::EIP", 0);
+        template.resourceCountIs("AWS::EC2::InternetGateway", 0);
+        template.resourceCountIs("AWS::EC2::VPCGatewayAttachment", 0);
+        template.resourceCountIs("AWS::EC2::VPCEndpoint", 7);
+
+        const routes = template.findResources("AWS::EC2::Route");
+        expect(Object.values(routes)).not.toContainEqual(
+            expect.objectContaining({
+                Properties: expect.objectContaining({
+                    DestinationCidrBlock: "0.0.0.0/0",
+                }),
+            }),
+        );
+
+        const endpoints = template.findResources("AWS::EC2::VPCEndpoint");
+        const serviceNameSuffixes = Object.values(endpoints).map((endpoint) =>
+            endpoint.Properties?.ServiceName?.["Fn::Join"]?.[1]?.at(-1),
+        );
+        expect(serviceNameSuffixes).toEqual(
+            expect.arrayContaining([
+                ".s3",
+                ".dynamodb",
+                ".ecr.api",
+                ".ecr.dkr",
+                ".logs",
+                ".bedrock-agent-runtime",
+                ".bedrock-runtime",
+            ]),
+        );
     });
 
     test("routes frontend and api traffic through CloudFront", () => {
@@ -155,6 +218,10 @@ describe("InfraStack", () => {
         template.hasResourceProperties("AWS::IAM::Policy", {
             PolicyDocument: {
                 Statement: Match.arrayWith([
+                    Match.objectLike({
+                        Action: "dynamodb:Scan",
+                        Effect: "Allow",
+                    }),
                     Match.objectLike({
                         Action: Match.arrayWith([
                             "dynamodb:GetItem",

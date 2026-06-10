@@ -59,6 +59,33 @@ export class InfraStack extends cdk.Stack {
             ],
         });
 
+        const libraryTable = new dynamodb.Table(this, "LibraryTable", {
+            tableName: `paperbuddy-${props.stageName}-library`,
+            partitionKey: {
+                name: "pk",
+                type: dynamodb.AttributeType.STRING,
+            },
+            sortKey: {
+                name: "sk",
+                type: dynamodb.AttributeType.STRING,
+            },
+            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption: dynamodb.TableEncryption.AWS_MANAGED,
+            pointInTimeRecoverySpecification: {
+                pointInTimeRecoveryEnabled: true,
+            },
+            deletionProtection: true,
+            removalPolicy: cdk.RemovalPolicy.RETAIN,
+        });
+
+        const ragSourceBucket = new s3.Bucket(this, "RagSourceBucket", {
+            blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+            encryption: s3.BucketEncryption.S3_MANAGED,
+            enforceSSL: true,
+            versioned: true,
+            removalPolicy: cdk.RemovalPolicy.RETAIN,
+        });
+
         const knowledgeBaseId = new cdk.CfnParameter(
             this,
             "BedrockKnowledgeBaseId",
@@ -74,16 +101,11 @@ export class InfraStack extends cdk.Stack {
 
         const vpc = new ec2.Vpc(this, "Vpc", {
             maxAzs: 2,
-            natGateways: 1,
+            natGateways: 0,
             subnetConfiguration: [
                 {
-                    name: "Public",
-                    subnetType: ec2.SubnetType.PUBLIC,
-                    cidrMask: 24,
-                },
-                {
                     name: "Application",
-                    subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
                     cidrMask: 24,
                 },
             ],
@@ -103,7 +125,7 @@ export class InfraStack extends cdk.Stack {
                     openListener: false,
                     assignPublicIp: false,
                     taskSubnets: {
-                        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
                     },
                     cpu: 512,
                     memoryLimitMiB: 1024,
@@ -123,6 +145,7 @@ export class InfraStack extends cdk.Stack {
                             CHAT_INFRASTRUCTURE_MODE: "aws",
                             AWS_REGION: this.region,
                             DYNAMODB_CHAT_TABLE_NAME: chatTable.tableName,
+                            DYNAMODB_LIBRARY_TABLE_NAME: libraryTable.tableName,
                             BEDROCK_KNOWLEDGE_BASE_ID:
                                 knowledgeBaseId.valueAsString,
                             BEDROCK_MODEL_ARN: modelArn.valueAsString,
@@ -140,6 +163,61 @@ export class InfraStack extends cdk.Stack {
             "Allow CloudFront VPC origin traffic inside the VPC",
         );
 
+        const endpointSecurityGroup = new ec2.SecurityGroup(
+            this,
+            "VpcEndpointSecurityGroup",
+            {
+                vpc,
+                allowAllOutbound: false,
+                description:
+                    "Allow HTTPS from the backend service to VPC endpoints",
+            },
+        );
+        endpointSecurityGroup.connections.allowFrom(
+            backendService.service,
+            ec2.Port.tcp(443),
+            "Allow backend HTTPS traffic",
+        );
+
+        const endpointSubnets = {
+            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        };
+        const gatewayEndpoints = [
+            vpc.addGatewayEndpoint("S3Endpoint", {
+                service: ec2.GatewayVpcEndpointAwsService.S3,
+                subnets: [endpointSubnets],
+            }),
+            vpc.addGatewayEndpoint("DynamoDbEndpoint", {
+                service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
+                subnets: [endpointSubnets],
+            }),
+        ];
+        const interfaceEndpointServices = [
+            ec2.InterfaceVpcEndpointAwsService.ECR,
+            ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+            ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+            ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT_RUNTIME,
+            ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
+        ];
+        const interfaceEndpoints = interfaceEndpointServices.map(
+            (service, index) =>
+                vpc.addInterfaceEndpoint(`InterfaceEndpoint${index}`, {
+                    service,
+                    subnets: endpointSubnets,
+                    securityGroups: [endpointSecurityGroup],
+                }),
+        );
+        backendService.service.node.addDependency(
+            ...gatewayEndpoints,
+            ...interfaceEndpoints,
+        );
+
+        backendService.taskDefinition.taskRole.addToPrincipalPolicy(
+            new iam.PolicyStatement({
+                actions: ["dynamodb:Scan"],
+                resources: [libraryTable.tableArn],
+            }),
+        );
         backendService.taskDefinition.taskRole.addToPrincipalPolicy(
             new iam.PolicyStatement({
                 actions: [
@@ -229,8 +307,20 @@ export class InfraStack extends cdk.Stack {
         new cdk.CfnOutput(this, "ChatTableArn", {
             value: chatTable.tableArn,
         });
+        new cdk.CfnOutput(this, "LibraryTableName", {
+            value: libraryTable.tableName,
+        });
+        new cdk.CfnOutput(this, "LibraryTableArn", {
+            value: libraryTable.tableArn,
+        });
         new cdk.CfnOutput(this, "FrontendBucketName", {
             value: frontendBucket.bucketName,
+        });
+        new cdk.CfnOutput(this, "RagSourceBucketName", {
+            value: ragSourceBucket.bucketName,
+        });
+        new cdk.CfnOutput(this, "RagSourceBucketArn", {
+            value: ragSourceBucket.bucketArn,
         });
         new cdk.CfnOutput(this, "DistributionDomainName", {
             value: distribution.distributionDomainName,
