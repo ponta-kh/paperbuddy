@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib/core';
 import { Match, Template } from 'aws-cdk-lib/assertions';
+import { describe, expect, test } from 'vitest';
 import { InfraStack } from '../lib/infra-stack';
 
 describe('InfraStack', () => {
@@ -92,7 +93,6 @@ describe('InfraStack', () => {
         }),
       },
     });
-
     const securityGroups = template.findResources('AWS::EC2::SecurityGroup');
     const ingressRules = Object.values(securityGroups).flatMap(
       (resource) => resource.Properties?.SecurityGroupIngress ?? [],
@@ -104,6 +104,17 @@ describe('InfraStack', () => {
         ToPort: 80,
       }),
     );
+
+    const taskDefinitions = template.findResources('AWS::ECS::TaskDefinition');
+    const environments = Object.values(taskDefinitions).flatMap((resource) =>
+      (resource.Properties?.ContainerDefinitions ?? []).flatMap(
+        (container: { Environment?: unknown[] }) => container.Environment ?? [],
+      ),
+    );
+    expect(environments).toContainEqual({
+      Name: 'CHAT_INFRASTRUCTURE_MODE',
+      Value: 'aws',
+    });
   });
 
   test('routes frontend and api traffic through CloudFront', () => {

@@ -34,6 +34,11 @@ description = "Build the frontend for deployment"
 dir = "frontend"
 run = "pnpm build"
 
+[tasks."frontend:test"]
+description = "フロントエンドをテストする"
+dir = "frontend"
+run = "pnpm test"
+
 [tasks."backend:test:domain"]
 description = "Test domain behavior and enforce 100 percent branch coverage"
 dir = "backend"

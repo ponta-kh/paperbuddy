@@ -109,6 +109,7 @@ export class InfraStack extends cdk.Stack {
           ),
           containerPort: 8000,
           environment: {
+            CHAT_INFRASTRUCTURE_MODE: 'aws',
             AWS_REGION: this.region,
             DYNAMODB_CHAT_TABLE_NAME: chatTable.tableName,
             BEDROCK_KNOWLEDGE_BASE_ID: knowledgeBaseId.valueAsString,
