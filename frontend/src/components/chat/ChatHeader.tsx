@@ -105,28 +105,37 @@ export function ChatHeader({
                     <TooltipContent>サイドバーを切り替える</TooltipContent>
                 </Tooltip>
 
-                <Separator orientation="vertical" className="mx-1 h-5" />
+                {selectedChatId && (
+                    <>
+                        <Separator
+                            orientation="vertical"
+                            className="mx-1 h-5"
+                        />
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            className="gap-2 rounded-lg px-2 text-[13px] font-medium text-[#344a42]"
-                        >
-                            <span className="max-w-44 truncate sm:max-w-none">
-                                {title ?? "新しいチャット"}
-                            </span>
-                            <ChevronDown className="size-3.5 text-[#809089]" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-52">
-                        <DropdownMenuItem>タイトルを変更</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                            チャットを削除
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="gap-2 rounded-lg px-2 text-[13px] font-medium text-[#344a42]"
+                                >
+                                    <span className="max-w-44 truncate sm:max-w-none">
+                                        {title ?? "新しいチャット"}
+                                    </span>
+                                    <ChevronDown className="size-3.5 text-[#809089]" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-52">
+                                <DropdownMenuItem>
+                                    タイトルを変更
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive">
+                                    チャットを削除
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </>
+                )}
             </div>
 
             <LibraryHeaderActions />
