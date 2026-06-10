@@ -182,7 +182,8 @@ export function ChatActionsMenu({
                     <AlertDialogHeader>
                         <AlertDialogTitle>チャットを削除</AlertDialogTitle>
                         <AlertDialogDescription>
-                            「{title}」を削除します。<br />
+                            「{title}」を削除します。
+                            <br />
                             この操作は取り消せません。
                         </AlertDialogDescription>
                     </AlertDialogHeader>
