@@ -55,6 +55,32 @@ production Docker image still runs as a non-root user.
 docker compose up --build
 ```
 
+## ローカル全体動作確認
+
+実AWSへ接続せずに画面から一連のチャット操作を確認する場合は、リポジトリルートで
+以下を実行する。
+
+```sh
+mise run dev:local
+```
+
+- バックエンド: `http://localhost:8000`
+- フロントエンド: `http://localhost:5173`
+- DB: DynamoDB Localコンテナ。データはDocker Volumeへ保存する
+- LLM: 既定で2秒待機し、300文字の疑似回答を返す
+- 初期データ: 今日2件、過去7日間3件、1週間以上前6件の会話履歴
+
+`CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用Infrastructureを注入する。
+通常起動およびAWSデプロイでは、既存のDynamoDB・Bedrock実装を使用する。
+
+バックエンドとDynamoDB Localを停止する場合は以下を実行する。
+
+```sh
+docker compose -f backend/compose.local.yaml down
+```
+
+DynamoDB Localの保存データも初期化する場合は、`--volumes`を追加する。
+
 ## Test the Bedrock Connection
 
 Start the backend, then create a chat. This calls both Knowledge Base

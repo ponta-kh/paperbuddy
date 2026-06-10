@@ -11,6 +11,9 @@ from src.application.ports.input.chat.list_chats_protocol import ListChatsProtoc
 from src.application.ports.input.chat.start_chat_protocol import (
     StartChatProtocol,
 )
+from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationClientProtocol,
+)
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages import (
     ListChatMessagesUseCase,
 )
@@ -22,16 +25,33 @@ from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCas
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
 )
+from src.infrastructure.llm.simulated_chat_generation_client import (
+    SimulatedChatGenerationClient,
+)
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
     DynamoDbChatRepository,
 )
+
+
+_AWS_MODE = "aws"
+_LOCAL_MODE = "local"
+
+
+def _infrastructure_mode() -> str:
+    mode = os.environ.get("CHAT_INFRASTRUCTURE_MODE", _AWS_MODE)
+    if mode not in {_AWS_MODE, _LOCAL_MODE}:
+        raise ValueError(f"Unsupported CHAT_INFRASTRUCTURE_MODE: {mode}")
+    return mode
 
 
 @lru_cache
 def get_chat_repository() -> DynamoDbChatRepository:
     region = os.environ["AWS_REGION"]
     table_name = os.environ["DYNAMODB_CHAT_TABLE_NAME"]
-    client = boto3.client("dynamodb", region_name=region)
+    client_options: dict[str, str] = {"region_name": region}
+    if _infrastructure_mode() == _LOCAL_MODE:
+        client_options["endpoint_url"] = os.environ["DYNAMODB_ENDPOINT_URL"]
+    client = boto3.client("dynamodb", **client_options)
     return DynamoDbChatRepository(client, table_name=table_name)
 
 
@@ -46,7 +66,11 @@ def get_list_chat_messages_use_case() -> ListChatMessagesProtocol:
 
 
 @lru_cache
-def get_chat_generation_client() -> BedrockKnowledgeBaseChatClient:
+def get_chat_generation_client() -> ChatGenerationClientProtocol:
+    if _infrastructure_mode() == _LOCAL_MODE:
+        delay_seconds = float(os.environ.get("SIMULATED_LLM_DELAY_SECONDS", "2"))
+        return SimulatedChatGenerationClient(delay_seconds=delay_seconds)
+
     region = os.environ["AWS_REGION"]
     knowledge_base_id = os.environ["BEDROCK_KNOWLEDGE_BASE_ID"]
     model_arn = os.environ["BEDROCK_MODEL_ARN"]

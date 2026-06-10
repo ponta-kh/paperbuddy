@@ -7,6 +7,9 @@ from src.dependencies import chat_deps
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
 )
+from src.infrastructure.llm.simulated_chat_generation_client import (
+    SimulatedChatGenerationClient,
+)
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
     DynamoDbChatRepository,
 )
@@ -36,6 +39,29 @@ def test_get_chat_repository_uses_dynamodb(
     assert client_factory.call_args == (
         ("dynamodb",),
         {"region_name": "ap-northeast-1"},
+    )
+
+
+def test_get_chat_repository_uses_dynamodb_local_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "local")
+    monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
+    monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+    monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
+    dynamodb_client = Mock()
+    client_factory = Mock(return_value=dynamodb_client)
+    monkeypatch.setattr(chat_deps.boto3, "client", client_factory)
+
+    repository = chat_deps.get_chat_repository()
+
+    assert isinstance(repository, DynamoDbChatRepository)
+    assert client_factory.call_args == (
+        ("dynamodb",),
+        {
+            "region_name": "ap-northeast-1",
+            "endpoint_url": "http://dynamodb-local:8000",
+        },
     )
 
 
@@ -74,6 +100,28 @@ def test_get_chat_generation_client_uses_bedrock_environment(
         (("bedrock-agent-runtime",), {"region_name": "ap-northeast-1"}),
         (("bedrock-runtime",), {"region_name": "ap-northeast-1"}),
     ]
+
+
+def test_get_chat_generation_client_uses_simulated_client_locally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "local")
+    monkeypatch.setenv("SIMULATED_LLM_DELAY_SECONDS", "0")
+
+    client = chat_deps.get_chat_generation_client()
+
+    assert isinstance(client, SimulatedChatGenerationClient)
+
+
+def test_rejects_unknown_infrastructure_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "unknown")
+    monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
+    monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+
+    with pytest.raises(ValueError, match="Unsupported CHAT_INFRASTRUCTURE_MODE"):
+        chat_deps.get_chat_repository()
 
 
 @pytest.mark.parametrize(

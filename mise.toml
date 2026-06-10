@@ -5,6 +5,20 @@ node = "26.3.0"
 description = "Start the frontend and backend development servers"
 depends = ["dev:backend", "dev:frontend"]
 
+[tasks."dev:local"]
+description = "ローカル検証用のフロントエンドとバックエンドを起動する"
+depends = ["dev:local:backend", "dev:local:frontend"]
+
+[tasks."dev:local:backend"]
+description = "DynamoDB Localと疑似LLMを使用するバックエンドを起動する"
+dir = "backend"
+run = "docker compose -f compose.local.yaml up --build"
+
+[tasks."dev:local:frontend"]
+description = "固定の検証ユーザーIDでフロントエンドを起動する"
+dir = "frontend"
+run = "VITE_USER_ID=00000000-0000-0000-0000-000000000001 pnpm dev"
+
 [tasks."dev:backend"]
 description = "Start the FastAPI development server"
 dir = "backend"
