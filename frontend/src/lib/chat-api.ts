@@ -43,6 +43,11 @@ type SendPromptResponse = {
     title: string;
 };
 
+type RenameChatResponse = {
+    chat_id: string;
+    title: string;
+};
+
 function getHeaders(includeContentType = false): Record<string, string> {
     if (!USER_ID) {
         throw new Error("VITE_USER_ID is not configured");
@@ -75,6 +80,23 @@ async function postJson<TResponse, TBody>(
 ): Promise<TResponse> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
+        headers: getHeaders(true),
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+    }
+
+    return response.json() as Promise<TResponse>;
+}
+
+async function patchJson<TResponse, TBody>(
+    path: string,
+    body: TBody,
+): Promise<TResponse> {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+        method: "PATCH",
         headers: getHeaders(true),
         body: JSON.stringify(body),
     });
@@ -140,4 +162,25 @@ export async function sendPrompt(
     );
 
     return response.chat_id;
+}
+
+export async function renameChat(chatId: string, title: string): Promise<void> {
+    await patchJson<RenameChatResponse, { title: string }>(
+        `/chats/${encodeURIComponent(chatId)}`,
+        { title },
+    );
+}
+
+export async function deleteChat(chatId: string): Promise<void> {
+    const response = await fetch(
+        `${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`,
+        {
+            method: "DELETE",
+            headers: getHeaders(),
+        },
+    );
+
+    if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+    }
 }

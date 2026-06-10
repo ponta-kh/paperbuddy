@@ -8,8 +8,10 @@ import { TooltipProvider } from "@/components/shadcn/tooltip";
 import {
     type ChatMessage,
     type ChatSummary,
+    deleteChat,
     getChatMessages,
     getChats,
+    renameChat,
     sendPrompt,
 } from "@/lib/chat-api";
 import { cn } from "@/lib/utils";
@@ -140,6 +142,27 @@ function Chat() {
         setSendError(false);
     };
 
+    const handleRenameChat = async (title: string) => {
+        if (!selectedChatId) return;
+
+        await renameChat(selectedChatId, title);
+        setChats((currentChats) =>
+            currentChats.map((chat) =>
+                chat.id === selectedChatId ? { ...chat, title } : chat,
+            ),
+        );
+    };
+
+    const handleDeleteChat = async () => {
+        if (!selectedChatId) return;
+
+        await deleteChat(selectedChatId);
+        setChats((currentChats) =>
+            currentChats.filter((chat) => chat.id !== selectedChatId),
+        );
+        handleNewChat();
+    };
+
     return (
         <TooltipProvider>
             <div className="flex h-dvh overflow-hidden bg-[#fbfcfa] text-[#263b34]">
@@ -171,8 +194,10 @@ function Chat() {
                         sidebarOpen={sidebarOpen}
                         title={selectedChat?.title}
                         onChatSelect={handleChatSelect}
+                        onDeleteChat={handleDeleteChat}
                         onMobileMenuOpenChange={setMobileMenuOpen}
                         onNewChat={handleNewChat}
+                        onRenameChat={handleRenameChat}
                         onSidebarOpenChange={setSidebarOpen}
                     />
                     <ChatConversation

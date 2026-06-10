@@ -1,15 +1,9 @@
-import { ChevronDown, Menu, PanelLeftClose } from "lucide-react";
+import { Menu, PanelLeftClose } from "lucide-react";
 
+import { ChatActionsMenu } from "@/components/chat/ChatActionsMenu";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { LibraryHeaderActions } from "@/components/library/LibraryHeaderActions";
 import { Button } from "@/components/shadcn/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/shadcn/dropdown-menu";
 import { Separator } from "@/components/shadcn/separator";
 import {
     Sheet,
@@ -34,8 +28,10 @@ type ChatHeaderProps = {
     sidebarOpen: boolean;
     title?: string;
     onChatSelect: (chatId: string) => void;
+    onDeleteChat: () => Promise<void>;
     onMobileMenuOpenChange: (open: boolean) => void;
     onNewChat: () => void;
+    onRenameChat: (title: string) => Promise<void>;
     onSidebarOpenChange: (open: boolean) => void;
 };
 
@@ -48,8 +44,10 @@ export function ChatHeader({
     sidebarOpen,
     title,
     onChatSelect,
+    onDeleteChat,
     onMobileMenuOpenChange,
     onNewChat,
+    onRenameChat,
     onSidebarOpenChange,
 }: ChatHeaderProps) {
     return (
@@ -112,28 +110,11 @@ export function ChatHeader({
                             className="mx-1 h-5"
                         />
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    className="gap-2 rounded-lg px-2 text-[13px] font-medium text-[#344a42]"
-                                >
-                                    <span className="max-w-44 truncate sm:max-w-none">
-                                        {title ?? "新しいチャット"}
-                                    </span>
-                                    <ChevronDown className="size-3.5 text-[#809089]" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-52">
-                                <DropdownMenuItem>
-                                    タイトルを変更
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
-                                    チャットを削除
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <ChatActionsMenu
+                            title={title ?? "新しいチャット"}
+                            onDelete={onDeleteChat}
+                            onRename={onRenameChat}
+                        />
                     </>
                 )}
             </div>
