@@ -21,6 +21,8 @@ from src.domain.repositories.chat_command_repository_protocol import (
     ChatNotFoundError,
     ChatSaveError,
 )
+from src.domain.repositories.chat_deletion_repository_protocol import ChatDeleteError
+from src.domain.repositories.chat_title_repository_protocol import ChatTitleUpdateError
 from src.presentation.auth import AuthenticationError
 
 
@@ -131,6 +133,26 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "chat_save_failed",
             "チャットを保存できませんでした",
+        )
+
+    @app.exception_handler(ChatTitleUpdateError)
+    async def chat_title_update_error_handler(
+        _: Request, __: ChatTitleUpdateError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "chat_title_update_failed",
+            "チャットタイトルを変更できませんでした",
+        )
+
+    @app.exception_handler(ChatDeleteError)
+    async def chat_delete_error_handler(
+        _: Request, __: ChatDeleteError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "chat_delete_failed",
+            "チャットを削除できませんでした",
         )
 
     @app.exception_handler(ChatLoadError)

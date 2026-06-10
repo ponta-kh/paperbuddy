@@ -1,7 +1,7 @@
-import { ChevronDown, Library, Menu, PanelLeftClose } from "lucide-react";
+import { ChevronDown, Menu, PanelLeftClose } from "lucide-react";
 
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
-import { Badge } from "@/components/shadcn/badge";
+import { LibraryHeaderActions } from "@/components/library/LibraryHeaderActions";
 import { Button } from "@/components/shadcn/button";
 import {
     DropdownMenu,
@@ -121,7 +121,6 @@ export function ChatHeader({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-52">
                         <DropdownMenuItem>タイトルを変更</DropdownMenuItem>
-                        <DropdownMenuItem>チャットを共有</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive">
                             チャットを削除
@@ -130,22 +129,7 @@ export function ChatHeader({
                 </DropdownMenu>
             </div>
 
-            <div className="flex items-center gap-2">
-                <Badge
-                    variant="outline"
-                    className="hidden gap-1.5 rounded-full border-[#dbe5df] bg-[#f5f8f6] px-2.5 py-1 text-[10px] font-medium text-[#567268] sm:flex"
-                >
-                    <span className="size-1.5 rounded-full bg-[#5b9b78]" />
-                    24 papers indexed
-                </Badge>
-                <Button
-                    variant="outline"
-                    className="hidden rounded-lg border-[#dfe5e1] text-[12px] text-[#4b6259] sm:inline-flex"
-                >
-                    <Library />
-                    ライブラリ
-                </Button>
-            </div>
+            <LibraryHeaderActions />
         </header>
     );
 }

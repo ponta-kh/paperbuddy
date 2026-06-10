@@ -28,6 +28,17 @@ class ContinueChatResponse(BaseModel):
     title: str
 
 
+class RenameChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(description="変更後のチャットタイトル")
+
+
+class RenameChatResponse(BaseModel):
+    chat_id: UUID
+    title: str
+
+
 class ChatSummaryResponse(BaseModel):
     chat_id: UUID
     title: str

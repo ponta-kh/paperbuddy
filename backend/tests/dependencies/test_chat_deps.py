@@ -4,6 +4,8 @@ from unittest.mock import Mock
 import pytest
 from pydantic import ValidationError
 
+from src.application.use_cases.chat.delete_chat.delete_chat import DeleteChatUseCase
+from src.application.use_cases.chat.rename_chat.rename_chat import RenameChatUseCase
 from src.dependencies import chat_deps
 from src.dependencies.settings import get_settings
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
@@ -21,10 +23,14 @@ from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
 def clear_cached_dependencies() -> Iterator[None]:
     chat_deps.get_chat_repository.cache_clear()
     chat_deps.get_chat_generation_client.cache_clear()
+    chat_deps.get_rename_chat_use_case.cache_clear()
+    chat_deps.get_delete_chat_use_case.cache_clear()
     get_settings.cache_clear()
     yield
     chat_deps.get_chat_repository.cache_clear()
     chat_deps.get_chat_generation_client.cache_clear()
+    chat_deps.get_rename_chat_use_case.cache_clear()
+    chat_deps.get_delete_chat_use_case.cache_clear()
     get_settings.cache_clear()
 
 
@@ -57,6 +63,16 @@ def test_get_chat_repository_uses_dynamodb(
         ("dynamodb",),
         {"region_name": "ap-northeast-1"},
     )
+
+
+def test_get_chat_command_use_cases_use_dynamodb_repository(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_aws_environment(monkeypatch)
+    monkeypatch.setattr(chat_deps.boto3, "client", Mock())
+
+    assert isinstance(chat_deps.get_rename_chat_use_case(), RenameChatUseCase)
+    assert isinstance(chat_deps.get_delete_chat_use_case(), DeleteChatUseCase)
 
 
 def test_get_chat_repository_uses_dynamodb_local_endpoint(

@@ -15,6 +15,8 @@ from src.domain.repositories.chat_command_repository_protocol import (
     ChatNotFoundError,
     ChatSaveError,
 )
+from src.domain.repositories.chat_deletion_repository_protocol import ChatDeleteError
+from src.domain.repositories.chat_title_repository_protocol import ChatTitleUpdateError
 from src.domain.value_objects.chat.prompt import Prompt
 
 _CHAT_SORT_KEY = "CHAT"
@@ -120,6 +122,66 @@ class DynamoDbChatRepository:
             ):
                 raise ChatConflictError from error
             raise ChatSaveError from error
+
+    async def update_title(
+        self,
+        *,
+        chat_id: UUID,
+        user_id: UUID,
+        title: str,
+    ) -> None:
+        try:
+            await asyncio.to_thread(
+                self._client.update_item,
+                TableName=self._table_name,
+                Key=self._serialize(
+                    {"pk": self._chat_key(chat_id), "sk": _CHAT_SORT_KEY}
+                ),
+                UpdateExpression="SET #title = :title",
+                ConditionExpression="attribute_exists(pk) AND #user_id = :user_id",
+                ExpressionAttributeNames={"#title": "title", "#user_id": "user_id"},
+                ExpressionAttributeValues=self._serialize(
+                    {":title": title, ":user_id": str(user_id)}
+                ),
+            )
+        except ClientError as error:
+            if (
+                error.response.get("Error", {}).get("Code")
+                == "ConditionalCheckFailedException"
+            ):
+                raise ChatNotFoundError from error
+            raise ChatTitleUpdateError from error
+
+    async def delete_chat(self, *, chat_id: UUID) -> None:
+        try:
+            items = await self._query_all(
+                TableName=self._table_name,
+                KeyConditionExpression="pk = :chat_key",
+                ExpressionAttributeValues=self._serialize(
+                    {":chat_key": self._chat_key(chat_id)}
+                ),
+                ProjectionExpression="pk, sk",
+                ConsistentRead=True,
+            )
+            for start in range(0, len(items), 25):
+                delete_requests = [
+                    {
+                        "DeleteRequest": {
+                            "Key": self._serialize({"pk": item["pk"], "sk": item["sk"]})
+                        }
+                    }
+                    for item in items[start : start + 25]
+                ]
+                response = await asyncio.to_thread(
+                    self._client.batch_write_item,
+                    RequestItems={self._table_name: delete_requests},
+                )
+                if response.get("UnprocessedItems"):
+                    raise ChatDeleteError
+        except ChatDeleteError:
+            raise
+        except ClientError as error:
+            raise ChatDeleteError from error
 
     async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
         try:

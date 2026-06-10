@@ -15,11 +15,12 @@
 - 所有ユーザーを検証した継続対象チャットの取得
 - ユーザー別チャット一覧の最終更新日時降順取得
 - 所有ユーザーを検証したチャットメッセージ履歴の発信日時昇順取得
+- 所有ユーザーを検証したチャットタイトルの更新
+- チャットIDに紐づく全項目の削除
 
 ### 対象外
 
 - API利用者がページ単位を指定するページネーション
-- チャットまたはメッセージの削除
 - DynamoDB Streamsを利用したイベント処理
 
 ## 関連する出力ポート
@@ -29,6 +30,8 @@
 | `ChatCommandRepositoryProtocol` | `save_started_chat` | `docs/backend/specification/chat/start_chat.md` |
 | `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | `docs/backend/specification/chat/continue_chat.md` |
 | `ChatCommandRepositoryProtocol` | `save_exchange` | `docs/backend/specification/chat/continue_chat.md` |
+| `ChatTitleRepositoryProtocol` | `update_title` | `docs/backend/specification/chat/rename_chat.md` |
+| `ChatDeletionRepositoryProtocol` | `delete_chat` | `docs/backend/specification/chat/delete_chat.md` |
 | `ChatQueryRepositoryProtocol` | `list_chats_by_user_id` | `docs/backend/specification/chat/list_chats.md` |
 | `ChatQueryRepositoryProtocol` | `list_messages_by_chat_id` | `docs/backend/specification/chat/list_chat_messages.md` |
 
@@ -37,7 +40,7 @@
 - SDK・プロトコル: boto3 DynamoDB low-level client
 - 接続先: `AWS_REGION`とboto3標準認証情報プロバイダーチェーンで決定する
 - 認証方式: ローカルではAWS profile、ECSではタスクロールを使用する。AWSアクセスキーを環境変数やコードへ保存しない
-- 必要なIAM操作: テーブルに対する`dynamodb:GetItem`、`dynamodb:Query`、`dynamodb:TransactWriteItems`と、`gsi1`に対する`dynamodb:Query`
+- 必要なIAM操作: テーブルに対する`dynamodb:GetItem`、`dynamodb:Query`、`dynamodb:TransactWriteItems`、`dynamodb:UpdateItem`、`dynamodb:BatchWriteItem`と、`gsi1`に対する`dynamodb:Query`
 
 テーブルは単一テーブル方式とし、以下のキーを持つ。
 
@@ -95,6 +98,19 @@
 - 外部出力: メッセージ項目一覧
 - 内部出力への変換: `ChatMessageRecord`のタプルへ変換する
 
+### update_title
+
+- 内部入力: `chat_id`、`user_id`、`title`
+- 外部入力への変換: チャット本体の主キーを指定し、所有ユーザーが一致する条件付き`UpdateItem`へ変換する
+- 内部出力への変換: 成功時は戻り値なし
+
+### delete_chat
+
+- 内部入力: `chat_id`
+- 外部入力への変換: `pk = CHAT#{chat_id}`として全ページをQueryし、主キーを25件単位の`BatchWriteItem`削除へ変換する
+- 内部出力への変換: 成功時は戻り値なし。対象0件も成功とする
+- 制約: 複数バッチにまたがる削除は原子的ではない
+
 日時はUTCへ変換したISO 8601文字列として保存する。メッセージのソートキー末尾には、同一発信日時でもユーザー、LLMの順序になる発信者順序を含める。
 
 ## 例外変換
@@ -106,6 +122,9 @@
 | 継続保存のその他の`ClientError` | `ChatSaveError` | いずれの項目も保存しない |
 | 継続対象取得の`ClientError` | `ChatLoadError` | SDK例外を外部へ漏らさない |
 | Query操作の`ClientError` | `RepositoryAccessError` | SDK例外を外部へ漏らさない |
+| タイトル更新の条件違反 | `ChatNotFoundError` | 項目なしまたは所有ユーザー不一致 |
+| タイトル更新のその他の`ClientError` | `ChatTitleUpdateError` | SDK例外を外部へ漏らさない |
+| 削除Query・BatchWriteの`ClientError`または未処理項目 | `ChatDeleteError` | SDK例外を外部へ漏らさない |
 
 ## 該当データなし
 

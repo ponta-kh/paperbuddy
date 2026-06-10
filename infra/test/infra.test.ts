@@ -156,11 +156,13 @@ describe("InfraStack", () => {
             PolicyDocument: {
                 Statement: Match.arrayWith([
                     Match.objectLike({
-                        Action: [
+                        Action: Match.arrayWith([
                             "dynamodb:GetItem",
+                            "dynamodb:BatchWriteItem",
                             "dynamodb:Query",
                             "dynamodb:TransactWriteItems",
-                        ],
+                            "dynamodb:UpdateItem",
+                        ]),
                         Effect: "Allow",
                     }),
                     Match.objectLike({

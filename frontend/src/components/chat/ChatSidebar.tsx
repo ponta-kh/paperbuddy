@@ -4,7 +4,6 @@ import {
     MessageSquareText,
     MoreHorizontal,
     Plus,
-    Search,
     Settings,
 } from "lucide-react";
 
@@ -67,16 +66,6 @@ export function ChatSidebar({
                     新しいチャット
                 </Button>
             </div>
-
-            <nav className="px-3">
-                <Button
-                    variant="ghost"
-                    className="h-9 w-full justify-start gap-2.5 rounded-lg px-3 text-[#44534e] hover:bg-[#e9ece8] hover:text-[#18352d]"
-                >
-                    <Search className="size-4" />
-                    チャットを検索
-                </Button>
-            </nav>
 
             <Separator className="mx-4 my-4 w-auto bg-[#dfe4df]" />
 

@@ -144,8 +144,10 @@ export class InfraStack extends cdk.Stack {
             new iam.PolicyStatement({
                 actions: [
                     "dynamodb:GetItem",
+                    "dynamodb:BatchWriteItem",
                     "dynamodb:Query",
                     "dynamodb:TransactWriteItems",
+                    "dynamodb:UpdateItem",
                 ],
                 resources: [
                     chatTable.tableArn,

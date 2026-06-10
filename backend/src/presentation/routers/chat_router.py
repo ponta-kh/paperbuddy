@@ -4,25 +4,31 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 
 from src.application.ports.input.chat.continue_chat_protocol import ContinueChatProtocol
+from src.application.ports.input.chat.delete_chat_protocol import DeleteChatProtocol
 from src.application.ports.input.chat.list_chat_messages_protocol import (
     ListChatMessagesProtocol,
 )
 from src.application.ports.input.chat.list_chats_protocol import ListChatsProtocol
+from src.application.ports.input.chat.rename_chat_protocol import RenameChatProtocol
 from src.application.ports.input.chat.start_chat_protocol import (
     StartChatProtocol,
 )
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
     ContinueChatInput,
 )
+from src.application.use_cases.chat.delete_chat.delete_chat_dto import DeleteChatInput
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
     ListChatMessagesInput,
 )
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
+from src.application.use_cases.chat.rename_chat.rename_chat_dto import RenameChatInput
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatInput
 from src.dependencies.chat_deps import (
     get_continue_chat_use_case,
+    get_delete_chat_use_case,
     get_list_chat_messages_use_case,
     get_list_chats_use_case,
+    get_rename_chat_use_case,
     get_start_chat_use_case,
 )
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
@@ -33,11 +39,35 @@ from src.presentation.schemas.chat_schema import (
     ContinueChatResponse,
     ListChatMessagesResponse,
     ListChatsResponse,
+    RenameChatRequest,
+    RenameChatResponse,
     StartChatRequest,
     StartChatResponse,
 )
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+@router.patch("/{chat_id}", response_model=RenameChatResponse)
+async def rename_chat(
+    chat_id: UUID,
+    request: RenameChatRequest,
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    use_case: Annotated[RenameChatProtocol, Depends(get_rename_chat_use_case)],
+) -> RenameChatResponse:
+    output = await use_case.execute(
+        RenameChatInput(user_id=user.user_id, chat_id=chat_id, title=request.title)
+    )
+    return RenameChatResponse(chat_id=output.chat_id, title=output.title)
+
+
+@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat(
+    chat_id: UUID,
+    _: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    use_case: Annotated[DeleteChatProtocol, Depends(get_delete_chat_use_case)],
+) -> None:
+    await use_case.execute(DeleteChatInput(chat_id=chat_id))
 
 
 @router.get("", response_model=ListChatsResponse)

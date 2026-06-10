@@ -20,11 +20,14 @@ from src.application.use_cases.chat.list_chats.list_chats_dto import (
     ChatSummaryOutput,
     ListChatsOutput,
 )
+from src.application.use_cases.chat.rename_chat.rename_chat_dto import RenameChatOutput
 from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatOutput
 from src.dependencies.chat_deps import (
     get_continue_chat_use_case,
+    get_delete_chat_use_case,
     get_list_chat_messages_use_case,
     get_list_chats_use_case,
+    get_rename_chat_use_case,
     get_start_chat_use_case,
 )
 from src.domain.repositories.chat_command_repository_protocol import ChatConflictError
@@ -46,6 +49,23 @@ class StubContinueChatUseCase:
         assert command.chat_id == CHAT_ID
         assert command.prompt == "next question"
         return ContinueChatOutput(chat_id=CHAT_ID, answer="next answer", title="title")
+
+
+class StubRenameChatUseCase:
+    async def execute(self, command: object) -> RenameChatOutput:
+        assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
+        assert command.chat_id == CHAT_ID
+        assert command.title == "変更後"
+        return RenameChatOutput(chat_id=CHAT_ID, title="変更後")
+
+
+class StubDeleteChatUseCase:
+    def __init__(self) -> None:
+        self.called = False
+
+    async def execute(self, command: object) -> None:
+        assert command.chat_id == CHAT_ID
+        self.called = True
 
 
 class StubExpiredContinueChatUseCase:
@@ -201,6 +221,37 @@ def test_continue_chat_endpoint() -> None:
         "answer": "next answer",
         "title": "title",
     }
+
+
+def test_rename_chat_endpoint() -> None:
+    app.dependency_overrides[get_rename_chat_use_case] = lambda: StubRenameChatUseCase()
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/api/chats/{CHAT_ID_TEXT}",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+        json={"title": "変更後"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json() == {"chat_id": CHAT_ID_TEXT, "title": "変更後"}
+
+
+def test_delete_chat_endpoint() -> None:
+    use_case = StubDeleteChatUseCase()
+    app.dependency_overrides[get_delete_chat_use_case] = lambda: use_case
+    client = TestClient(app)
+
+    response = client.delete(
+        f"/api/chats/{CHAT_ID_TEXT}",
+        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 204
+    assert response.content == b""
+    assert use_case.called
 
 
 def test_continue_chat_endpoint_returns_conflict_when_expired() -> None:
