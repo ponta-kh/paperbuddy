@@ -1,15 +1,10 @@
-import * as path from "node:path";
-import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
-import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as ecs from "aws-cdk-lib/aws-ecs";
-import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
-import * as iam from "aws-cdk-lib/aws-iam";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import * as s3Deployment from "aws-cdk-lib/aws-s3-deployment";
 import * as cdk from "aws-cdk-lib/core";
 import type { Construct } from "constructs";
+import { createBackend } from "./backend";
+import { createDatabaseResources } from "./database";
+import { createFrontendDelivery } from "./frontend-delivery";
+import { createLlmResources, grantBackendBedrockAccess } from "./llm";
+import { connectBackendToAwsServices, createNetwork } from "./network";
 
 export interface InfraStackProps extends cdk.StackProps {
     readonly stageName: string;
@@ -21,309 +16,52 @@ export class InfraStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: InfraStackProps) {
         super(scope, id, props);
 
-        const chatTable = new dynamodb.Table(this, "ChatTable", {
-            tableName: `paperbuddy-${props.stageName}-chat`,
-            partitionKey: {
-                name: "pk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            sortKey: {
-                name: "sk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-            encryption: dynamodb.TableEncryption.AWS_MANAGED,
-            pointInTimeRecoverySpecification: {
-                pointInTimeRecoveryEnabled: true,
-            },
-            deletionProtection: true,
-            removalPolicy: cdk.RemovalPolicy.RETAIN,
+        const database = createDatabaseResources(this, props.stageName);
+        const llm = createLlmResources(this);
+        const network = createNetwork(this);
+        const backend = createBackend(this, {
+            assetPath: props.backendAssetPath,
+            llm,
+            network,
+            database,
         });
-
-        chatTable.addGlobalSecondaryIndex({
-            indexName: "gsi1",
-            partitionKey: {
-                name: "gsi1pk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            sortKey: {
-                name: "gsi1sk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            projectionType: dynamodb.ProjectionType.INCLUDE,
-            nonKeyAttributes: [
-                "chat_id",
-                "title",
-                "created_at",
-                "last_updated_at",
-            ],
-        });
-
-        const libraryTable = new dynamodb.Table(this, "LibraryTable", {
-            tableName: `paperbuddy-${props.stageName}-library`,
-            partitionKey: {
-                name: "pk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            sortKey: {
-                name: "sk",
-                type: dynamodb.AttributeType.STRING,
-            },
-            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-            encryption: dynamodb.TableEncryption.AWS_MANAGED,
-            pointInTimeRecoverySpecification: {
-                pointInTimeRecoveryEnabled: true,
-            },
-            deletionProtection: true,
-            removalPolicy: cdk.RemovalPolicy.RETAIN,
-        });
-
-        const ragSourceBucket = new s3.Bucket(this, "RagSourceBucket", {
-            blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-            encryption: s3.BucketEncryption.S3_MANAGED,
-            enforceSSL: true,
-            versioned: true,
-            removalPolicy: cdk.RemovalPolicy.RETAIN,
-        });
-
-        const knowledgeBaseId = new cdk.CfnParameter(
+        grantBackendBedrockAccess(
+            backend.backendService.taskDefinition.taskRole,
+            llm,
+        );
+        connectBackendToAwsServices(
             this,
-            "BedrockKnowledgeBaseId",
-            {
-                type: "String",
-                description: "Bedrock Knowledge Base ID used by the backend",
-            },
+            network,
+            backend.backendService.service,
         );
-        const modelArn = new cdk.CfnParameter(this, "BedrockModelArn", {
-            type: "String",
-            description: "Bedrock model ARN used by the backend",
-        });
-
-        const vpc = new ec2.Vpc(this, "Vpc", {
-            maxAzs: 2,
-            natGateways: 0,
-            subnetConfiguration: [
-                {
-                    name: "Application",
-                    subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-                    cidrMask: 24,
-                },
-            ],
-        });
-
-        const cluster = new ecs.Cluster(this, "Cluster", {
-            vpc,
-            containerInsightsV2: ecs.ContainerInsights.ENABLED,
-        });
-        const backendService =
-            new ecsPatterns.ApplicationLoadBalancedFargateService(
-                this,
-                "BackendService",
-                {
-                    cluster,
-                    publicLoadBalancer: false,
-                    openListener: false,
-                    assignPublicIp: false,
-                    taskSubnets: {
-                        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-                    },
-                    cpu: 512,
-                    memoryLimitMiB: 1024,
-                    desiredCount: 1,
-                    minHealthyPercent: 100,
-                    circuitBreaker: {
-                        rollback: true,
-                    },
-                    listenerPort: 80,
-                    taskImageOptions: {
-                        image: ecs.ContainerImage.fromAsset(
-                            props.backendAssetPath ??
-                                path.join(__dirname, "../../backend"),
-                        ),
-                        containerPort: 8000,
-                        environment: {
-                            CHAT_INFRASTRUCTURE_MODE: "aws",
-                            AWS_REGION: this.region,
-                            DYNAMODB_CHAT_TABLE_NAME: chatTable.tableName,
-                            DYNAMODB_LIBRARY_TABLE_NAME: libraryTable.tableName,
-                            BEDROCK_KNOWLEDGE_BASE_ID:
-                                knowledgeBaseId.valueAsString,
-                            BEDROCK_MODEL_ARN: modelArn.valueAsString,
-                        },
-                    },
-                },
-            );
-        backendService.targetGroup.configureHealthCheck({
-            path: "/api/health",
-            healthyHttpCodes: "200",
-        });
-        backendService.loadBalancer.connections.allowFrom(
-            ec2.Peer.ipv4(vpc.vpcCidrBlock),
-            ec2.Port.tcp(80),
-            "Allow CloudFront VPC origin traffic inside the VPC",
-        );
-
-        const endpointSecurityGroup = new ec2.SecurityGroup(
-            this,
-            "VpcEndpointSecurityGroup",
-            {
-                vpc,
-                allowAllOutbound: false,
-                description:
-                    "Allow HTTPS from the backend service to VPC endpoints",
-            },
-        );
-        endpointSecurityGroup.connections.allowFrom(
-            backendService.service,
-            ec2.Port.tcp(443),
-            "Allow backend HTTPS traffic",
-        );
-
-        const endpointSubnets = {
-            subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-        };
-        const gatewayEndpoints = [
-            vpc.addGatewayEndpoint("S3Endpoint", {
-                service: ec2.GatewayVpcEndpointAwsService.S3,
-                subnets: [endpointSubnets],
-            }),
-            vpc.addGatewayEndpoint("DynamoDbEndpoint", {
-                service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
-                subnets: [endpointSubnets],
-            }),
-        ];
-        const interfaceEndpointServices = [
-            ec2.InterfaceVpcEndpointAwsService.ECR,
-            ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-            ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-            ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT_RUNTIME,
-            ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
-        ];
-        const interfaceEndpoints = interfaceEndpointServices.map(
-            (service, index) =>
-                vpc.addInterfaceEndpoint(`InterfaceEndpoint${index}`, {
-                    service,
-                    subnets: endpointSubnets,
-                    securityGroups: [endpointSecurityGroup],
-                }),
-        );
-        backendService.service.node.addDependency(
-            ...gatewayEndpoints,
-            ...interfaceEndpoints,
-        );
-
-        backendService.taskDefinition.taskRole.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-                actions: ["dynamodb:Scan"],
-                resources: [libraryTable.tableArn],
-            }),
-        );
-        backendService.taskDefinition.taskRole.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-                actions: [
-                    "dynamodb:GetItem",
-                    "dynamodb:BatchWriteItem",
-                    "dynamodb:Query",
-                    "dynamodb:TransactWriteItems",
-                    "dynamodb:UpdateItem",
-                ],
-                resources: [
-                    chatTable.tableArn,
-                    `${chatTable.tableArn}/index/gsi1`,
-                ],
-            }),
-        );
-        backendService.taskDefinition.taskRole.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-                actions: ["bedrock:RetrieveAndGenerate"],
-                resources: ["*"],
-            }),
-        );
-        backendService.taskDefinition.taskRole.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-                actions: ["bedrock:InvokeModel"],
-                resources: [modelArn.valueAsString],
-            }),
-        );
-
-        const frontendBucket = new s3.Bucket(this, "FrontendBucket", {
-            blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-            encryption: s3.BucketEncryption.S3_MANAGED,
-            enforceSSL: true,
-            removalPolicy: cdk.RemovalPolicy.RETAIN,
-        });
-        const frontendOrigin =
-            origins.S3BucketOrigin.withOriginAccessControl(frontendBucket);
-        const backendOrigin = origins.VpcOrigin.withApplicationLoadBalancer(
-            backendService.loadBalancer,
-            {
-                protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-                httpPort: 80,
-            },
-        );
-        const distribution = new cloudfront.Distribution(this, "Distribution", {
-            defaultRootObject: "index.html",
-            minimumProtocolVersion:
-                cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-            defaultBehavior: {
-                origin: frontendOrigin,
-                viewerProtocolPolicy:
-                    cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                allowedMethods:
-                    cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-                cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-                compress: true,
-            },
-            additionalBehaviors: {
-                "/api/*": {
-                    origin: backendOrigin,
-                    viewerProtocolPolicy:
-                        cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                    allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-                    cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-                    originRequestPolicy:
-                        cloudfront.OriginRequestPolicy
-                            .ALL_VIEWER_EXCEPT_HOST_HEADER,
-                    compress: true,
-                },
-            },
-        });
-        new s3Deployment.BucketDeployment(this, "DeployFrontend", {
-            destinationBucket: frontendBucket,
-            sources: [
-                s3Deployment.Source.asset(
-                    props.frontendAssetPath ??
-                        path.join(__dirname, "../../frontend/dist"),
-                ),
-            ],
-            distribution,
-            distributionPaths: ["/*"],
-            prune: true,
+        const frontendDelivery = createFrontendDelivery(this, {
+            assetPath: props.frontendAssetPath,
+            backendLoadBalancer: backend.backendService.loadBalancer,
         });
 
         new cdk.CfnOutput(this, "ChatTableName", {
-            value: chatTable.tableName,
+            value: database.chatTable.tableName,
         });
         new cdk.CfnOutput(this, "ChatTableArn", {
-            value: chatTable.tableArn,
+            value: database.chatTable.tableArn,
         });
         new cdk.CfnOutput(this, "LibraryTableName", {
-            value: libraryTable.tableName,
+            value: database.libraryTable.tableName,
         });
         new cdk.CfnOutput(this, "LibraryTableArn", {
-            value: libraryTable.tableArn,
+            value: database.libraryTable.tableArn,
         });
         new cdk.CfnOutput(this, "FrontendBucketName", {
-            value: frontendBucket.bucketName,
+            value: frontendDelivery.frontendBucket.bucketName,
         });
         new cdk.CfnOutput(this, "RagSourceBucketName", {
-            value: ragSourceBucket.bucketName,
+            value: llm.ragSourceBucket.bucketName,
         });
         new cdk.CfnOutput(this, "RagSourceBucketArn", {
-            value: ragSourceBucket.bucketArn,
+            value: llm.ragSourceBucket.bucketArn,
         });
         new cdk.CfnOutput(this, "DistributionDomainName", {
-            value: distribution.distributionDomainName,
+            value: frontendDelivery.distribution.distributionDomainName,
         });
     }
 }
