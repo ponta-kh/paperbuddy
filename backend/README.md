@@ -9,6 +9,15 @@
 The application uses boto3's standard AWS credential provider chain. Do not put
 AWS access keys in `.env`.
 
+アプリケーション固有の環境変数は
+`src/dependencies/settings.py`のPydantic Settingsへ集約している。
+
+- 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`
+- AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
+- ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
+- 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
+- Boto3認証用: `AWS_PROFILE`などの標準AWS環境変数
+
 ## Local Configuration
 
 Create the local environment file and replace the Bedrock identifiers:

@@ -1,4 +1,3 @@
-import os
 from functools import lru_cache
 
 import boto3
@@ -31,28 +30,18 @@ from src.infrastructure.llm.simulated_chat_generation_client import (
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
     DynamoDbChatRepository,
 )
-
-
-_AWS_MODE = "aws"
-_LOCAL_MODE = "local"
-
-
-def _infrastructure_mode() -> str:
-    mode = os.environ.get("CHAT_INFRASTRUCTURE_MODE", _AWS_MODE)
-    if mode not in {_AWS_MODE, _LOCAL_MODE}:
-        raise ValueError(f"Unsupported CHAT_INFRASTRUCTURE_MODE: {mode}")
-    return mode
+from src.dependencies.settings import ChatInfrastructureMode, get_settings
 
 
 @lru_cache
 def get_chat_repository() -> DynamoDbChatRepository:
-    region = os.environ["AWS_REGION"]
-    table_name = os.environ["DYNAMODB_CHAT_TABLE_NAME"]
-    client_options: dict[str, str] = {"region_name": region}
-    if _infrastructure_mode() == _LOCAL_MODE:
-        client_options["endpoint_url"] = os.environ["DYNAMODB_ENDPOINT_URL"]
+    settings = get_settings()
+    client_options: dict[str, str] = {"region_name": settings.aws_region}
+    if settings.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL:
+        assert settings.dynamodb_endpoint_url is not None
+        client_options["endpoint_url"] = settings.dynamodb_endpoint_url
     client = boto3.client("dynamodb", **client_options)
-    return DynamoDbChatRepository(client, table_name=table_name)
+    return DynamoDbChatRepository(client, table_name=settings.dynamodb_chat_table_name)
 
 
 @lru_cache
@@ -67,20 +56,23 @@ def get_list_chat_messages_use_case() -> ListChatMessagesProtocol:
 
 @lru_cache
 def get_chat_generation_client() -> ChatGenerationClientProtocol:
-    if _infrastructure_mode() == _LOCAL_MODE:
-        delay_seconds = float(os.environ.get("SIMULATED_LLM_DELAY_SECONDS", "2"))
-        return SimulatedChatGenerationClient(delay_seconds=delay_seconds)
+    settings = get_settings()
+    if settings.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL:
+        return SimulatedChatGenerationClient(
+            delay_seconds=settings.simulated_llm_delay_seconds
+        )
 
-    region = os.environ["AWS_REGION"]
-    knowledge_base_id = os.environ["BEDROCK_KNOWLEDGE_BASE_ID"]
-    model_arn = os.environ["BEDROCK_MODEL_ARN"]
-    knowledge_base_client = boto3.client("bedrock-agent-runtime", region_name=region)
-    model_client = boto3.client("bedrock-runtime", region_name=region)
+    assert settings.bedrock_knowledge_base_id is not None
+    assert settings.bedrock_model_arn is not None
+    knowledge_base_client = boto3.client(
+        "bedrock-agent-runtime", region_name=settings.aws_region
+    )
+    model_client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
     generation_client = BedrockKnowledgeBaseChatClient(
         knowledge_base_client,
         model_client,
-        knowledge_base_id=knowledge_base_id,
-        model_arn=model_arn,
+        knowledge_base_id=settings.bedrock_knowledge_base_id,
+        model_arn=settings.bedrock_model_arn,
     )
     return generation_client
 
