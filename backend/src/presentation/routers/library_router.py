@@ -24,5 +24,16 @@ async def list_indexed_files(
 ) -> ListIndexedFilesResponse:
     output = await use_case.execute()
     return ListIndexedFilesResponse(
-        files=[IndexedFileResponse(name=file.name) for file in output.files]
+        files=[
+            IndexedFileResponse(
+                source_id=file.source_id,
+                s3_key=file.s3_key,
+                name=file.name,
+                category=file.category,
+                status=file.status,
+                s3_uploaded_at=file.s3_uploaded_at,
+                rag_indexed_at=file.rag_indexed_at,
+            )
+            for file in output.files
+        ]
     )

@@ -8,11 +8,13 @@ def test_loads_aws_mode_settings() -> None:
     settings = Settings(
         aws_region="ap-northeast-1",
         dynamodb_chat_table_name="chat-table",
+        dynamodb_library_table_name="library-table",
         bedrock_knowledge_base_id="knowledge-base-id",
         bedrock_model_arn="model-arn",
     )
 
     assert settings.chat_infrastructure_mode is ChatInfrastructureMode.AWS
+    assert settings.dynamodb_library_table_name == "library-table"
     assert settings.simulated_llm_delay_seconds == 2
 
 
@@ -21,11 +23,13 @@ def test_loads_local_mode_settings_without_bedrock() -> None:
         chat_infrastructure_mode=ChatInfrastructureMode.LOCAL,
         aws_region="ap-northeast-1",
         dynamodb_chat_table_name="chat-table",
+        dynamodb_library_table_name="library-table",
         dynamodb_endpoint_url="http://dynamodb-local:8000",
         simulated_llm_delay_seconds=0.5,
     )
 
     assert settings.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
+    assert settings.dynamodb_library_table_name == "library-table"
     assert settings.simulated_llm_delay_seconds == 0.5
 
 
@@ -33,6 +37,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "local")
     monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+    monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
     monkeypatch.setenv("SIMULATED_LLM_DELAY_SECONDS", "1.5")
 
@@ -41,6 +46,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     assert settings.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
     assert settings.aws_region == "ap-northeast-1"
     assert settings.dynamodb_chat_table_name == "chat-table"
+    assert settings.dynamodb_library_table_name == "library-table"
     assert settings.dynamodb_endpoint_url == "http://dynamodb-local:8000"
     assert settings.simulated_llm_delay_seconds == 1.5
 
@@ -52,6 +58,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
             {
                 "aws_region": "ap-northeast-1",
                 "dynamodb_chat_table_name": "chat-table",
+                "dynamodb_library_table_name": "library-table",
                 "bedrock_model_arn": "model-arn",
             },
             "BEDROCK_KNOWLEDGE_BASE_ID",
@@ -60,6 +67,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
             {
                 "aws_region": "ap-northeast-1",
                 "dynamodb_chat_table_name": "chat-table",
+                "dynamodb_library_table_name": "library-table",
                 "bedrock_knowledge_base_id": "knowledge-base-id",
             },
             "BEDROCK_MODEL_ARN",
@@ -69,6 +77,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
                 "chat_infrastructure_mode": "local",
                 "aws_region": "ap-northeast-1",
                 "dynamodb_chat_table_name": "chat-table",
+                "dynamodb_library_table_name": "library-table",
             },
             "DYNAMODB_ENDPOINT_URL",
         ),
@@ -88,6 +97,7 @@ def test_rejects_negative_simulated_llm_delay() -> None:
             chat_infrastructure_mode=ChatInfrastructureMode.LOCAL,
             aws_region="ap-northeast-1",
             dynamodb_chat_table_name="chat-table",
+            dynamodb_library_table_name="library-table",
             dynamodb_endpoint_url="http://dynamodb-local:8000",
             simulated_llm_delay_seconds=-0.001,
         )

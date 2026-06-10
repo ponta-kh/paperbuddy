@@ -1,0 +1,88 @@
+import asyncio
+from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID
+
+from boto3.dynamodb.types import TypeDeserializer
+from botocore.exceptions import ClientError
+
+from src.application.exceptions import RepositoryAccessError, RepositoryNotFoundError
+from src.application.ports.out.indexed_file_catalog_protocol import IndexedFile
+
+_deserializer = TypeDeserializer()
+
+
+class DynamoDbIndexedFileCatalog:
+    def __init__(self, client: Any, *, table_name: str) -> None:
+        self._client = client
+        self._table_name = table_name
+
+    async def list_indexed_files(self) -> tuple[IndexedFile, ...]:
+        try:
+            items = await self._scan_all()
+        except ClientError as error:
+            raise RepositoryAccessError from error
+
+        if not items:
+            raise RepositoryNotFoundError
+
+        try:
+            return tuple(self._to_indexed_file(item) for item in items)
+        except (KeyError, TypeError, ValueError) as error:
+            raise RepositoryAccessError from error
+
+    async def _scan_all(self) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        scan_kwargs: dict[str, Any] = {
+            "TableName": self._table_name,
+            "ProjectionExpression": (
+                "source_id, s3_key, file_name, category, #status, "
+                "s3_uploaded_at, rag_indexed_at"
+            ),
+            "ExpressionAttributeNames": {"#status": "status"},
+        }
+
+        while True:
+            response = await asyncio.to_thread(self._client.scan, **scan_kwargs)
+            items.extend(
+                self._deserialize_item(item) for item in response.get("Items", [])
+            )
+
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if last_evaluated_key is None:
+                return items
+
+            scan_kwargs["ExclusiveStartKey"] = last_evaluated_key
+
+    @staticmethod
+    def _to_indexed_file(item: dict[str, Any]) -> IndexedFile:
+        return IndexedFile(
+            source_id=UUID(str(item["source_id"])),
+            s3_key=str(item["s3_key"]),
+            name=str(item["file_name"]),
+            category=str(item["category"]),
+            status=str(item["status"]),
+            s3_uploaded_at=DynamoDbIndexedFileCatalog._parse_datetime(
+                item["s3_uploaded_at"]
+            ),
+            rag_indexed_at=DynamoDbIndexedFileCatalog._parse_nullable_datetime(
+                item.get("rag_indexed_at")
+            ),
+        )
+
+    @staticmethod
+    def _parse_nullable_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        return DynamoDbIndexedFileCatalog._parse_datetime(value)
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed
+
+    @staticmethod
+    def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
+        return {key: _deserializer.deserialize(value) for key, value in item.items()}

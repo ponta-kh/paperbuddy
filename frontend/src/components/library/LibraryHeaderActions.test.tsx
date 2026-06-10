@@ -15,8 +15,24 @@ describe("LibraryHeaderActions", () => {
 
     test("取り込み済みファイル一覧を取得して件数を表示する", async () => {
         vi.mocked(getIndexedFiles).mockResolvedValue([
-            { name: "paper-a.pdf" },
-            { name: "paper-b.pdf" },
+            {
+                id: "00000000-0000-0000-0000-000000000001",
+                s3Key: "papers/a.pdf",
+                name: "paper-a.pdf",
+                category: "LLM",
+                status: "indexed",
+                s3UploadedAt: "2026-01-01T00:00:00Z",
+                ragIndexedAt: "2026-01-02T00:00:00Z",
+            },
+            {
+                id: "00000000-0000-0000-0000-000000000002",
+                s3Key: "papers/b.pdf",
+                name: "paper-b.pdf",
+                category: "経済",
+                status: "processing",
+                s3UploadedAt: "2026-01-03T00:00:00Z",
+                ragIndexedAt: null,
+            },
         ]);
 
         render(<LibraryHeaderActions />);

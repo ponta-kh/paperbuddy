@@ -2,9 +2,10 @@
 
 ## 方針
 
-ローカルバックエンドとECS上のバックエンドは、同じ`DynamoDbChatRepository`と実AWSの開発用DynamoDBテーブルを使用する。
+ローカルバックエンドとECS上のバックエンドは、同じDynamoDBテーブル群と実AWSの開発用DynamoDBテーブルを使用する。
 
 - テーブル名: `paperbuddy-dev-chat`
+- ライブラリ一覧テーブル名: `paperbuddy-dev-library`
 - リージョン: 既定値は`ap-northeast-1`
 - ローカル認証: boto3標準認証チェーンのAWS Profile
 - ECS認証: ECSタスクロール
@@ -40,15 +41,18 @@ AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
 AWS_PROFILE=your-profile
 AWS_REGION=ap-northeast-1
 DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
+DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 ```
 
 ローカルで使用するAWS Profileには、テーブルに対する次の権限が必要となる。
 
 - `dynamodb:GetItem`
 - `dynamodb:Query`
+- `dynamodb:Scan`
 - `dynamodb:TransactWriteItems`
 
 `dynamodb:Query`のResourceには、テーブル本体に加えて`paperbuddy-dev-chat/index/gsi1`を含める。
+`dynamodb:Scan`のResourceには`paperbuddy-dev-library`を含める。
 
 ## ECS接続
 
@@ -57,6 +61,7 @@ ECSデプロイ時はコンテナへ次の環境変数を設定する。
 ```dotenv
 AWS_REGION=ap-northeast-1
 DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
+DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 ```
 
 `AWS_PROFILE`や固定AWSアクセスキーは設定しない。ECSタスクロールへ必要なDynamoDB権限を付与する。

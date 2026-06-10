@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 
 from main import app
@@ -12,8 +15,24 @@ class StubListIndexedFilesUseCase:
     async def execute(self) -> ListIndexedFilesOutput:
         return ListIndexedFilesOutput(
             files=(
-                IndexedFileOutput(name="paper-a.pdf"),
-                IndexedFileOutput(name="paper-b.pdf"),
+                IndexedFileOutput(
+                    source_id=UUID("00000000-0000-0000-0000-000000000001"),
+                    s3_key="papers/a.pdf",
+                    name="paper-a.pdf",
+                    category="LLM",
+                    status="indexed",
+                    s3_uploaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    rag_indexed_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+                ),
+                IndexedFileOutput(
+                    source_id=UUID("00000000-0000-0000-0000-000000000002"),
+                    s3_key="papers/b.pdf",
+                    name="paper-b.pdf",
+                    category="経済",
+                    status="processing",
+                    s3_uploaded_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+                    rag_indexed_at=None,
+                ),
             )
         )
 
@@ -32,7 +51,26 @@ def test_list_indexed_files_endpoint() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json() == {
-        "files": [{"name": "paper-a.pdf"}, {"name": "paper-b.pdf"}]
+        "files": [
+            {
+                "source_id": "00000000-0000-0000-0000-000000000001",
+                "s3_key": "papers/a.pdf",
+                "name": "paper-a.pdf",
+                "category": "LLM",
+                "status": "indexed",
+                "s3_uploaded_at": "2026-01-01T00:00:00Z",
+                "rag_indexed_at": "2026-01-02T00:00:00Z",
+            },
+            {
+                "source_id": "00000000-0000-0000-0000-000000000002",
+                "s3_key": "papers/b.pdf",
+                "name": "paper-b.pdf",
+                "category": "経済",
+                "status": "processing",
+                "s3_uploaded_at": "2026-01-03T00:00:00Z",
+                "rag_indexed_at": None,
+            },
+        ]
     }
 
 

@@ -1,3 +1,4 @@
+from src.application.exceptions import RepositoryNotFoundError
 from src.application.ports.out.indexed_file_catalog_protocol import (
     IndexedFileCatalogProtocol,
 )
@@ -12,10 +13,27 @@ class ListIndexedFilesUseCase:
         self._indexed_file_catalog = indexed_file_catalog
 
     async def execute(self) -> ListIndexedFilesOutput:
-        indexed_files = await self._indexed_file_catalog.list_indexed_files()
+        try:
+            indexed_files = await self._indexed_file_catalog.list_indexed_files()
+        except RepositoryNotFoundError:
+            indexed_files = ()
+
+        sorted_files = sorted(
+            indexed_files,
+            key=lambda indexed_file: (indexed_file.category, indexed_file.name),
+        )
+
         return ListIndexedFilesOutput(
             files=tuple(
-                IndexedFileOutput(name=indexed_file.name)
-                for indexed_file in indexed_files
+                IndexedFileOutput(
+                    source_id=indexed_file.source_id,
+                    s3_key=indexed_file.s3_key,
+                    name=indexed_file.name,
+                    category=indexed_file.category,
+                    status=indexed_file.status,
+                    s3_uploaded_at=indexed_file.s3_uploaded_at,
+                    rag_indexed_at=indexed_file.rag_indexed_at,
+                )
+                for indexed_file in sorted_files
             )
         )

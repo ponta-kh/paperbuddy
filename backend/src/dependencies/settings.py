@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     chat_infrastructure_mode: ChatInfrastructureMode = ChatInfrastructureMode.AWS
     aws_region: str = Field(default="", min_length=1)
     dynamodb_chat_table_name: str = Field(default="", min_length=1)
+    dynamodb_library_table_name: str = Field(default="", min_length=1)
     dynamodb_endpoint_url: str | None = None
     bedrock_knowledge_base_id: str | None = None
     bedrock_model_arn: str | None = None

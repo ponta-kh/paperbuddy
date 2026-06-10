@@ -163,5 +163,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _response(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "repository_unavailable",
-            "チャット情報を取得できませんでした",
+            "情報を取得できませんでした",
         )

@@ -56,7 +56,7 @@ export function LibraryHeaderActions() {
                     <SheetHeader>
                         <SheetTitle>ライブラリ</SheetTitle>
                         <SheetDescription>
-                            RAGへ取り込み済みのファイル一覧
+                            RAGへ取り込み済みのデータソース一覧
                         </SheetDescription>
                     </SheetHeader>
                     <LibraryFileList

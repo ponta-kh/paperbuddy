@@ -12,7 +12,7 @@ AWS access keys in `.env`.
 アプリケーション固有の環境変数は
 `src/dependencies/settings.py`のPydantic Settingsへ集約している。
 
-- 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`
+- 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`、`DYNAMODB_LIBRARY_TABLE_NAME`
 - AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
 - ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
 - 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
@@ -40,11 +40,14 @@ Deploy the development table and set:
 
 ```dotenv
 DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
+DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 ```
 
 See `docs/infra/dynamodb.md` for deployment, authentication, and IAM
-requirements. The table and `gsi1` key schema are defined in
+requirements. The chat table and `gsi1` key schema are defined in
 `docs/backend/specification/integrations/dynamodb_chat_repository.md`.
+The library table is defined in
+`docs/backend/specification/integrations/dynamodb_indexed_file_catalog.md`.
 
 ## Run on the Host
 

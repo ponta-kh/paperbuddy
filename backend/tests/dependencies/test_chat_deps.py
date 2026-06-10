@@ -37,6 +37,7 @@ def clear_cached_dependencies() -> Iterator[None]:
 def _set_aws_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+    monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
     monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
 
@@ -45,6 +46,7 @@ def _set_local_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "local")
     monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+    monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
 
 
@@ -95,7 +97,10 @@ def test_get_chat_repository_uses_dynamodb_local_endpoint(
     )
 
 
-@pytest.mark.parametrize("missing_name", ["AWS_REGION", "DYNAMODB_CHAT_TABLE_NAME"])
+@pytest.mark.parametrize(
+    "missing_name",
+    ["AWS_REGION", "DYNAMODB_CHAT_TABLE_NAME", "DYNAMODB_LIBRARY_TABLE_NAME"],
+)
 def test_get_chat_repository_rejects_missing_environment(
     monkeypatch: pytest.MonkeyPatch,
     missing_name: str,
