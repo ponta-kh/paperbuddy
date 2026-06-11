@@ -31,7 +31,7 @@ AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
 
 削除保護と保持ポリシーを有効にしているため、`cdk destroy`だけではテーブルを削除できない。
 
-アプリケーションを含むデプロイ手順は`docs/infra/application.md`を参照する。
+アプリケーションを含むデプロイ手順は[AWSデプロイ手順](deployment-guide.md)を参照する。
 
 ## ローカル接続
 

@@ -42,4 +42,4 @@ mise run dev
 - フロントエンドからの `/api/*` リクエストは、Viteがバックエンドへプロキシする
 
 ローカルバックエンドもAWS上の開発用DynamoDBを使用する。初回構築とAWSデプロイの手順は
-`docs/infra/application.md`を参照する。
+[AWSデプロイ手順](docs/infra/deployment-guide.md)を参照する。

@@ -1,6 +1,8 @@
 # Application Deployment
 
 ネットワーク構成図は[network.md](network.md)を参照する。
+実際の初回デプロイからPDF取り込み、動作確認までの作業手順は[AWSデプロイ手順](deployment-guide.md)を参照する。
+PaperBuddyに起因する課金対象を完全に削除する場合は[AWS完全削除手順](deletion-guide.md)を参照する。
 
 ## 構成
 
