@@ -27,7 +27,8 @@
 - Interface VPC EndpointはECS FargateからのHTTPS通信だけを許可する。
 - フロントエンドS3とRAG材料PDF用S3は公開アクセスをすべて遮断する。
 - ECSタスクには固定AWSアクセスキーを設定せず、タスクロールを使用する。
-- RAG材料PDF用S3は現時点ではBedrock Knowledge Baseへ接続しない。
+- RAG材料PDF用S3はBedrock Knowledge BaseのS3 Data Sourceとして接続する。
+- Bedrock Knowledge BaseのVector StoreにはOpenSearch Serverlessを使用し、ネットワークポリシーでBedrockサービスからのアクセスだけを許可する。
 
 ## 現在の制約
 

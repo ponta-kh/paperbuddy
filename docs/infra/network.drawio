@@ -34,7 +34,7 @@
         <mxCell id="dynamodb-library" value="DynamoDB&lt;br&gt;ライブラリテーブル" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;" vertex="1" parent="1">
           <mxGeometry x="1240" y="125" width="78" height="78" as="geometry"/>
         </mxCell>
-        <mxCell id="bedrock" value="Amazon Bedrock&lt;br&gt;Knowledge Base / Model&lt;br&gt;後続構築" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;" vertex="1" parent="1">
+        <mxCell id="bedrock" value="Amazon Bedrock&lt;br&gt;Knowledge Base / Model" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;" vertex="1" parent="1">
           <mxGeometry x="1420" y="125" width="78" height="78" as="geometry"/>
         </mxCell>
         <mxCell id="gateway-endpoints" value="Gateway VPC Endpoints&lt;br&gt;S3 / DynamoDB" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc_endpoints;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;" vertex="1" parent="1">

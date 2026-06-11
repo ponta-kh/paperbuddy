@@ -108,4 +108,4 @@ depends = ["frontend:format", "backend:format", "infra:format"]
 description = "Deploy the development AWS infrastructure"
 depends = ["frontend:build"]
 dir = "infra"
-run = "pnpm cdk deploy PaperBuddyDev --parameters BedrockKnowledgeBaseId=$BEDROCK_KNOWLEDGE_BASE_ID --parameters BedrockModelArn=$BEDROCK_MODEL_ARN"
+run = "pnpm cdk deploy PaperBuddyDev --parameters BedrockModelArn=$BEDROCK_MODEL_ARN"

@@ -244,4 +244,112 @@ describe("InfraStack", () => {
             },
         });
     });
+
+    test("Bedrock Knowledge BaseとS3 Data Sourceを作成する", () => {
+        template.templateMatches({
+            Parameters: {
+                BedrockKnowledgeBaseId: Match.absent(),
+            },
+        });
+        template.hasResourceProperties("AWS::Bedrock::KnowledgeBase", {
+            Name: "paperbuddy-dev",
+            KnowledgeBaseConfiguration: {
+                Type: "VECTOR",
+                VectorKnowledgeBaseConfiguration: {
+                    EmbeddingModelArn: Match.anyValue(),
+                },
+            },
+            StorageConfiguration: Match.objectLike({
+                Type: "OPENSEARCH_SERVERLESS",
+                OpensearchServerlessConfiguration: Match.objectLike({
+                    VectorIndexName: "bedrock-knowledge-base",
+                }),
+            }),
+        });
+        template.hasResourceProperties("AWS::Bedrock::DataSource", {
+            Name: "paperbuddy-dev-s3",
+            DataDeletionPolicy: "RETAIN",
+            DataSourceConfiguration: {
+                Type: "S3",
+                S3Configuration: Match.objectLike({
+                    InclusionPrefixes: ["documents/"],
+                }),
+            },
+        });
+    });
+
+    test("Knowledge Base用の非公開OpenSearch Serverlessを作成する", () => {
+        template.hasResourceProperties(
+            "AWS::OpenSearchServerless::Collection",
+            {
+                Name: "paperbuddy-dev-kb",
+                Type: "VECTORSEARCH",
+                StandbyReplicas: "DISABLED",
+            },
+        );
+        template.hasResourceProperties("AWS::OpenSearchServerless::Index", {
+            IndexName: "bedrock-knowledge-base",
+            Settings: {
+                Index: {
+                    Knn: true,
+                },
+            },
+            Mappings: {
+                Properties: Match.objectLike({
+                    "bedrock-knowledge-base-default-vector": {
+                        Dimension: 1024,
+                        Method: {
+                            Engine: "faiss",
+                            Name: "hnsw",
+                            SpaceType: "l2",
+                        },
+                        Type: "knn_vector",
+                    },
+                }),
+            },
+        });
+        template.hasResourceProperties(
+            "AWS::OpenSearchServerless::SecurityPolicy",
+            {
+                Type: "network",
+                Policy: Match.stringLikeRegexp(
+                    '"AllowFromPublic":false.*"SourceServices":\\["bedrock.amazonaws.com"\\]',
+                ),
+            },
+        );
+    });
+
+    test("Knowledge Baseロールへ埋め込みモデル・S3・Vector Store権限を付与する", () => {
+        template.hasResourceProperties("AWS::IAM::Policy", {
+            PolicyDocument: {
+                Statement: Match.arrayWith([
+                    Match.objectLike({
+                        Action: "bedrock:InvokeModel",
+                        Effect: "Allow",
+                        Resource: Match.anyValue(),
+                    }),
+                    Match.objectLike({
+                        Action: Match.arrayWith(["s3:GetObject*", "s3:List*"]),
+                        Effect: "Allow",
+                    }),
+                    Match.objectLike({
+                        Action: "aoss:APIAccessAll",
+                        Effect: "Allow",
+                    }),
+                ]),
+            },
+        });
+
+        const knowledgeBases = template.findResources(
+            "AWS::Bedrock::KnowledgeBase",
+        );
+        const knowledgeBasePolicies =
+            template.findResources("AWS::IAM::Policy");
+        expect(JSON.stringify(knowledgeBases)).toContain(
+            "amazon.titan-embed-text-v2:0",
+        );
+        expect(JSON.stringify(knowledgeBasePolicies)).toContain(
+            "amazon.titan-embed-text-v2:0",
+        );
+    });
 });

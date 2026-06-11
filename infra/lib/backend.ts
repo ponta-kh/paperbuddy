@@ -60,7 +60,7 @@ export function createBackend(
                     DYNAMODB_LIBRARY_TABLE_NAME:
                         props.database.libraryTable.tableName,
                     BEDROCK_KNOWLEDGE_BASE_ID:
-                        props.llm.knowledgeBaseId.valueAsString,
+                        props.llm.knowledgeBase.attrKnowledgeBaseId,
                     BEDROCK_MODEL_ARN: props.llm.modelArn.valueAsString,
                 },
             },

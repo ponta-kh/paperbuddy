@@ -17,7 +17,7 @@ export class InfraStack extends cdk.Stack {
         super(scope, id, props);
 
         const database = createDatabaseResources(this, props.stageName);
-        const llm = createLlmResources(this);
+        const llm = createLlmResources(this, props.stageName);
         const network = createNetwork(this);
         const backend = createBackend(this, {
             assetPath: props.backendAssetPath,
@@ -59,6 +59,12 @@ export class InfraStack extends cdk.Stack {
         });
         new cdk.CfnOutput(this, "RagSourceBucketArn", {
             value: llm.ragSourceBucket.bucketArn,
+        });
+        new cdk.CfnOutput(this, "BedrockKnowledgeBaseId", {
+            value: llm.knowledgeBase.attrKnowledgeBaseId,
+        });
+        new cdk.CfnOutput(this, "BedrockDataSourceId", {
+            value: llm.dataSource.attrDataSourceId,
         });
         new cdk.CfnOutput(this, "DistributionDomainName", {
             value: frontendDelivery.distribution.distributionDomainName,
