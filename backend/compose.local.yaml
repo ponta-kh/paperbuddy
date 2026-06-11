@@ -20,6 +20,8 @@ services:
       DYNAMODB_LIBRARY_TABLE_NAME: paperbuddy-local-library
       DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
       CHAT_INFRASTRUCTURE_MODE: local
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID}
+      COGNITO_USER_POOL_CLIENT_ID: ${COGNITO_USER_POOL_CLIENT_ID}
       SIMULATED_LLM_DELAY_SECONDS: "2"
     depends_on:
       - dynamodb-local

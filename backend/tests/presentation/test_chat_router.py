@@ -31,7 +31,9 @@ from src.dependencies.chat_deps import (
     get_start_chat_use_case,
 )
 from src.domain.repositories.chat_command_repository_protocol import ChatConflictError
+from src.presentation.auth import AuthenticatedUser, get_authenticated_user
 
+USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 CHAT_ID_TEXT = str(CHAT_ID)
 
@@ -123,11 +125,13 @@ class StubUnavailableListChatsUseCase:
 
 def test_list_chats_endpoint() -> None:
     app.dependency_overrides[get_list_chats_use_case] = lambda: StubListChatsUseCase()
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.get(
         "/api/chats",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
@@ -148,11 +152,13 @@ def test_list_chats_endpoint_returns_service_unavailable_for_repository_error() 
     app.dependency_overrides[get_list_chats_use_case] = lambda: (
         StubUnavailableListChatsUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.get(
         "/api/chats",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
@@ -164,11 +170,13 @@ def test_list_chat_messages_endpoint() -> None:
     app.dependency_overrides[get_list_chat_messages_use_case] = lambda: (
         StubListChatMessagesUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.get(
         f"/api/chats/{CHAT_ID_TEXT}/messages",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
@@ -190,11 +198,13 @@ def test_list_chat_messages_endpoint_returns_not_found() -> None:
     app.dependency_overrides[get_list_chat_messages_use_case] = lambda: (
         StubNotFoundListChatMessagesUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.get(
         f"/api/chats/{CHAT_ID_TEXT}/messages",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
@@ -206,11 +216,13 @@ def test_continue_chat_endpoint() -> None:
     app.dependency_overrides[get_continue_chat_use_case] = lambda: (
         StubContinueChatUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.post(
         f"/api/chats/{CHAT_ID_TEXT}/messages",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
 
@@ -225,11 +237,13 @@ def test_continue_chat_endpoint() -> None:
 
 def test_rename_chat_endpoint() -> None:
     app.dependency_overrides[get_rename_chat_use_case] = lambda: StubRenameChatUseCase()
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.patch(
         f"/api/chats/{CHAT_ID_TEXT}",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"title": "変更後"},
     )
 
@@ -241,11 +255,13 @@ def test_rename_chat_endpoint() -> None:
 def test_delete_chat_endpoint() -> None:
     use_case = StubDeleteChatUseCase()
     app.dependency_overrides[get_delete_chat_use_case] = lambda: use_case
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.delete(
         f"/api/chats/{CHAT_ID_TEXT}",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()
@@ -258,11 +274,13 @@ def test_continue_chat_endpoint_returns_conflict_when_expired() -> None:
     app.dependency_overrides[get_continue_chat_use_case] = lambda: (
         StubExpiredContinueChatUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.post(
         f"/api/chats/{CHAT_ID_TEXT}/messages",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
 
@@ -275,11 +293,13 @@ def test_continue_chat_endpoint_returns_conflict_when_stale() -> None:
     app.dependency_overrides[get_continue_chat_use_case] = lambda: (
         StubConflictContinueChatUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.post(
         f"/api/chats/{CHAT_ID_TEXT}/messages",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "next question"},
     )
 
@@ -290,11 +310,13 @@ def test_continue_chat_endpoint_returns_conflict_when_stale() -> None:
 
 def test_start_chat_endpoint() -> None:
     app.dependency_overrides[get_start_chat_use_case] = lambda: StubStartChatUseCase()
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.post(
         "/api/chats",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
         json={"prompt": "question"},
     )
 

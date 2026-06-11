@@ -5,6 +5,7 @@ import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as cdk from "aws-cdk-lib/core";
 import type { Construct } from "constructs";
+import type { AuthenticationResources } from "./authentication";
 import type { DatabaseResources } from "./database";
 import type { LlmResources } from "./llm";
 import type { NetworkResources } from "./network";
@@ -15,6 +16,7 @@ export interface BackendResources {
 
 export interface BackendProps {
     readonly assetPath?: string;
+    readonly authentication: AuthenticationResources;
     readonly llm: LlmResources;
     readonly network: NetworkResources;
     readonly database: DatabaseResources;
@@ -62,6 +64,10 @@ export function createBackend(
                     BEDROCK_KNOWLEDGE_BASE_ID:
                         props.llm.knowledgeBase.attrKnowledgeBaseId,
                     BEDROCK_MODEL_ARN: props.llm.modelArn.valueAsString,
+                    COGNITO_USER_POOL_ID:
+                        props.authentication.userPool.userPoolId,
+                    COGNITO_USER_POOL_CLIENT_ID:
+                        props.authentication.userPoolClient.userPoolClientId,
                 },
             },
         },

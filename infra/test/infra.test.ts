@@ -160,6 +160,18 @@ describe("InfraStack", () => {
                 Ref: expect.stringMatching("LibraryTable"),
             }),
         });
+        expect(environments).toContainEqual({
+            Name: "COGNITO_USER_POOL_ID",
+            Value: expect.objectContaining({
+                Ref: expect.stringMatching("UserPool"),
+            }),
+        });
+        expect(environments).toContainEqual({
+            Name: "COGNITO_USER_POOL_CLIENT_ID",
+            Value: expect.objectContaining({
+                Ref: expect.stringMatching("UserPoolWebClient"),
+            }),
+        });
     });
 
     test("NATとインターネット接続を作成せずVPC Endpointを使用する", () => {
@@ -167,7 +179,7 @@ describe("InfraStack", () => {
         template.resourceCountIs("AWS::EC2::EIP", 0);
         template.resourceCountIs("AWS::EC2::InternetGateway", 0);
         template.resourceCountIs("AWS::EC2::VPCGatewayAttachment", 0);
-        template.resourceCountIs("AWS::EC2::VPCEndpoint", 7);
+        template.resourceCountIs("AWS::EC2::VPCEndpoint", 8);
 
         const routes = template.findResources("AWS::EC2::Route");
         expect(Object.values(routes)).not.toContainEqual(
@@ -189,10 +201,29 @@ describe("InfraStack", () => {
                 ".ecr.api",
                 ".ecr.dkr",
                 ".logs",
+                ".cognito-idp",
                 ".bedrock-agent-runtime",
                 ".bedrock-runtime",
             ]),
         );
+    });
+
+    test("Cognito User Poolとシークレットを持たないWebクライアントを作成する", () => {
+        template.hasResourceProperties("AWS::Cognito::UserPool", {
+            UserPoolName: "paperbuddy-dev",
+            UsernameAttributes: ["email"],
+            AutoVerifiedAttributes: ["email"],
+            Policies: {
+                PasswordPolicy: Match.objectLike({
+                    MinimumLength: 12,
+                }),
+            },
+        });
+        template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+            ClientName: "paperbuddy-dev-web",
+            GenerateSecret: false,
+            PreventUserExistenceErrors: "ENABLED",
+        });
     });
 
     test("routes frontend and api traffic through CloudFront", () => {

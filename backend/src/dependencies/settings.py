@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     dynamodb_endpoint_url: str | None = None
     bedrock_knowledge_base_id: str | None = None
     bedrock_model_arn: str | None = None
+    cognito_user_pool_id: str | None = None
+    cognito_user_pool_client_id: str | None = None
     simulated_llm_delay_seconds: float = Field(default=2, ge=0)
 
     @model_validator(mode="after")

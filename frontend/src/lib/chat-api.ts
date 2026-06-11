@@ -1,5 +1,6 @@
+import { getApiHeaders } from "@/lib/api-client";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const USER_ID = import.meta.env.VITE_USER_ID;
 
 export type ChatSummary = {
     id: string;
@@ -48,22 +49,10 @@ type RenameChatResponse = {
     title: string;
 };
 
-function getHeaders(includeContentType = false): Record<string, string> {
-    if (!USER_ID) {
-        throw new Error("VITE_USER_ID is not configured");
-    }
-
-    return {
-        Accept: "application/json",
-        "X-User-ID": USER_ID,
-        ...(includeContentType ? { "Content-Type": "application/json" } : {}),
-    };
-}
-
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
         method: "GET",
-        headers: getHeaders(),
+        headers: await getApiHeaders(),
         signal,
     });
 
@@ -80,7 +69,7 @@ async function postJson<TResponse, TBody>(
 ): Promise<TResponse> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
-        headers: getHeaders(true),
+        headers: await getApiHeaders(true),
         body: JSON.stringify(body),
     });
 
@@ -97,7 +86,7 @@ async function patchJson<TResponse, TBody>(
 ): Promise<TResponse> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
         method: "PATCH",
-        headers: getHeaders(true),
+        headers: await getApiHeaders(true),
         body: JSON.stringify(body),
     });
 
@@ -176,7 +165,7 @@ export async function deleteChat(chatId: string): Promise<void> {
         `${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`,
         {
             method: "DELETE",
-            headers: getHeaders(),
+            headers: await getApiHeaders(),
         },
     );
 

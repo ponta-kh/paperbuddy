@@ -9,6 +9,9 @@ from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto
     ListIndexedFilesOutput,
 )
 from src.dependencies.library_deps import get_list_indexed_files_use_case
+from src.presentation.auth import AuthenticatedUser, get_authenticated_user
+
+USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 class StubListIndexedFilesUseCase:
@@ -41,11 +44,13 @@ def test_list_indexed_files_endpoint() -> None:
     app.dependency_overrides[get_list_indexed_files_use_case] = lambda: (
         StubListIndexedFilesUseCase()
     )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
     client = TestClient(app)
 
     response = client.get(
         "/api/library/files",
-        headers={"X-User-ID": "00000000-0000-0000-0000-000000000001"},
     )
 
     app.dependency_overrides.clear()

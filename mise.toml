@@ -15,9 +15,9 @@ dir = "backend"
 run = "docker compose -f compose.local.yaml up --build"
 
 [tasks."dev:local:frontend"]
-description = "固定の検証ユーザーIDでフロントエンドを起動する"
+description = "Cognito認証を使用してフロントエンドを起動する"
 dir = "frontend"
-run = "VITE_USER_ID=00000000-0000-0000-0000-000000000001 pnpm dev"
+run = "pnpm dev"
 
 [tasks."dev:backend"]
 description = "Start the FastAPI development server"

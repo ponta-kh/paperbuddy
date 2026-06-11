@@ -17,7 +17,7 @@
 | CloudFront | 内部ALB | `/api/*`のみCloudFront VPC Origin経由で転送 |
 | 内部ALB | ECS Fargate | TCP 8000。ECS Security GroupはALB Security Groupからのみ許可 |
 | ECS Fargate | DynamoDB / S3 | Gateway VPC Endpoint経由で通信 |
-| ECS Fargate | ECR / CloudWatch Logs / Bedrock | Interface VPC Endpoint経由でHTTPS通信 |
+| ECS Fargate | ECR / CloudWatch Logs / Bedrock / Cognito | Interface VPC Endpoint経由でHTTPS通信 |
 
 ## セキュリティ境界
 

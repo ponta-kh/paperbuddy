@@ -1,7 +1,10 @@
+import "@aws-amplify/ui-react/styles.css";
+import { Authenticator } from "@aws-amplify/ui-react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import Chat from "./Chat.tsx";
+import { configureAuth } from "./lib/auth.ts";
 
 const rootElement = document.getElementById("root");
 
@@ -9,8 +12,22 @@ if (!rootElement) {
     throw new Error("Root element not found");
 }
 
-createRoot(rootElement).render(
-    <StrictMode>
-        <Chat />
-    </StrictMode>,
-);
+const root = createRoot(rootElement);
+
+configureAuth()
+    .then(() => {
+        root.render(
+            <StrictMode>
+                <Authenticator loginMechanisms={["email"]}>
+                    <Chat />
+                </Authenticator>
+            </StrictMode>,
+        );
+    })
+    .catch(() => {
+        root.render(
+            <p className="p-6 text-red-700">
+                認証設定を読み込めませんでした。管理者へお問い合わせください。
+            </p>,
+        );
+    });

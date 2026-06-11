@@ -13,6 +13,7 @@ AWS access keys in `.env`.
 `src/dependencies/settings.py`のPydantic Settingsへ集約している。
 
 - 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`、`DYNAMODB_LIBRARY_TABLE_NAME`
+- 認証必須: `COGNITO_USER_POOL_ID`、`COGNITO_USER_POOL_CLIENT_ID`
 - AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
 - ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
 - 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
@@ -81,6 +82,7 @@ mise run dev:local
 - DB: DynamoDB Localコンテナ。データはDocker Volumeへ保存する
 - LLM: 既定で2秒待機し、300文字の疑似回答を返す
 - 初期データ: 今日2件、過去7日間3件、1週間以上前6件の会話履歴
+- 認証: `backend/.env`と`frontend/.env`に同じCognito User PoolとWeb App Clientを設定する
 
 `CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用Infrastructureを注入する。
 通常起動およびAWSデプロイでは、既存のDynamoDB・Bedrock実装を使用する。
@@ -99,10 +101,12 @@ Start the backend, then create a chat. This calls both Knowledge Base
 `RetrieveAndGenerate` and Bedrock Runtime `Converse`.
 
 ```sh
+export ACCESS_TOKEN=replace-with-cognito-access-token
+
 curl --fail-with-body \
   -X POST http://localhost:8000/api/chats \
   -H 'Content-Type: application/json' \
-  -H 'X-User-ID: 00000000-0000-0000-0000-000000000001' \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
   -d '{"prompt":"このナレッジベースの内容を簡潔に説明してください"}'
 ```
 

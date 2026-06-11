@@ -14,7 +14,7 @@ Browser
                                                         -> Gateway VPC Endpoints
                                                            -> S3 / DynamoDB
                                                         -> Interface VPC Endpoints
-                                                           -> ECR / CloudWatch Logs / Amazon Bedrock
+                                                           -> ECR / CloudWatch Logs / Amazon Bedrock / Amazon Cognito
 
 RAG source PDF -> private S3 bucket
 ```
@@ -24,7 +24,8 @@ RAG source PDF -> private S3 bucket
 - ALB: 内部向けとしてプライベートサブネットに配置する
 - CloudFront: `/api/*`をキャッシュせず、VPC Origin経由でALBへ転送する
 - VPC: 2 Availability Zoneの隔離サブネット。NAT GatewayとInternet Gatewayは作成しない
-- AWSサービス接続: S3・DynamoDBのGateway Endpointと、ECR・CloudWatch Logs・BedrockのInterface Endpointを使用する
+- AWSサービス接続: S3・DynamoDBのGateway Endpointと、ECR・CloudWatch Logs・Bedrock・CognitoのInterface Endpointを使用する
+- 認証: Cognito User Poolとシークレットを持たないWeb App Clientを使用し、フロントエンドはAmplify UI、バックエンドはアクセストークンのJWT検証を行う
 - 永続化: 開発用DynamoDBテーブル`paperbuddy-dev-chat`
 - ライブラリ一覧: 開発用DynamoDBテーブル`paperbuddy-dev-library`
 - RAG材料: 非公開S3バケットの`documents/`配下へPDFを配置し、Bedrock Knowledge BaseのS3 Data Sourceとして使用する
@@ -76,6 +77,7 @@ mise run infra:deploy:dev
 5. `frontend/dist/`をフロントエンド配信用S3バケットへ配置する
 6. CloudFrontのキャッシュを無効化する
 7. Bedrock Knowledge Base、S3 Data Source、OpenSearch Serverless Vector Storeを含むCloudFormationスタック全体を更新する
+8. Cognito User PoolとWeb App Clientを作成し、フロントエンド用の`auth-config.json`をS3へ配置する
 
 Knowledge Base IDはCDKが作成したリソースからECSタスク定義へ設定するため、デプロイ時の入力は不要である。埋め込みモデルにはTitan Text Embeddings V2を使用する。
 
@@ -164,6 +166,8 @@ Fargateタスクロールには以下の権限だけを付与する。
 
 - DynamoDB: `GetItem`、`Query`、`TransactWriteItems`
 - Bedrock: `RetrieveAndGenerate`、`InvokeModel`
+
+JWT署名鍵はCognito User PoolsのInterface VPC Endpoint経由で取得する。User PoolにはHosted UI用ドメインを設定せず、ブラウザからCognito APIへ接続するAmplify UIの認証フローを使用する。
 
 ECSタスクへ`AWS_PROFILE`や固定AWSアクセスキーは設定しない。
 

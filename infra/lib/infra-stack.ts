@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib/core";
 import type { Construct } from "constructs";
+import { createAuthenticationResources } from "./authentication";
 import { createBackend } from "./backend";
 import { createDatabaseResources } from "./database";
 import { createFrontendDelivery } from "./frontend-delivery";
@@ -16,11 +17,16 @@ export class InfraStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: InfraStackProps) {
         super(scope, id, props);
 
+        const authentication = createAuthenticationResources(
+            this,
+            props.stageName,
+        );
         const database = createDatabaseResources(this, props.stageName);
         const llm = createLlmResources(this, props.stageName);
         const network = createNetwork(this);
         const backend = createBackend(this, {
             assetPath: props.backendAssetPath,
+            authentication,
             llm,
             network,
             database,
@@ -36,6 +42,7 @@ export class InfraStack extends cdk.Stack {
         );
         const frontendDelivery = createFrontendDelivery(this, {
             assetPath: props.frontendAssetPath,
+            authentication,
             backendLoadBalancer: backend.backendService.loadBalancer,
         });
 
@@ -68,6 +75,12 @@ export class InfraStack extends cdk.Stack {
         });
         new cdk.CfnOutput(this, "DistributionDomainName", {
             value: frontendDelivery.distribution.distributionDomainName,
+        });
+        new cdk.CfnOutput(this, "UserPoolId", {
+            value: authentication.userPool.userPoolId,
+        });
+        new cdk.CfnOutput(this, "UserPoolClientId", {
+            value: authentication.userPoolClient.userPoolClientId,
         });
     }
 }
