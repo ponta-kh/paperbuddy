@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="AWSインフラストラクチャをLintする"
+#MISE dir="infra"
+
+pnpm lint

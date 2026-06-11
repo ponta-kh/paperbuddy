@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Vite開発サーバーを起動する"
+#MISE dir="frontend"
+
+pnpm dev

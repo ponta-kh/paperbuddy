@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="FastAPI開発サーバーを起動する"
+#MISE dir="backend"
+
+uv run uvicorn main:app --reload --env-file .env

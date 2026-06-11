@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="フロントエンドをテストする"
+#MISE dir="frontend"
+
+pnpm test

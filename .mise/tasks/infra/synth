@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のAWSインフラストラクチャをsynthする"
+#MISE depends=["frontend:build"]
+#MISE dir="infra"
+
+pnpm cdk synth PaperBuddyDev

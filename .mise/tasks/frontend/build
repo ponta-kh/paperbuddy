@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="デプロイ用フロントエンドをビルドする"
+#MISE dir="frontend"
+
+pnpm build

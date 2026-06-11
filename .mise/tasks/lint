@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="すべてのソースコードをLintする"
+#MISE depends=["frontend:lint", "backend:lint", "infra:lint"]
