@@ -208,6 +208,20 @@ describe("InfraStack", () => {
         );
     });
 
+    test("Cognito JWT署名鍵を取得するためPrivate DNSを有効にする", () => {
+        const endpoints = template.findResources("AWS::EC2::VPCEndpoint");
+        const cognitoEndpoint = Object.values(endpoints).find((endpoint) =>
+            JSON.stringify(endpoint.Properties?.ServiceName).includes(
+                "cognito-idp",
+            ),
+        );
+
+        expect(cognitoEndpoint?.Properties).toMatchObject({
+            PrivateDnsEnabled: true,
+            VpcEndpointType: "Interface",
+        });
+    });
+
     test("Cognito User Poolとシークレットを持たないWebクライアントを作成する", () => {
         template.hasResourceProperties("AWS::Cognito::UserPool", {
             UserPoolName: "paperbuddy-dev",

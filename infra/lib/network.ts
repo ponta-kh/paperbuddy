@@ -1,6 +1,5 @@
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import type * as ecs from "aws-cdk-lib/aws-ecs";
-import * as cdk from "aws-cdk-lib/core";
 import type { Construct } from "constructs";
 
 export interface NetworkResources {
@@ -61,10 +60,7 @@ export function connectBackendToAwsServices(
         ec2.InterfaceVpcEndpointAwsService.ECR,
         ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
         ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-        new ec2.InterfaceVpcEndpointService(
-            `com.amazonaws.${cdk.Stack.of(scope).region}.cognito-idp`,
-            443,
-        ),
+        ec2.InterfaceVpcEndpointAwsService.COGNITO_IDP,
         ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT_RUNTIME,
         ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
     ];
