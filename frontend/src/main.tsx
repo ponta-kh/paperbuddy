@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import Chat from "./Chat.tsx";
+import { SystemErrorScreen } from "./components/system/SystemErrorScreen.tsx";
 import { configureAuth } from "./lib/auth.ts";
 
 const rootElement = document.getElementById("root");
@@ -25,9 +26,5 @@ configureAuth()
         );
     })
     .catch(() => {
-        root.render(
-            <p className="p-6 text-red-700">
-                認証設定を読み込めませんでした。管理者へお問い合わせください。
-            </p>,
-        );
+        root.render(<SystemErrorScreen />);
     });
