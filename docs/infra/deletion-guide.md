@@ -27,18 +27,18 @@ PaperBuddyのAWSリソースを削除し、PaperBuddyに起因する継続課金
 
 CDK bootstrapのアセットS3バケットとECRリポジトリにも、デプロイしたファイルやDockerイメージが残る。これらを削除する方法は、CDK bootstrapを他プロジェクトと共有しているかによって異なる。
 
-## 完全削除チェックリスト
+## 削除可否の確認
 
-1. 削除対象のAWSアカウントとリージョンを確認する
-2. 必要なデータをバックアップする
-3. スタック削除前に保持リソースの物理IDを保存する
-4. `PaperBuddyDev`スタックを削除する
-5. 保持されたDynamoDB、S3、Cognito、CloudWatch Logsを削除する
-6. CDK bootstrapの不要アセットを削除する
-7. PaperBuddy関連リソースが残っていないことを監査する
-8. AWS Cost Explorerで課金停止を後日確認する
+この手順へ進む前に、以下を満たしていることを確認する。
 
-## 事前確認
+- PaperBuddy関連リソースをすべて削除してよい
+- 削除対象アカウントとリージョンが正しい
+- 必要なデータはすでに退避済み、または退避不要である
+- AWS CLIで対象アカウントへログイン済みである
+
+削除後は復元できない。必要なデータがある場合は、先に退避する。
+
+## 削除前準備
 
 各端末でAWS CLIによるログインが完了していることを前提とする。AWS認証情報やProfileはこの手順では設定しない。
 
@@ -71,7 +71,7 @@ aws cloudformation describe-stacks \
   --output text
 ```
 
-## 必要なデータのバックアップ
+### 必要なデータのバックアップ
 
 必要に応じて、RAG材料PDFをローカルへ退避する。
 
@@ -103,7 +103,7 @@ aws dynamodb create-backup \
 
 継続課金を完全に停止する場合、確認完了後にこれらのバックアップも削除する。
 
-## 保持リソースIDの保存
+### 保持リソースIDの保存
 
 スタック削除後はCloudFormation Outputやスタックリソース一覧を取得できないため、削除前に保存する。
 
@@ -156,7 +156,9 @@ printf 'USER_POOL_ID=%s\n' "$USER_POOL_ID"
 printf 'LOG_GROUP_NAMES=%s\n' "${LOG_GROUP_NAMES[*]}"
 ```
 
-## PaperBuddyDevスタックの削除
+## 削除作業
+
+### PaperBuddyDevスタックの削除
 
 CloudFormationでスタックを削除する。保持ポリシーが設定されたリソースは残る。
 
@@ -182,7 +184,7 @@ aws cloudformation describe-stack-events \
 
 `FORCE_DELETE_STACK`は、原因を確認せずに使用しない。強制削除では課金対象リソースが残る可能性がある。
 
-## 保持されたDynamoDBテーブルの削除
+### 保持されたDynamoDBテーブルの削除
 
 DynamoDBテーブルは削除保護が有効なため、削除保護を解除してから削除する。
 
@@ -235,7 +237,7 @@ aws dynamodb delete-backup \
   --backup-arn <削除対象バックアップARN>
 ```
 
-## 保持されたS3バケットの削除
+### 保持されたS3バケットの削除
 
 RAG材料用S3バケットではバージョニングが有効なため、現行オブジェクトだけでなく全バージョンと削除マーカーを削除する必要がある。
 
@@ -289,7 +291,7 @@ for BUCKET_NAME in "$FRONTEND_BUCKET_NAME" "$RAG_SOURCE_BUCKET_NAME"; do
 done
 ```
 
-## 保持されたCognito User Poolの削除
+### 保持されたCognito User Poolの削除
 
 Cognito利用者を含むUser Poolを削除する。
 
@@ -299,7 +301,7 @@ aws cognito-idp delete-user-pool \
   --region "$AWS_REGION"
 ```
 
-## 保持されたCloudWatch Logsの削除
+### 保持されたCloudWatch Logsの削除
 
 スタック削除後も保持されたロググループを削除する。
 
@@ -311,7 +313,7 @@ for LOG_GROUP_NAME in "${LOG_GROUP_NAMES[@]}"; do
 done
 ```
 
-## CDK bootstrapアセットの削除
+### CDK bootstrapアセットの削除
 
 CDK bootstrapのS3バケットとECRリポジトリには、デプロイ時のファイル・Dockerイメージが残り、ストレージ料金が発生する可能性がある。
 
@@ -408,7 +410,7 @@ aws cloudformation wait stack-delete-complete \
   --region "$AWS_REGION"
 ```
 
-## 削除結果の監査
+### 削除結果の監査
 
 `PaperBuddyDev`スタックが存在しないことを確認する。
 
@@ -475,7 +477,7 @@ aws resourcegroupstaggingapi get-resources \
 
 出力されたリソースがある場合は、サービス種別と課金有無を確認して個別削除する。
 
-## 課金停止の確認
+### 課金停止の確認
 
 AWS Cost Explorerの反映には時間差がある。削除直後に利用料金が表示されても、削除前の利用分である可能性がある。
 
