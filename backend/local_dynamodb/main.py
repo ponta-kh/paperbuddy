@@ -1,22 +1,16 @@
 import time
+from typing import Any
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.dependencies.local_chat_seed import seed_local_chats
-from src.dependencies.settings import ChatInfrastructureMode, get_settings
+from local_dynamodb.seed import seed_local_chats
+from src.dependencies.client_factories import create_local_dynamodb_client
+from src.dependencies.settings import get_settings
 
 
 def main() -> None:
     settings = get_settings()
-    if settings.chat_infrastructure_mode is not ChatInfrastructureMode.LOCAL:
-        raise ValueError("Local DynamoDB initialization requires local mode")
-    assert settings.dynamodb_endpoint_url is not None
-    client = boto3.client(
-        "dynamodb",
-        region_name=settings.aws_region,
-        endpoint_url=settings.dynamodb_endpoint_url,
-    )
+    client = create_local_dynamodb_client(settings)
 
     for attempt in range(30):
         chat_table_ready = False
@@ -57,7 +51,7 @@ def main() -> None:
     seed_local_chats(client, table_name=settings.dynamodb_chat_table_name)
 
 
-def _create_chat_table(client: object, *, table_name: str) -> None:
+def _create_chat_table(client: Any, *, table_name: str) -> None:
     client.create_table(
         TableName=table_name,
         AttributeDefinitions=[
@@ -99,7 +93,7 @@ def _create_chat_table(client: object, *, table_name: str) -> None:
     )
 
 
-def _create_library_table(client: object, *, table_name: str) -> None:
+def _create_library_table(client: Any, *, table_name: str) -> None:
     client.create_table(
         TableName=table_name,
         AttributeDefinitions=[

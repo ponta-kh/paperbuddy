@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from boto3.dynamodb.types import TypeDeserializer
 
-from src.dependencies.local_chat_seed import build_seed_items, seed_local_chats
+from local_dynamodb.seed import build_seed_items, seed_local_chats
 
 _JST = ZoneInfo("Asia/Tokyo")
 _deserializer = TypeDeserializer()

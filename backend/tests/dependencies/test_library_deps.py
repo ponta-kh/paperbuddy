@@ -6,7 +6,7 @@ import pytest
 from src.application.use_cases.library.list_indexed_files.list_indexed_files import (
     ListIndexedFilesUseCase,
 )
-from src.dependencies import library_deps
+from src.dependencies import client_factories, library_deps
 from src.dependencies.settings import get_settings
 from src.infrastructure.library.dynamodb_indexed_file_catalog import (
     DynamoDbIndexedFileCatalog,
@@ -46,7 +46,7 @@ def test_get_library_dependencies_use_dynamodb_repository(
     _set_aws_environment(monkeypatch)
     dynamodb_client = Mock()
     client_factory = Mock(return_value=dynamodb_client)
-    monkeypatch.setattr(library_deps.boto3, "client", client_factory)
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     catalog = library_deps.get_indexed_file_catalog()
     use_case = library_deps.get_list_indexed_files_use_case()
@@ -65,7 +65,7 @@ def test_get_library_dependencies_use_dynamodb_local_endpoint(
     _set_local_environment(monkeypatch)
     dynamodb_client = Mock()
     client_factory = Mock(return_value=dynamodb_client)
-    monkeypatch.setattr(library_deps.boto3, "client", client_factory)
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     catalog = library_deps.get_indexed_file_catalog()
 

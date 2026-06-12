@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from src.application.use_cases.chat.delete_chat.delete_chat import DeleteChatUseCase
 from src.application.use_cases.chat.rename_chat.rename_chat import RenameChatUseCase
-from src.dependencies import chat_deps
+from src.dependencies import chat_deps, client_factories
 from src.dependencies.settings import get_settings
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
@@ -56,7 +56,7 @@ def test_get_chat_repository_uses_dynamodb(
     _set_aws_environment(monkeypatch)
     dynamodb_client = Mock()
     client_factory = Mock(return_value=dynamodb_client)
-    monkeypatch.setattr(chat_deps.boto3, "client", client_factory)
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     repository = chat_deps.get_chat_repository()
 
@@ -71,7 +71,7 @@ def test_get_chat_command_use_cases_use_dynamodb_repository(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _set_aws_environment(monkeypatch)
-    monkeypatch.setattr(chat_deps.boto3, "client", Mock())
+    monkeypatch.setattr(client_factories.boto3, "client", Mock())
 
     assert isinstance(chat_deps.get_rename_chat_use_case(), RenameChatUseCase)
     assert isinstance(chat_deps.get_delete_chat_use_case(), DeleteChatUseCase)
@@ -83,7 +83,7 @@ def test_get_chat_repository_uses_dynamodb_local_endpoint(
     _set_local_environment(monkeypatch)
     dynamodb_client = Mock()
     client_factory = Mock(return_value=dynamodb_client)
-    monkeypatch.setattr(chat_deps.boto3, "client", client_factory)
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     repository = chat_deps.get_chat_repository()
 
@@ -119,7 +119,7 @@ def test_get_chat_generation_client_uses_bedrock_environment(
     knowledge_base_client = Mock()
     model_client = Mock()
     client_factory = Mock(side_effect=[knowledge_base_client, model_client])
-    monkeypatch.setattr(chat_deps.boto3, "client", client_factory)
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     client = chat_deps.get_chat_generation_client()
 

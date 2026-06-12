@@ -11,7 +11,7 @@ services:
   dynamodb-init:
     build:
       context: .
-    command: python -m src.dependencies.initialize_local_dynamodb
+    command: python -m local_dynamodb.main
     environment: &local-environment
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local

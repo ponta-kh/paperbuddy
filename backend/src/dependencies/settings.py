@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     cognito_user_pool_client_id: str | None = None
     simulated_llm_delay_seconds: float = Field(default=2, ge=0)
 
+    @property
+    def is_local_mode(self) -> bool:
+        return self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
+
     @model_validator(mode="after")
     def validate_mode_specific_settings(self) -> "Settings":
         if self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL:
