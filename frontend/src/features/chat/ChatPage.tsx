@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
-import { ChatComposer } from "@/components/chat/ChatComposer";
-import { ChatConversation } from "@/components/chat/ChatConversation";
-import { ChatHeader } from "@/components/chat/ChatHeader";
-import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { TooltipProvider } from "@/components/shadcn/tooltip";
+import { ChatComposer } from "@/features/chat/components/ChatComposer";
+import { ChatConversation } from "@/features/chat/components/ChatConversation";
+import { ChatHeader } from "@/features/chat/components/ChatHeader";
+import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
+import { LibraryHeaderActions } from "@/features/chat/components/library/LibraryHeaderActions";
 import {
     type ChatMessage,
     type ChatSummary,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/chat-api";
 import { cn } from "@/lib/utils";
 
-function Chat() {
+function ChatPage() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [message, setMessage] = useState("");
@@ -29,8 +30,6 @@ function Chat() {
     const [chatsError, setChatsError] = useState(false);
     const [messagesError, setMessagesError] = useState(false);
     const [sendError, setSendError] = useState(false);
-
-    const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -188,11 +187,15 @@ function Chat() {
                     <ChatHeader
                         chats={chats}
                         chatsError={chatsError}
+                        headerActions={<LibraryHeaderActions />}
                         isChatsLoading={isChatsLoading}
                         mobileMenuOpen={mobileMenuOpen}
                         selectedChatId={selectedChatId}
                         sidebarOpen={sidebarOpen}
-                        title={selectedChat?.title}
+                        title={
+                            chats.find((chat) => chat.id === selectedChatId)
+                                ?.title
+                        }
                         onChatSelect={handleChatSelect}
                         onDeleteChat={handleDeleteChat}
                         onMobileMenuOpenChange={setMobileMenuOpen}
@@ -220,4 +223,4 @@ function Chat() {
     );
 }
 
-export default Chat;
+export default ChatPage;

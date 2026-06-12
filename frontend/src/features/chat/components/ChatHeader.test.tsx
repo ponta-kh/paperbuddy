@@ -3,11 +3,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, test, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/shadcn/tooltip";
-import { ChatHeader } from "./ChatHeader";
-
-vi.mock("@/components/library/LibraryHeaderActions", () => ({
-    LibraryHeaderActions: () => <div>ライブラリアクション</div>,
-}));
+import { ChatHeader } from "@/features/chat/components/ChatHeader";
 
 const defaultProps: ComponentProps<typeof ChatHeader> = {
     chats: [],
@@ -21,6 +17,7 @@ const defaultProps: ComponentProps<typeof ChatHeader> = {
     onNewChat: vi.fn(),
     onRenameChat: vi.fn(),
     onSidebarOpenChange: vi.fn(),
+    headerActions: <div>ライブラリアクション</div>,
 };
 
 function renderHeader(props: Partial<ComponentProps<typeof ChatHeader>> = {}) {

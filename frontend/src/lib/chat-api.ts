@@ -1,6 +1,4 @@
-import { getApiHeaders } from "@/lib/api-client";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import { requestJson } from "@/lib/api-client";
 
 export type ChatSummary = {
     id: string;
@@ -49,56 +47,11 @@ type RenameChatResponse = {
     title: string;
 };
 
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+export async function getChats(signal?: AbortSignal): Promise<ChatSummary[]> {
+    const response = await requestJson<ListChatsResponse>("/chats", {
         method: "GET",
-        headers: await getApiHeaders(),
         signal,
     });
-
-    if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-    }
-
-    return response.json() as Promise<T>;
-}
-
-async function postJson<TResponse, TBody>(
-    path: string,
-    body: TBody,
-): Promise<TResponse> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-        method: "POST",
-        headers: await getApiHeaders(true),
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-    }
-
-    return response.json() as Promise<TResponse>;
-}
-
-async function patchJson<TResponse, TBody>(
-    path: string,
-    body: TBody,
-): Promise<TResponse> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-        method: "PATCH",
-        headers: await getApiHeaders(true),
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-    }
-
-    return response.json() as Promise<TResponse>;
-}
-
-export async function getChats(signal?: AbortSignal): Promise<ChatSummary[]> {
-    const response = await getJson<ListChatsResponse>("/chats", signal);
 
     return response.chats
         .map((chat) => ({
@@ -117,9 +70,12 @@ export async function getChatMessages(
     chatId: string,
     signal?: AbortSignal,
 ): Promise<ChatMessage[]> {
-    const chat = await getJson<ListChatMessagesResponse>(
+    const chat = await requestJson<ListChatMessagesResponse>(
         `/chats/${encodeURIComponent(chatId)}/messages`,
-        signal,
+        {
+            method: "GET",
+            signal,
+        },
     );
 
     return chat.messages
@@ -143,33 +99,26 @@ export async function sendPrompt(
     const path = chatId
         ? `/chats/${encodeURIComponent(chatId)}/messages`
         : "/chats";
-    const response = await postJson<SendPromptResponse, { prompt: string }>(
-        path,
-        {
-            prompt,
-        },
-    );
+    const response = await requestJson<SendPromptResponse>(path, {
+        method: "POST",
+        body: { prompt },
+    });
 
     return response.chat_id;
 }
 
 export async function renameChat(chatId: string, title: string): Promise<void> {
-    await patchJson<RenameChatResponse, { title: string }>(
+    await requestJson<RenameChatResponse>(
         `/chats/${encodeURIComponent(chatId)}`,
-        { title },
+        {
+            method: "PATCH",
+            body: { title },
+        },
     );
 }
 
 export async function deleteChat(chatId: string): Promise<void> {
-    const response = await fetch(
-        `${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`,
-        {
-            method: "DELETE",
-            headers: await getApiHeaders(),
-        },
-    );
-
-    if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-    }
+    await requestJson<void>(`/chats/${encodeURIComponent(chatId)}`, {
+        method: "DELETE",
+    });
 }

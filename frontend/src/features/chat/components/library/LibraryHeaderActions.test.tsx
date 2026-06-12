@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-
+import { LibraryHeaderActions } from "@/features/chat/components/library/LibraryHeaderActions";
 import { getIndexedFiles } from "@/lib/library-api";
-import { LibraryHeaderActions } from "./LibraryHeaderActions";
 
 vi.mock("@/lib/library-api", () => ({
     getIndexedFiles: vi.fn(),

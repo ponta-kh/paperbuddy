@@ -2,13 +2,13 @@ import { RefreshCw, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/shadcn/button";
 
-type SystemErrorScreenProps = {
+type SystemErrorPageProps = {
     onReload?: () => void;
 };
 
-export function SystemErrorScreen({
+export function SystemErrorPage({
     onReload = () => window.location.reload(),
-}: SystemErrorScreenProps) {
+}: SystemErrorPageProps) {
     return (
         <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#f5f8f6] px-5 py-12 text-[#263b34]">
             <div

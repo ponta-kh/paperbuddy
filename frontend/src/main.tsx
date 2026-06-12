@@ -3,8 +3,8 @@ import { Authenticator } from "@aws-amplify/ui-react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import Chat from "./Chat.tsx";
-import { SystemErrorScreen } from "./components/system/SystemErrorScreen.tsx";
+import ChatPage from "./features/chat/ChatPage.tsx";
+import { SystemErrorPage } from "./features/system/SystemErrorPage.tsx";
 import { configureAuth } from "./lib/auth.ts";
 
 const rootElement = document.getElementById("root");
@@ -20,11 +20,11 @@ configureAuth()
         root.render(
             <StrictMode>
                 <Authenticator loginMechanisms={["email"]}>
-                    <Chat />
+                    <ChatPage />
                 </Authenticator>
             </StrictMode>,
         );
     })
     .catch(() => {
-        root.render(<SystemErrorScreen />);
+        root.render(<SystemErrorPage />);
     });

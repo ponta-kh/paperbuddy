@@ -1,8 +1,5 @@
 import { Menu, PanelLeftClose } from "lucide-react";
-
-import { ChatActionsMenu } from "@/components/chat/ChatActionsMenu";
-import { ChatSidebar } from "@/components/chat/ChatSidebar";
-import { LibraryHeaderActions } from "@/components/library/LibraryHeaderActions";
+import type { ReactNode } from "react";
 import { Button } from "@/components/shadcn/button";
 import { Separator } from "@/components/shadcn/separator";
 import {
@@ -16,6 +13,8 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/shadcn/tooltip";
+import { ChatActionsMenu } from "@/features/chat/components/ChatActionsMenu";
+import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
 import type { ChatSummary } from "@/lib/chat-api";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +32,7 @@ type ChatHeaderProps = {
     onNewChat: () => void;
     onRenameChat: (title: string) => Promise<void>;
     onSidebarOpenChange: (open: boolean) => void;
+    headerActions?: ReactNode;
 };
 
 export function ChatHeader({
@@ -49,6 +49,7 @@ export function ChatHeader({
     onNewChat,
     onRenameChat,
     onSidebarOpenChange,
+    headerActions,
 }: ChatHeaderProps) {
     return (
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#e8ebe8] bg-white/80 px-4 backdrop-blur-md sm:px-6">
@@ -119,7 +120,7 @@ export function ChatHeader({
                 )}
             </div>
 
-            <LibraryHeaderActions />
+            {headerActions}
         </header>
     );
 }

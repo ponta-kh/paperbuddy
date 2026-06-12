@@ -1,7 +1,6 @@
 import { LoaderCircle, Sparkles } from "lucide-react";
-
-import { suggestions } from "@/components/chat/chat-data";
 import { ScrollArea } from "@/components/shadcn/scroll-area";
+import { suggestions } from "@/features/chat/utils/chat-data";
 import type { ChatMessage } from "@/lib/chat-api";
 
 type ChatConversationProps = {

@@ -1,6 +1,4 @@
-import { getApiHeaders } from "@/lib/api-client";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import { requestJson } from "@/lib/api-client";
 
 export type IndexedFile = {
     id: string;
@@ -27,17 +25,13 @@ type ListIndexedFilesResponse = {
 export async function getIndexedFiles(
     signal?: AbortSignal,
 ): Promise<IndexedFile[]> {
-    const response = await fetch(`${API_BASE_URL}/library/files`, {
-        method: "GET",
-        headers: await getApiHeaders(),
-        signal,
-    });
-
-    if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-    }
-
-    const result = (await response.json()) as ListIndexedFilesResponse;
+    const result = await requestJson<ListIndexedFilesResponse>(
+        "/library/files",
+        {
+            method: "GET",
+            signal,
+        },
+    );
     return result.files.map((file) => ({
         id: file.source_id,
         s3Key: file.s3_key,

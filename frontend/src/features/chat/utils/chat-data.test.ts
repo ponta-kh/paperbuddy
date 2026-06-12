@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { groupChatsByUpdatedAt } from "@/features/chat/utils/chat-data";
 import type { ChatSummary } from "@/lib/chat-api";
-import { groupChatsByUpdatedAt } from "./chat-data";
 
 function createChat(id: string, updatedAt: Date): ChatSummary {
     return {

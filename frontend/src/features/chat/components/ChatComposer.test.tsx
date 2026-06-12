@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
-import { ChatComposer } from "./ChatComposer";
+import { ChatComposer } from "@/features/chat/components/ChatComposer";
 
 const defaultProps = {
     isSending: false,

@@ -6,8 +6,6 @@ import {
     Plus,
     Settings,
 } from "lucide-react";
-
-import { groupChatsByUpdatedAt } from "@/components/chat/chat-data";
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar";
 import { Button } from "@/components/shadcn/button";
 import {
@@ -19,6 +17,7 @@ import {
 } from "@/components/shadcn/dropdown-menu";
 import { ScrollArea } from "@/components/shadcn/scroll-area";
 import { Separator } from "@/components/shadcn/separator";
+import { groupChatsByUpdatedAt } from "@/features/chat/utils/chat-data";
 import type { ChatSummary } from "@/lib/chat-api";
 import { cn } from "@/lib/utils";
 
