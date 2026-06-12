@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { LibraryHeaderActions } from "@/features/chat/components/library/LibraryHeaderActions";
+import { LibraryHeaderActionsContainer } from "@/features/chat/containers/library/LibraryHeaderActionsContainer";
 import { getIndexedFiles } from "@/lib/library-api";
 
 vi.mock("@/lib/library-api", () => ({
     getIndexedFiles: vi.fn(),
 }));
 
-describe("LibraryHeaderActions", () => {
+describe("LibraryHeaderActionsContainer", () => {
     beforeEach(() => {
         vi.mocked(getIndexedFiles).mockReset();
     });
@@ -34,7 +34,7 @@ describe("LibraryHeaderActions", () => {
             },
         ]);
 
-        render(<LibraryHeaderActions />);
+        render(<LibraryHeaderActionsContainer />);
 
         await waitFor(() => {
             expect(getIndexedFiles).toHaveBeenCalledOnce();
@@ -44,7 +44,7 @@ describe("LibraryHeaderActions", () => {
 
     test("ライブラリを開いて空状態を表示する", async () => {
         vi.mocked(getIndexedFiles).mockResolvedValue([]);
-        render(<LibraryHeaderActions />);
+        render(<LibraryHeaderActionsContainer />);
 
         await screen.findByText("0 papers indexed");
         fireEvent.click(screen.getByRole("button", { name: "ライブラリ" }));

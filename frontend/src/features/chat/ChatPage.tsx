@@ -1,127 +1,39 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { TooltipProvider } from "@/components/shadcn/tooltip";
 import { ChatComposer } from "@/features/chat/components/ChatComposer";
 import { ChatConversation } from "@/features/chat/components/ChatConversation";
 import { ChatHeader } from "@/features/chat/components/ChatHeader";
 import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
-import { LibraryHeaderActions } from "@/features/chat/components/library/LibraryHeaderActions";
-import {
-    type ChatMessage,
-    type ChatSummary,
-    deleteChat,
-    getChatMessages,
-    getChats,
-    renameChat,
-    sendPrompt,
-} from "@/lib/chat-api";
-import { cn } from "@/lib/utils";
+import { ChatMessagesContainer } from "@/features/chat/containers/ChatMessagesContainer";
+import { ChatThreadsContainer } from "@/features/chat/containers/ChatThreadsContainer";
+import { LibraryHeaderActionsContainer } from "@/features/chat/containers/library/LibraryHeaderActionsContainer";
+import { sendPrompt } from "@/lib/chat-api";
 
 function ChatPage() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [message, setMessage] = useState("");
-    const [chats, setChats] = useState<ChatSummary[]>([]);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [selectedChatId, setSelectedChatId] = useState<string>();
-    const [isChatsLoading, setIsChatsLoading] = useState(true);
-    const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    const [chatsError, setChatsError] = useState(false);
-    const [messagesError, setMessagesError] = useState(false);
     const [sendError, setSendError] = useState(false);
-
-    useEffect(() => {
-        const controller = new AbortController();
-
-        getChats(controller.signal)
-            .then((response) => {
-                setChats(response);
-                setChatsError(false);
-            })
-            .catch((error: unknown) => {
-                if (
-                    error instanceof DOMException &&
-                    error.name === "AbortError"
-                )
-                    return;
-                setChatsError(true);
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setIsChatsLoading(false);
-            });
-
-        return () => controller.abort();
-    }, []);
-
-    useEffect(() => {
-        if (!selectedChatId) {
-            setMessages([]);
-            setMessagesError(false);
-            return;
-        }
-
-        const controller = new AbortController();
-        setIsMessagesLoading(true);
-
-        getChatMessages(selectedChatId, controller.signal)
-            .then((response) => {
-                setMessages(response);
-                setMessagesError(false);
-            })
-            .catch((error: unknown) => {
-                if (
-                    error instanceof DOMException &&
-                    error.name === "AbortError"
-                )
-                    return;
-                setMessagesError(true);
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setIsMessagesLoading(false);
-            });
-
-        return () => controller.abort();
-    }, [selectedChatId]);
+    const [chatRefreshKey, setChatRefreshKey] = useState(0);
+    const [messageRefreshKey, setMessageRefreshKey] = useState(0);
 
     const handleSubmit = async () => {
         const trimmedMessage = message.trim();
         if (!trimmedMessage || isSending) return;
 
-        const optimisticMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: "user",
-            content: trimmedMessage,
-            createdAt: new Date().toISOString(),
-        };
-
-        setMessages((currentMessages) => [
-            ...currentMessages,
-            optimisticMessage,
-        ]);
         setIsSending(true);
         setSendError(false);
 
         try {
             const chatId = await sendPrompt(trimmedMessage, selectedChatId);
-            const [updatedChats, updatedMessages] = await Promise.all([
-                getChats(),
-                getChatMessages(chatId),
-            ]);
-
             setSelectedChatId(chatId);
-            setChats(updatedChats);
-            setMessages(updatedMessages);
-            setChatsError(false);
-            setMessagesError(false);
             setMessage("");
+            setChatRefreshKey((current) => current + 1);
+            setMessageRefreshKey((current) => current + 1);
         } catch {
-            setMessages((currentMessages) =>
-                currentMessages.filter(
-                    (currentMessage) =>
-                        currentMessage.id !== optimisticMessage.id,
-                ),
-            );
             setSendError(true);
         } finally {
             setIsSending(false);
@@ -130,7 +42,6 @@ function ChatPage() {
 
     const handleNewChat = () => {
         setSelectedChatId(undefined);
-        setMessages([]);
         setMessage("");
         setSendError(false);
     };
@@ -141,83 +52,92 @@ function ChatPage() {
         setSendError(false);
     };
 
-    const handleRenameChat = async (title: string) => {
-        if (!selectedChatId) return;
-
-        await renameChat(selectedChatId, title);
-        setChats((currentChats) =>
-            currentChats.map((chat) =>
-                chat.id === selectedChatId ? { ...chat, title } : chat,
-            ),
-        );
-    };
-
-    const handleDeleteChat = async () => {
-        if (!selectedChatId) return;
-
-        await deleteChat(selectedChatId);
-        setChats((currentChats) =>
-            currentChats.filter((chat) => chat.id !== selectedChatId),
-        );
-        handleNewChat();
-    };
-
     return (
         <TooltipProvider>
             <div className="flex h-dvh overflow-hidden bg-[#fbfcfa] text-[#263b34]">
-                <aside
-                    className={cn(
-                        "hidden shrink-0 overflow-hidden border-r border-[#e1e6e2] transition-[width] duration-300 lg:block",
-                        sidebarOpen ? "w-64" : "w-0 border-r-0",
-                    )}
+                <ChatThreadsContainer
+                    key={chatRefreshKey}
+                    selectedChatId={selectedChatId}
                 >
-                    <div className="h-full w-64">
-                        <ChatSidebar
-                            chats={chats}
-                            chatsError={chatsError}
-                            isLoading={isChatsLoading}
-                            selectedChatId={selectedChatId}
-                            onChatSelect={handleChatSelect}
-                            onNewChat={handleNewChat}
-                        />
-                    </div>
-                </aside>
+                    {({
+                        chats,
+                        chatsError,
+                        isLoading,
+                        title,
+                        onDeleteChat,
+                        onRenameChat,
+                    }) => (
+                        <>
+                            <aside
+                                className={
+                                    sidebarOpen
+                                        ? "hidden shrink-0 overflow-hidden border-r border-[#e1e6e2] transition-[width] duration-300 lg:block lg:w-64"
+                                        : "hidden shrink-0 overflow-hidden border-r-0 transition-[width] duration-300 lg:block lg:w-0"
+                                }
+                            >
+                                <div className="h-full w-64">
+                                    <ChatSidebar
+                                        chats={chats}
+                                        chatsError={chatsError}
+                                        isLoading={isLoading}
+                                        selectedChatId={selectedChatId}
+                                        onChatSelect={handleChatSelect}
+                                        onNewChat={handleNewChat}
+                                    />
+                                </div>
+                            </aside>
 
-                <main className="relative flex min-w-0 flex-1 flex-col">
-                    <ChatHeader
-                        chats={chats}
-                        chatsError={chatsError}
-                        headerActions={<LibraryHeaderActions />}
-                        isChatsLoading={isChatsLoading}
-                        mobileMenuOpen={mobileMenuOpen}
-                        selectedChatId={selectedChatId}
-                        sidebarOpen={sidebarOpen}
-                        title={
-                            chats.find((chat) => chat.id === selectedChatId)
-                                ?.title
-                        }
-                        onChatSelect={handleChatSelect}
-                        onDeleteChat={handleDeleteChat}
-                        onMobileMenuOpenChange={setMobileMenuOpen}
-                        onNewChat={handleNewChat}
-                        onRenameChat={handleRenameChat}
-                        onSidebarOpenChange={setSidebarOpen}
-                    />
-                    <ChatConversation
-                        isLoading={isMessagesLoading}
-                        isSending={isSending}
-                        loadError={messagesError}
-                        messages={messages}
-                        onSuggestionSelect={setMessage}
-                    />
-                    <ChatComposer
-                        isSending={isSending}
-                        message={message}
-                        sendError={sendError}
-                        onMessageChange={setMessage}
-                        onSubmit={handleSubmit}
-                    />
-                </main>
+                            <main className="relative flex min-w-0 flex-1 flex-col">
+                                <ChatHeader
+                                    chats={chats}
+                                    chatsError={chatsError}
+                                    headerActions={
+                                        <LibraryHeaderActionsContainer />
+                                    }
+                                    isChatsLoading={isLoading}
+                                    mobileMenuOpen={mobileMenuOpen}
+                                    selectedChatId={selectedChatId}
+                                    sidebarOpen={sidebarOpen}
+                                    title={title}
+                                    onChatSelect={handleChatSelect}
+                                    onDeleteChat={async () => {
+                                        await onDeleteChat();
+                                        handleNewChat();
+                                    }}
+                                    onMobileMenuOpenChange={setMobileMenuOpen}
+                                    onNewChat={handleNewChat}
+                                    onRenameChat={onRenameChat}
+                                    onSidebarOpenChange={setSidebarOpen}
+                                />
+                                <ChatMessagesContainer
+                                    key={messageRefreshKey}
+                                    selectedChatId={selectedChatId}
+                                >
+                                    {({
+                                        messages,
+                                        isLoading: isMessagesLoading,
+                                        loadError: messagesError,
+                                    }) => (
+                                        <ChatConversation
+                                            isLoading={isMessagesLoading}
+                                            isSending={isSending}
+                                            loadError={messagesError}
+                                            messages={messages}
+                                            onSuggestionSelect={setMessage}
+                                        />
+                                    )}
+                                </ChatMessagesContainer>
+                                <ChatComposer
+                                    isSending={isSending}
+                                    message={message}
+                                    sendError={sendError}
+                                    onMessageChange={setMessage}
+                                    onSubmit={handleSubmit}
+                                />
+                            </main>
+                        </>
+                    )}
+                </ChatThreadsContainer>
             </div>
         </TooltipProvider>
     );

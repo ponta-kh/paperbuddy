@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { LibraryHeaderActionsView } from "@/features/chat/components/library/LibraryHeaderActionsView";
 import { getIndexedFiles, type IndexedFile } from "@/lib/library-api";
 
-export function LibraryHeaderActions() {
+export function LibraryHeaderActionsContainer() {
     const [files, setFiles] = useState<IndexedFile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
