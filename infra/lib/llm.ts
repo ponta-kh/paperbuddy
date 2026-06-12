@@ -16,20 +16,18 @@ const METADATA_FIELD_NAME = "AMAZON_BEDROCK_METADATA";
 export interface LlmResources {
     readonly dataSource: bedrock.CfnDataSource;
     readonly knowledgeBase: bedrock.CfnKnowledgeBase;
-    readonly modelArn: cdk.CfnParameter;
+    readonly modelArn: string;
     readonly ragSourceBucket: s3.Bucket;
 }
 
 export function createLlmResources(
     scope: Construct,
     stageName: string,
+    generationModelArn: string,
 ): LlmResources {
     const stack = cdk.Stack.of(scope);
     const ragSourceBucket = createRagSourceBucket(scope);
-    const modelArn = new cdk.CfnParameter(scope, "BedrockModelArn", {
-        type: "String",
-        description: "Bedrock generation model ARN used by the backend",
-    });
+    const modelArn = generationModelArn;
     const embeddingModelArn = stack.formatArn({
         service: "bedrock",
         region: stack.region,
@@ -108,7 +106,7 @@ export function grantBackendBedrockAccess(
     taskRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
             actions: ["bedrock:InvokeModel"],
-            resources: [llm.modelArn.valueAsString],
+            resources: [llm.modelArn],
         }),
     );
 }

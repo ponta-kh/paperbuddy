@@ -3,4 +3,4 @@
 #MISE depends=["frontend:build"]
 #MISE dir="infra"
 
-pnpm cdk deploy PaperBuddyDev --parameters BedrockModelArn="$BEDROCK_MODEL_ARN"
+pnpm cdk deploy PaperBuddyDev

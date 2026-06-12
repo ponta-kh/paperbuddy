@@ -8,6 +8,8 @@ describe("InfraStack", () => {
     const app = new cdk.App();
     const stack = new InfraStack(app, "TestStack", {
         stageName: "dev",
+        bedrockModelArn:
+            "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.nova-lite-v1:0",
         frontendAssetPath: path.join(__dirname, "fixtures/frontend"),
     });
     const template = Template.fromStack(stack);
@@ -294,6 +296,7 @@ describe("InfraStack", () => {
         template.templateMatches({
             Parameters: {
                 BedrockKnowledgeBaseId: Match.absent(),
+                BedrockModelArn: Match.absent(),
             },
         });
         template.hasResourceProperties("AWS::Bedrock::KnowledgeBase", {
@@ -395,6 +398,9 @@ describe("InfraStack", () => {
         );
         expect(JSON.stringify(knowledgeBasePolicies)).toContain(
             "amazon.titan-embed-text-v2:0",
+        );
+        expect(JSON.stringify(knowledgeBasePolicies)).toContain(
+            "amazon.nova-lite-v1:0",
         );
     });
 });

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="開発環境の対象アカウント・東京リージョンをCDK bootstrapする"
+#MISE dir="infra"
+
+pnpm exec ts-node --prefer-ts-exts scripts/bootstrap-dev.ts

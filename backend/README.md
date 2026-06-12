@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.14 and uv
-- An AWS profile with access to the target Bedrock Knowledge Base and model
+- AWS CLIで対象アカウントへログイン済みであること
 - Model access enabled in the AWS region used by the Knowledge Base
 
 The application uses boto3's standard AWS credential provider chain. Do not put
@@ -17,7 +17,7 @@ AWS access keys in `.env`.
 - AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
 - ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
 - 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
-- Boto3認証用: `AWS_PROFILE`などの標準AWS環境変数
+- Boto3認証: 各端末でログイン済みのAWS CLI認証を標準認証チェーンから使用する
 
 ## Local Configuration
 
@@ -27,14 +27,13 @@ Create the local environment file and replace the Bedrock identifiers:
 cp .env.example .env
 ```
 
-For an AWS SSO profile, authenticate before starting the backend:
+バックエンド起動前に、現在ログインしているAWSアカウントを確認する。
 
 ```sh
-aws sso login --profile your-profile
-AWS_PROFILE=your-profile aws sts get-caller-identity
+aws sts get-caller-identity
 ```
 
-Set the same profile name in `.env`.
+AWS CLIの認証方式とログイン操作は各端末の責務とし、`.env`ではAWS認証情報を管理しない。
 
 The local and deployed backends both use the persistent DynamoDB repository.
 Deploy the development table and set:
@@ -101,12 +100,12 @@ Start the backend, then create a chat. This calls both Knowledge Base
 `RetrieveAndGenerate` and Bedrock Runtime `Converse`.
 
 ```sh
-export ACCESS_TOKEN=replace-with-cognito-access-token
+access_token=replace-with-cognito-access-token
 
 curl --fail-with-body \
   -X POST http://localhost:8000/api/chats \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Authorization: Bearer ${access_token}" \
   -d '{"prompt":"このナレッジベースの内容を簡潔に説明してください"}'
 ```
 

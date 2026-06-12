@@ -7,7 +7,7 @@
 - テーブル名: `paperbuddy-dev-chat`
 - ライブラリ一覧テーブル名: `paperbuddy-dev-library`
 - リージョン: 既定値は`ap-northeast-1`
-- ローカル認証: boto3標準認証チェーンのAWS Profile
+- ローカル認証: 各端末でログイン済みのAWS CLI認証をboto3標準認証チェーンから使用する
 - ECS認証: ECSタスクロール
 - 課金モード: オンデマンド
 - 保護: AWS管理暗号化、PITR、削除保護、CloudFormation削除時の保持
@@ -16,17 +16,17 @@
 
 ## 初回デプロイ
 
-AWSアクセスキーは`.env`へ保存せず、AWS SSOなどでProfileを設定する。
+AWSアクセスキーは`.env`へ保存しない。各端末でAWS CLIによるログインが完了していることを前提とする。
 
 ```sh
-aws sso login --profile your-profile
-AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 mise run infra:synth
+aws sts get-caller-identity
+mise run infra:synth
 ```
 
 対象アカウント・リージョンでCDKを初めて使う場合は、デプロイ前に次を実行する。
 
 ```sh
-AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
+mise run infra:bootstrap:dev
 ```
 
 削除保護と保持ポリシーを有効にしているため、`cdk destroy`だけではテーブルを削除できない。
@@ -38,13 +38,12 @@ AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
 `backend/.env`を次のように設定し、`mise run dev`でフロントエンドとバックエンドを起動する。
 
 ```dotenv
-AWS_PROFILE=your-profile
 AWS_REGION=ap-northeast-1
 DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
 DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 ```
 
-ローカルで使用するAWS Profileには、テーブルに対する次の権限が必要となる。
+ローカルでログインしているAWS Identityには、テーブルに対する次の権限が必要となる。
 
 - `dynamodb:GetItem`
 - `dynamodb:Query`

@@ -33,20 +33,21 @@ RAG source PDF -> private S3 bucket
 - RAG材料: 非公開S3バケットの`documents/`配下へPDFを配置し、Bedrock Knowledge BaseのS3 Data Sourceとして使用する
 - Vector Store: 非公開のOpenSearch Serverless Vector Searchコレクションを使用する
 
-固定AWSアクセスキーは使用しない。ローカルのCDK実行はAWS Profile、Fargateはタスクロールを使用する。
+固定AWSアクセスキーは使用しない。ローカルのCDK実行は各端末でログイン済みのAWS CLI認証、Fargateはタスクロールを使用する。
 
 ## 前提条件
 
-- AWS CLIとAWS Profileが設定済みである
+- AWS CLIでデプロイ対象アカウントへログイン済みである
 - Dockerが起動している
-- 利用する生成モデルARNが分かっている
 - 対象リージョンでTitan Text Embeddings V2と生成モデルを利用できる
 - 対象リージョンでBedrockモデルアクセスが有効である
+
+開発環境のスタック名、リージョン、生成モデルARNは`infra/.env`で管理する。
 
 対象アカウント・リージョンでCDKを初めて使う場合は、最初にbootstrapする。
 
 ```sh
-AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
+mise run infra:bootstrap:dev
 ```
 
 ## Synthとテスト
@@ -55,18 +56,14 @@ AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 pnpm -C infra cdk bootstrap
 
 ```sh
 mise run infra:test
-AWS_PROFILE=your-profile AWS_REGION=ap-northeast-1 mise run infra:synth
+mise run infra:synth
 ```
 
 ## 開発環境のデプロイ
 
-生成モデルARNを環境変数で渡してデプロイする。Knowledge Base、S3 Data Source、埋め込みモデル、Vector StoreはCDKが管理する。
+Knowledge Base、S3 Data Source、生成・埋め込みモデル、Vector StoreはCDKが管理する。デプロイ設定を環境変数で渡す必要はない。
 
 ```sh
-export AWS_PROFILE=your-profile
-export AWS_REGION=ap-northeast-1
-export BEDROCK_MODEL_ARN=arn:aws:bedrock:ap-northeast-1::foundation-model/your-model-id
-
 mise run infra:deploy:dev
 ```
 
@@ -105,24 +102,24 @@ RAG材料PDF用S3バケットはCDKデプロイ時に作成されるが、PDFフ
 最初にCloudFormation Outputからバケット名を取得する。
 
 ```sh
-export RAG_SOURCE_BUCKET_NAME="$(
-  aws cloudformation describe-stacks \
-    --stack-name PaperBuddyDev \
-    --query "Stacks[0].Outputs[?OutputKey=='RagSourceBucketName'].OutputValue | [0]" \
-    --output text
+rag_source_bucket_name="$(
+    aws cloudformation describe-stacks \
+        --stack-name PaperBuddyDev \
+        --query "Stacks[0].Outputs[?OutputKey=='RagSourceBucketName'].OutputValue | [0]" \
+        --output text
 )"
 ```
 
 PDFを配置する。
 
 ```sh
-aws s3 cp ./path/to/document.pdf "s3://${RAG_SOURCE_BUCKET_NAME}/documents/document.pdf"
+aws s3 cp ./path/to/document.pdf "s3://${rag_source_bucket_name}/documents/document.pdf"
 ```
 
 ディレクトリ内のPDFをまとめて同期する場合は次を実行する。
 
 ```sh
-aws s3 sync ./path/to/pdfs "s3://${RAG_SOURCE_BUCKET_NAME}/documents/" \
+aws s3 sync ./path/to/pdfs "s3://${rag_source_bucket_name}/documents/" \
   --exclude '*' \
   --include '*.pdf'
 ```
@@ -130,22 +127,22 @@ aws s3 sync ./path/to/pdfs "s3://${RAG_SOURCE_BUCKET_NAME}/documents/" \
 PDF配置後、CloudFormation OutputからKnowledge Base IDとData Source IDを取得して同期処理を開始する。
 
 ```sh
-export BEDROCK_KNOWLEDGE_BASE_ID="$(
-  aws cloudformation describe-stacks \
-    --stack-name PaperBuddyDev \
-    --query "Stacks[0].Outputs[?OutputKey=='BedrockKnowledgeBaseId'].OutputValue | [0]" \
-    --output text
+bedrock_knowledge_base_id="$(
+    aws cloudformation describe-stacks \
+        --stack-name PaperBuddyDev \
+        --query "Stacks[0].Outputs[?OutputKey=='BedrockKnowledgeBaseId'].OutputValue | [0]" \
+        --output text
 )"
-export BEDROCK_DATA_SOURCE_ID="$(
-  aws cloudformation describe-stacks \
-    --stack-name PaperBuddyDev \
-    --query "Stacks[0].Outputs[?OutputKey=='BedrockDataSourceId'].OutputValue | [0]" \
-    --output text
+bedrock_data_source_id="$(
+    aws cloudformation describe-stacks \
+        --stack-name PaperBuddyDev \
+        --query "Stacks[0].Outputs[?OutputKey=='BedrockDataSourceId'].OutputValue | [0]" \
+        --output text
 )"
 
 aws bedrock-agent start-ingestion-job \
-  --knowledge-base-id "$BEDROCK_KNOWLEDGE_BASE_ID" \
-  --data-source-id "$BEDROCK_DATA_SOURCE_ID"
+  --knowledge-base-id "$bedrock_knowledge_base_id" \
+  --data-source-id "$bedrock_data_source_id"
 ```
 
 PDFを追加、更新、削除した場合は、同じ同期処理を再実行する。
