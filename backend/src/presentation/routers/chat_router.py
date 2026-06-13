@@ -64,10 +64,10 @@ async def rename_chat(
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_chat(
     chat_id: UUID,
-    _: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[DeleteChatProtocol, Depends(get_delete_chat_use_case)],
 ) -> None:
-    await use_case.execute(DeleteChatInput(chat_id=chat_id))
+    await use_case.execute(DeleteChatInput(chat_id=chat_id, user_id=user.user_id))
 
 
 @router.get("", response_model=ListChatsResponse)

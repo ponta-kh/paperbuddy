@@ -25,6 +25,40 @@ type RequestJsonOptions = {
     body?: unknown;
 };
 
+type ApiErrorResponse = {
+    code?: unknown;
+    message?: unknown;
+};
+
+export class ApiError extends Error {
+    readonly status: number;
+    readonly code: string;
+
+    constructor(status: number, code: string, message: string) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+    }
+}
+
+async function createApiError(response: Response): Promise<ApiError> {
+    let body: ApiErrorResponse = {};
+    try {
+        body = (await response.json()) as ApiErrorResponse;
+    } catch {
+        // JSONでないエラーレスポンスでもHTTPステータスは保持する。
+    }
+
+    const code =
+        typeof body.code === "string" ? body.code : "api_request_failed";
+    const message =
+        typeof body.message === "string"
+            ? body.message
+            : `API request failed: ${response.status}`;
+    return new ApiError(response.status, code, message);
+}
+
 export async function requestJson<TResponse>(
     path: string,
     { method, signal, body }: RequestJsonOptions,
@@ -37,7 +71,7 @@ export async function requestJson<TResponse>(
     });
 
     if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        throw await createApiError(response);
     }
 
     if (response.status === 204) {

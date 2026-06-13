@@ -1,6 +1,6 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { beforeEach, expect, test, vi } from "vitest";
-import { getApiHeaders, requestJson } from "./api-client";
+import { ApiError, getApiHeaders, requestJson } from "./api-client";
 
 vi.mock("aws-amplify/auth", () => ({
     fetchAuthSession: vi.fn(),
@@ -100,11 +100,44 @@ test("失敗レスポンスは例外にする", async () => {
     } as Awaited<ReturnType<typeof fetchAuthSession>>);
     vi.mocked(fetch).mockResolvedValue({
         ok: false,
+        status: 409,
+        json: vi.fn().mockResolvedValue({
+            code: "chat_continuation_expired",
+            message: "このチャットでは会話を継続できません",
+        }),
+    } as unknown as Response);
+
+    const error = await requestJson<void>("/hello", { method: "GET" }).catch(
+        (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+        status: 409,
+        code: "chat_continuation_expired",
+        message: "このチャットでは会話を継続できません",
+    });
+});
+
+test("JSONでない失敗レスポンスでも型付き例外にする", async () => {
+    vi.mocked(fetchAuthSession).mockResolvedValue({
+        tokens: {
+            accessToken: {
+                toString: () => "access-token",
+            },
+        },
+    } as Awaited<ReturnType<typeof fetchAuthSession>>);
+    vi.mocked(fetch).mockResolvedValue({
+        ok: false,
         status: 500,
-        json: vi.fn(),
+        json: vi.fn().mockRejectedValue(new SyntaxError()),
     } as unknown as Response);
 
     await expect(
         requestJson<void>("/hello", { method: "GET" }),
-    ).rejects.toThrow("API request failed: 500");
+    ).rejects.toMatchObject({
+        status: 500,
+        code: "api_request_failed",
+        message: "API request failed: 500",
+    });
 });

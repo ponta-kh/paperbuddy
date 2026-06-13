@@ -4,6 +4,7 @@ import { Button } from "@/components/shadcn/button";
 import { Textarea } from "@/components/shadcn/textarea";
 
 type ChatComposerProps = {
+    isContinuationExpired: boolean;
     isSending: boolean;
     message: string;
     sendError: boolean;
@@ -12,6 +13,7 @@ type ChatComposerProps = {
 };
 
 export function ChatComposer({
+    isContinuationExpired,
     isSending,
     message,
     sendError,
@@ -32,20 +34,25 @@ export function ChatComposer({
                             if (
                                 event.key === "Enter" &&
                                 !event.shiftKey &&
-                                !event.nativeEvent.isComposing
+                                !event.nativeEvent.isComposing &&
+                                !isContinuationExpired
                             ) {
                                 event.preventDefault();
                                 onSubmit();
                             }
                         }}
                         placeholder="論文について質問する..."
-                        disabled={isSending}
+                        disabled={isSending || isContinuationExpired}
                         className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-3 py-2 text-[14px] shadow-none focus-visible:ring-0"
                     />
                     <Button
                         size="icon"
                         className="mb-0.5 shrink-0 rounded-full bg-[#163d32] text-white hover:bg-[#285446]"
-                        disabled={!message.trim() || isSending}
+                        disabled={
+                            !message.trim() ||
+                            isSending ||
+                            isContinuationExpired
+                        }
                         onClick={onSubmit}
                         aria-label={isSending ? "送信中" : "送信"}
                     >
@@ -57,6 +64,11 @@ export function ChatComposer({
                 {sendError && (
                     <p className="mt-2 px-2 text-center text-[10px] text-destructive">
                         メッセージを送信できませんでした。もう一度お試しください。
+                    </p>
+                )}
+                {isContinuationExpired && (
+                    <p className="mt-2 px-2 text-center text-[10px] text-[#7b8984]">
+                        最終更新から24時間が経過したため、このチャットでは会話を継続できません。
                     </p>
                 )}
                 <div className="mt-2 flex flex-col items-center justify-between gap-1 px-2 text-[9px] text-[#9ba6a1] sm:flex-row">

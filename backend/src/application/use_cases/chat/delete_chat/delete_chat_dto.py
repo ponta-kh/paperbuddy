@@ -7,3 +7,4 @@ class DeleteChatInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     chat_id: UUID
+    user_id: UUID

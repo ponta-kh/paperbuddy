@@ -15,19 +15,30 @@ from src.infrastructure.llm.simulated_chat_generation_client import (
     SimulatedChatGenerationClient,
 )
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
-    DynamoDbChatRepository,
+    DynamoDbChatCommandRepository,
+    DynamoDbChatDeletionRepository,
+    DynamoDbChatQueryRepository,
+    DynamoDbChatTitleRepository,
 )
 
 
 @pytest.fixture(autouse=True)
 def clear_cached_dependencies() -> Iterator[None]:
-    chat_deps.get_chat_repository.cache_clear()
+    chat_deps.get_chat_dynamodb_client.cache_clear()
+    chat_deps.get_chat_command_repository.cache_clear()
+    chat_deps.get_chat_query_repository.cache_clear()
+    chat_deps.get_chat_title_repository.cache_clear()
+    chat_deps.get_chat_deletion_repository.cache_clear()
     chat_deps.get_chat_generation_client.cache_clear()
     chat_deps.get_rename_chat_use_case.cache_clear()
     chat_deps.get_delete_chat_use_case.cache_clear()
     get_settings.cache_clear()
     yield
-    chat_deps.get_chat_repository.cache_clear()
+    chat_deps.get_chat_dynamodb_client.cache_clear()
+    chat_deps.get_chat_command_repository.cache_clear()
+    chat_deps.get_chat_query_repository.cache_clear()
+    chat_deps.get_chat_title_repository.cache_clear()
+    chat_deps.get_chat_deletion_repository.cache_clear()
     chat_deps.get_chat_generation_client.cache_clear()
     chat_deps.get_rename_chat_use_case.cache_clear()
     chat_deps.get_delete_chat_use_case.cache_clear()
@@ -50,7 +61,7 @@ def _set_local_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
 
 
-def test_get_chat_repository_uses_dynamodb(
+def test_get_chat_repositories_use_dynamodb(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _set_aws_environment(monkeypatch)
@@ -58,13 +69,20 @@ def test_get_chat_repository_uses_dynamodb(
     client_factory = Mock(return_value=dynamodb_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
-    repository = chat_deps.get_chat_repository()
-
-    assert isinstance(repository, DynamoDbChatRepository)
-    assert client_factory.call_args == (
-        ("dynamodb",),
-        {"region_name": "ap-northeast-1"},
+    repositories = (
+        chat_deps.get_chat_command_repository(),
+        chat_deps.get_chat_query_repository(),
+        chat_deps.get_chat_title_repository(),
+        chat_deps.get_chat_deletion_repository(),
     )
+
+    assert isinstance(repositories[0], DynamoDbChatCommandRepository)
+    assert isinstance(repositories[1], DynamoDbChatQueryRepository)
+    assert isinstance(repositories[2], DynamoDbChatTitleRepository)
+    assert isinstance(repositories[3], DynamoDbChatDeletionRepository)
+    assert client_factory.call_args_list == [
+        (("dynamodb",), {"region_name": "ap-northeast-1"}),
+    ]
 
 
 def test_get_chat_command_use_cases_use_dynamodb_repository(
@@ -85,9 +103,9 @@ def test_get_chat_repository_uses_dynamodb_local_endpoint(
     client_factory = Mock(return_value=dynamodb_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
-    repository = chat_deps.get_chat_repository()
+    repository = chat_deps.get_chat_command_repository()
 
-    assert isinstance(repository, DynamoDbChatRepository)
+    assert isinstance(repository, DynamoDbChatCommandRepository)
     assert client_factory.call_args == (
         ("dynamodb",),
         {
@@ -109,7 +127,7 @@ def test_get_chat_repository_rejects_missing_environment(
     monkeypatch.delenv(missing_name)
 
     with pytest.raises(ValidationError, match=missing_name.lower()):
-        chat_deps.get_chat_repository()
+        chat_deps.get_chat_command_repository()
 
 
 def test_get_chat_generation_client_uses_bedrock_environment(
@@ -148,7 +166,7 @@ def test_rejects_unknown_infrastructure_mode(
     monkeypatch.setenv("CHAT_INFRASTRUCTURE_MODE", "unknown")
 
     with pytest.raises(ValidationError, match="chat_infrastructure_mode"):
-        chat_deps.get_chat_repository()
+        chat_deps.get_chat_command_repository()
 
 
 @pytest.mark.parametrize(

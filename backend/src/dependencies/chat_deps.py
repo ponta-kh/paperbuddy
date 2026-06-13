@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Any
 
 from src.application.ports.input.chat.continue_chat_protocol import ContinueChatProtocol
 from src.application.ports.input.chat.delete_chat_protocol import DeleteChatProtocol
@@ -29,25 +30,54 @@ from src.dependencies.client_factories import (
 )
 from src.dependencies.settings import get_settings
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
-    DynamoDbChatRepository,
+    DynamoDbChatCommandRepository,
+    DynamoDbChatDeletionRepository,
+    DynamoDbChatQueryRepository,
+    DynamoDbChatTitleRepository,
 )
 
 
 @lru_cache
-def get_chat_repository() -> DynamoDbChatRepository:
+def get_chat_dynamodb_client() -> Any:
+    return create_dynamodb_client(get_settings())
+
+
+def _create_chat_repository(repository_type: type[Any]) -> Any:
     settings = get_settings()
-    client = create_dynamodb_client(settings)
-    return DynamoDbChatRepository(client, table_name=settings.dynamodb_chat_table_name)
+    return repository_type(
+        get_chat_dynamodb_client(),
+        table_name=settings.dynamodb_chat_table_name,
+    )
+
+
+@lru_cache
+def get_chat_command_repository() -> DynamoDbChatCommandRepository:
+    return _create_chat_repository(DynamoDbChatCommandRepository)
+
+
+@lru_cache
+def get_chat_query_repository() -> DynamoDbChatQueryRepository:
+    return _create_chat_repository(DynamoDbChatQueryRepository)
+
+
+@lru_cache
+def get_chat_title_repository() -> DynamoDbChatTitleRepository:
+    return _create_chat_repository(DynamoDbChatTitleRepository)
+
+
+@lru_cache
+def get_chat_deletion_repository() -> DynamoDbChatDeletionRepository:
+    return _create_chat_repository(DynamoDbChatDeletionRepository)
 
 
 @lru_cache
 def get_list_chats_use_case() -> ListChatsProtocol:
-    return ListChatsUseCase(get_chat_repository())
+    return ListChatsUseCase(get_chat_query_repository())
 
 
 @lru_cache
 def get_list_chat_messages_use_case() -> ListChatMessagesProtocol:
-    return ListChatMessagesUseCase(get_chat_repository())
+    return ListChatMessagesUseCase(get_chat_query_repository())
 
 
 @lru_cache
@@ -57,20 +87,20 @@ def get_chat_generation_client() -> ChatGenerationClientProtocol:
 
 @lru_cache
 def get_continue_chat_use_case() -> ContinueChatProtocol:
-    repository = get_chat_repository()
+    repository = get_chat_command_repository()
     return ContinueChatUseCase(get_chat_generation_client(), repository)
 
 
 @lru_cache
 def get_start_chat_use_case() -> StartChatProtocol:
-    return StartChatUseCase(get_chat_generation_client(), get_chat_repository())
+    return StartChatUseCase(get_chat_generation_client(), get_chat_command_repository())
 
 
 @lru_cache
 def get_rename_chat_use_case() -> RenameChatProtocol:
-    return RenameChatUseCase(get_chat_repository())
+    return RenameChatUseCase(get_chat_title_repository())
 
 
 @lru_cache
 def get_delete_chat_use_case() -> DeleteChatProtocol:
-    return DeleteChatUseCase(get_chat_repository())
+    return DeleteChatUseCase(get_chat_deletion_repository())

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { groupChatsByUpdatedAt } from "@/features/chat/utils/chat-data";
+import {
+    groupChatsByUpdatedAt,
+    isChatContinuationExpired,
+} from "@/features/chat/utils/chat-data";
 import type { ChatSummary } from "@/lib/chat-api";
 
 function createChat(id: string, updatedAt: Date): ChatSummary {
@@ -43,5 +46,17 @@ describe("groupChatsByUpdatedAt", () => {
             { label: "過去7日間", chats: [] },
             { label: "1週間以上前", chats: [] },
         ]);
+    });
+});
+
+describe("isChatContinuationExpired", () => {
+    const now = new Date("2026-06-10T12:00:00Z");
+
+    test.each([
+        ["24時間未満", "2026-06-09T12:00:00.001Z", false],
+        ["ちょうど24時間", "2026-06-09T12:00:00.000Z", true],
+        ["24時間超過", "2026-06-09T11:59:59.999Z", true],
+    ])("%sを判定する", (_, updatedAt, expected) => {
+        expect(isChatContinuationExpired(updatedAt, now)).toBe(expected);
     });
 });

@@ -20,9 +20,9 @@ function ChatPage() {
     const [chatRefreshKey, setChatRefreshKey] = useState(0);
     const [messageRefreshKey, setMessageRefreshKey] = useState(0);
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (isContinuationExpired: boolean) => {
         const trimmedMessage = message.trim();
-        if (!trimmedMessage || isSending) return;
+        if (!trimmedMessage || isSending || isContinuationExpired) return;
 
         setIsSending(true);
         setSendError(false);
@@ -63,6 +63,7 @@ function ChatPage() {
                         chats,
                         chatsError,
                         isLoading,
+                        isContinuationExpired,
                         title,
                         onDeleteChat,
                         onRenameChat,
@@ -128,11 +129,16 @@ function ChatPage() {
                                     )}
                                 </ChatMessagesContainer>
                                 <ChatComposer
+                                    isContinuationExpired={
+                                        isContinuationExpired
+                                    }
                                     isSending={isSending}
                                     message={message}
                                     sendError={sendError}
                                     onMessageChange={setMessage}
-                                    onSubmit={handleSubmit}
+                                    onSubmit={() =>
+                                        handleSubmit(isContinuationExpired)
+                                    }
                                 />
                             </main>
                         </>

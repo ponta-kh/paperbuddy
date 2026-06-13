@@ -26,7 +26,7 @@ _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
 
 
-class DynamoDbChatRepository:
+class _DynamoDbChatRepositoryOperations:
     def __init__(self, client: Any, *, table_name: str) -> None:
         self._client = client
         self._table_name = table_name
@@ -152,8 +152,11 @@ class DynamoDbChatRepository:
                 raise ChatNotFoundError from error
             raise ChatTitleUpdateError from error
 
-    async def delete_chat(self, *, chat_id: UUID) -> None:
+    async def delete_chat(self, *, chat_id: UUID, user_id: UUID) -> None:
         try:
+            chat_item = await self._get_chat_item(chat_id)
+            if chat_item is None or chat_item["user_id"] != str(user_id):
+                raise ChatNotFoundError
             items = await self._query_all(
                 TableName=self._table_name,
                 KeyConditionExpression="pk = :chat_key",
@@ -179,6 +182,8 @@ class DynamoDbChatRepository:
                 if response.get("UnprocessedItems"):
                     raise ChatDeleteError
         except ChatDeleteError:
+            raise
+        except ChatNotFoundError:
             raise
         except ClientError as error:
             raise ChatDeleteError from error
@@ -317,8 +322,10 @@ class DynamoDbChatRepository:
             session_id=item["session_id"],
             title=item["title"],
             user_id=UUID(item["user_id"]),
-            created_at=DynamoDbChatRepository._parse_datetime(item["created_at"]),
-            last_updated_at=DynamoDbChatRepository._parse_datetime(
+            created_at=_DynamoDbChatRepositoryOperations._parse_datetime(
+                item["created_at"]
+            ),
+            last_updated_at=_DynamoDbChatRepositoryOperations._parse_datetime(
                 item["last_updated_at"]
             ),
             version=item["version"],
@@ -351,3 +358,71 @@ class DynamoDbChatRepository:
     @staticmethod
     def _deserialize(item: dict[str, Any]) -> dict[str, Any]:
         return {key: _deserializer.deserialize(value) for key, value in item.items()}
+
+
+class _DynamoDbChatRepository:
+    def __init__(self, client: Any, *, table_name: str) -> None:
+        self._operations = _DynamoDbChatRepositoryOperations(
+            client,
+            table_name=table_name,
+        )
+
+
+class DynamoDbChatCommandRepository(_DynamoDbChatRepository):
+    async def save_started_chat(
+        self,
+        chat: Chat,
+        user_message: ChatMessage,
+        llm_message: ChatMessage,
+    ) -> None:
+        await self._operations.save_started_chat(chat, user_message, llm_message)
+
+    async def get_chat_for_continuation(self, *, chat_id: UUID, user_id: UUID) -> Chat:
+        return await self._operations.get_chat_for_continuation(
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+
+    async def save_exchange(
+        self,
+        chat: Chat,
+        user_message: ChatMessage,
+        llm_message: ChatMessage,
+    ) -> None:
+        await self._operations.save_exchange(chat, user_message, llm_message)
+
+
+class DynamoDbChatQueryRepository(_DynamoDbChatRepository):
+    async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
+        return await self._operations.list_chats_by_user_id(user_id)
+
+    async def list_messages_by_chat_id(
+        self,
+        *,
+        user_id: UUID,
+        chat_id: UUID,
+    ) -> tuple[ChatMessageRecord, ...]:
+        return await self._operations.list_messages_by_chat_id(
+            user_id=user_id,
+            chat_id=chat_id,
+        )
+
+
+class DynamoDbChatTitleRepository(_DynamoDbChatRepository):
+    async def update_title(
+        self,
+        *,
+        chat_id: UUID,
+        user_id: UUID,
+        title: str,
+    ) -> None:
+        await self._operations.update_title(
+            chat_id=chat_id,
+            user_id=user_id,
+            title=title,
+        )
+
+
+class DynamoDbChatDeletionRepository(_DynamoDbChatRepository):
+    async def delete_chat(self, *, chat_id: UUID, user_id: UUID) -> None:
+        await self._operations.delete_chat(chat_id=chat_id, user_id=user_id)

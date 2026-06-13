@@ -67,6 +67,7 @@ class StubDeleteChatUseCase:
 
     async def execute(self, command: object) -> None:
         assert command.chat_id == CHAT_ID
+        assert command.user_id == USER_ID
         self.called = True
 
 

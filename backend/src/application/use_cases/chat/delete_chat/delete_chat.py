@@ -9,4 +9,7 @@ class DeleteChatUseCase:
         self._chat_repository = chat_repository
 
     async def execute(self, command: DeleteChatInput) -> None:
-        await self._chat_repository.delete_chat(chat_id=command.chat_id)
+        await self._chat_repository.delete_chat(
+            chat_id=command.chat_id,
+            user_id=command.user_id,
+        )

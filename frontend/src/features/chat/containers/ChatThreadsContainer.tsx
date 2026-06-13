@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-
+import {
+    CHAT_CONTINUATION_LIMIT_MS,
+    isChatContinuationExpired,
+} from "@/features/chat/utils/chat-data";
 import {
     type ChatSummary,
     deleteChat,
@@ -14,6 +17,7 @@ type ChatThreadsContainerProps = {
         chats: ChatSummary[];
         chatsError: boolean;
         isLoading: boolean;
+        isContinuationExpired: boolean;
         title?: string;
         onDeleteChat: () => Promise<void>;
         onRenameChat: (title: string) => Promise<void>;
@@ -27,6 +31,7 @@ export function ChatThreadsContainer({
     const [chats, setChats] = useState<ChatSummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [chatsError, setChatsError] = useState(false);
+    const [isContinuationExpired, setIsContinuationExpired] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -55,6 +60,28 @@ export function ChatThreadsContainer({
 
     const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
+    useEffect(() => {
+        if (!selectedChat) {
+            setIsContinuationExpired(false);
+            return;
+        }
+
+        const updateExpiration = () =>
+            setIsContinuationExpired(
+                isChatContinuationExpired(selectedChat.updatedAt),
+            );
+        updateExpiration();
+
+        const remaining =
+            new Date(selectedChat.updatedAt).getTime() +
+            CHAT_CONTINUATION_LIMIT_MS -
+            Date.now();
+        if (remaining <= 0) return;
+
+        const timeout = window.setTimeout(updateExpiration, remaining);
+        return () => window.clearTimeout(timeout);
+    }, [selectedChat]);
+
     const handleRenameChat = async (title: string) => {
         if (!selectedChatId) return;
 
@@ -79,6 +106,7 @@ export function ChatThreadsContainer({
         chats,
         chatsError,
         isLoading,
+        isContinuationExpired,
         title: selectedChat?.title,
         onDeleteChat: handleDeleteChat,
         onRenameChat: handleRenameChat,

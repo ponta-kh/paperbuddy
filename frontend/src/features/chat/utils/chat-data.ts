@@ -1,5 +1,17 @@
 import type { ChatSummary } from "@/lib/chat-api";
 
+export const CHAT_CONTINUATION_LIMIT_MS = 24 * 60 * 60 * 1000;
+
+export function isChatContinuationExpired(
+    updatedAt: string,
+    now = new Date(),
+): boolean {
+    return (
+        now.getTime() - new Date(updatedAt).getTime() >=
+        CHAT_CONTINUATION_LIMIT_MS
+    );
+}
+
 export type ChatGroup = {
     label: "今日" | "過去7日間" | "1週間以上前";
     chats: ChatSummary[];

@@ -19,7 +19,7 @@ from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
-    DynamoDbChatRepository,
+    _DynamoDbChatRepositoryOperations as DynamoDbChatRepository,
 )
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -253,9 +253,10 @@ async def test_delete_chat_deletes_all_items_in_batches_of_25() -> None:
         for index in range(26)
     ]
     client.query.return_value = {"Items": items}
+    client.get_item.return_value = {"Item": _serialized_chat_item(repository)}
     client.batch_write_item.return_value = {}
 
-    await repository.delete_chat(chat_id=CHAT_ID)
+    await repository.delete_chat(chat_id=CHAT_ID, user_id=USER_ID)
 
     query = client.query.call_args.kwargs
     assert query["ProjectionExpression"] == "pk, sk"
@@ -284,8 +285,9 @@ async def test_delete_chat_succeeds_when_chat_has_no_items() -> None:
     client = Mock()
     client.query.return_value = {"Items": []}
     repository = DynamoDbChatRepository(client, table_name="chat-table")
+    client.get_item.return_value = {"Item": _serialized_chat_item(repository)}
 
-    await repository.delete_chat(chat_id=CHAT_ID)
+    await repository.delete_chat(chat_id=CHAT_ID, user_id=USER_ID)
 
     client.batch_write_item.assert_not_called()
 
@@ -295,23 +297,56 @@ async def test_delete_chat_rejects_unprocessed_items() -> None:
     client = Mock()
     repository = DynamoDbChatRepository(client, table_name="chat-table")
     item = repository._serialize({"pk": f"CHAT#{CHAT_ID}", "sk": "CHAT"})
+    client.get_item.return_value = {"Item": _serialized_chat_item(repository)}
     client.query.return_value = {"Items": [item]}
     client.batch_write_item.return_value = {
         "UnprocessedItems": {"chat-table": [{"DeleteRequest": {"Key": item}}]}
     }
 
     with pytest.raises(ChatDeleteError):
-        await repository.delete_chat(chat_id=CHAT_ID)
+        await repository.delete_chat(chat_id=CHAT_ID, user_id=USER_ID)
 
 
 @pytest.mark.asyncio
 async def test_delete_chat_converts_client_error() -> None:
     client = Mock()
-    client.query.side_effect = _client_error("InternalServerError")
+    client.get_item.side_effect = _client_error("InternalServerError")
     repository = DynamoDbChatRepository(client, table_name="chat-table")
 
     with pytest.raises(ChatDeleteError):
-        await repository.delete_chat(chat_id=CHAT_ID)
+        await repository.delete_chat(chat_id=CHAT_ID, user_id=USER_ID)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        {},
+        pytest.param(
+            {
+                "Item": DynamoDbChatRepository._serialize(
+                    {
+                        **DynamoDbChatRepository._chat_item(_chat()),
+                        "user_id": str(OTHER_USER_ID),
+                    }
+                )
+            },
+            id="other-user",
+        ),
+    ],
+)
+async def test_delete_chat_hides_missing_or_other_users_chat(
+    response: dict[str, object],
+) -> None:
+    client = Mock()
+    client.get_item.return_value = response
+    repository = DynamoDbChatRepository(client, table_name="chat-table")
+
+    with pytest.raises(ChatNotFoundError):
+        await repository.delete_chat(chat_id=CHAT_ID, user_id=USER_ID)
+
+    client.query.assert_not_called()
+    client.batch_write_item.assert_not_called()
 
 
 @pytest.mark.asyncio

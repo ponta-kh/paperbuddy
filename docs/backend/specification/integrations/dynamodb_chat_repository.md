@@ -2,7 +2,7 @@
 
 ## 概要
 
-- 接続先・アダプター: Amazon DynamoDB / `DynamoDbChatRepository`
+- 接続先・アダプター: Amazon DynamoDB / `DynamoDbChatCommandRepository`、`DynamoDbChatQueryRepository`、`DynamoDbChatTitleRepository`、`DynamoDbChatDeletionRepository`
 - 利用目的: チャット本体とチャットメッセージを永続化し、ユーザー別チャット一覧とチャット別メッセージ履歴を取得する
 
 ## 対象範囲
@@ -16,7 +16,7 @@
 - ユーザー別チャット一覧の最終更新日時降順取得
 - 所有ユーザーを検証したチャットメッセージ履歴の発信日時昇順取得
 - 所有ユーザーを検証したチャットタイトルの更新
-- チャットIDに紐づく全項目の削除
+- 所有ユーザーを検証したチャットIDに紐づく全項目の削除
 
 ### 対象外
 
@@ -106,9 +106,9 @@
 
 ### delete_chat
 
-- 内部入力: `chat_id`
-- 外部入力への変換: `pk = CHAT#{chat_id}`として全ページをQueryし、主キーを25件単位の`BatchWriteItem`削除へ変換する
-- 内部出力への変換: 成功時は戻り値なし。対象0件も成功とする
+- 内部入力: `chat_id`、`user_id`
+- 外部入力への変換: チャット本体を強い整合性で取得して所有ユーザーを検証後、`pk = CHAT#{chat_id}`として全ページをQueryし、主キーを25件単位の`BatchWriteItem`削除へ変換する
+- 内部出力への変換: 成功時は戻り値なし
 - 制約: 複数バッチにまたがる削除は原子的ではない
 
 日時はUTCへ変換したISO 8601文字列として保存する。メッセージのソートキー末尾には、同一発信日時でもユーザー、LLMの順序になる発信者順序を含める。
@@ -125,12 +125,14 @@
 | タイトル更新の条件違反 | `ChatNotFoundError` | 項目なしまたは所有ユーザー不一致 |
 | タイトル更新のその他の`ClientError` | `ChatTitleUpdateError` | SDK例外を外部へ漏らさない |
 | 削除Query・BatchWriteの`ClientError`または未処理項目 | `ChatDeleteError` | SDK例外を外部へ漏らさない |
+| 削除対象の項目なしまたは所有ユーザー不一致 | `ChatNotFoundError` | 対象の存在を他ユーザーへ開示しない |
 
 ## 該当データなし
 
 - `get_chat_for_continuation`: 項目なしまたは所有ユーザー不一致の場合は`ChatNotFoundError`
 - `list_chats_by_user_id`: DynamoDB Queryの全ページを内部で走査し、合計0件の場合は`RepositoryNotFoundError`
 - `list_messages_by_chat_id`: DynamoDB Queryの全ページを内部で走査し、チャットなし、所有ユーザー不一致、またはメッセージ合計0件の場合は`RepositoryNotFoundError`
+- `delete_chat`: チャットなしまたは所有ユーザー不一致の場合は`ChatNotFoundError`
 
 ## タイムアウト・リトライ・制限
 
