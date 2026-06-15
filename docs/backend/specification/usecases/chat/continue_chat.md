@@ -180,8 +180,8 @@ flowchart TD
 
 ## 16. 関連仕様書
 
-- ドメイン仕様書: `docs/backend/specification/chat/domain.md`
-- 外部接続仕様書: `docs/backend/specification/integrations/dynamodb_chat_repository.md`
+- ドメイン仕様書: `docs/backend/specification/domain/chat/domain.md`
+- 外部接続仕様書: `docs/backend/specification/infrastructure/dynamodb_chat_repository.md`
 - 外部接続仕様書: チャット生成サービスの接続仕様書は未作成
 
 ## 17. 未確定事項

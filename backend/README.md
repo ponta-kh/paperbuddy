@@ -45,9 +45,9 @@ DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 
 See `docs/infra/dynamodb.md` for deployment, authentication, and IAM
 requirements. The chat table and `gsi1` key schema are defined in
-`docs/backend/specification/integrations/dynamodb_chat_repository.md`.
+`docs/backend/specification/infrastructure/dynamodb_chat_repository.md`.
 The library table is defined in
-`docs/backend/specification/integrations/dynamodb_indexed_file_catalog.md`.
+`docs/backend/specification/infrastructure/dynamodb_indexed_file_catalog.md`.
 
 ## Run on the Host
 

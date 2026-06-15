@@ -27,13 +27,13 @@
 
 | Protocol | 操作 | 利用ユースケース |
 | --- | --- | --- |
-| `ChatCommandRepositoryProtocol` | `save_started_chat` | `docs/backend/specification/chat/start_chat.md` |
-| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | `docs/backend/specification/chat/continue_chat.md` |
-| `ChatCommandRepositoryProtocol` | `save_exchange` | `docs/backend/specification/chat/continue_chat.md` |
-| `ChatTitleRepositoryProtocol` | `update_title` | `docs/backend/specification/chat/rename_chat.md` |
-| `ChatDeletionRepositoryProtocol` | `delete_chat` | `docs/backend/specification/chat/delete_chat.md` |
-| `ChatQueryRepositoryProtocol` | `list_chats_by_user_id` | `docs/backend/specification/chat/list_chats.md` |
-| `ChatQueryRepositoryProtocol` | `list_messages_by_chat_id` | `docs/backend/specification/chat/list_chat_messages.md` |
+| `ChatCommandRepositoryProtocol` | `save_started_chat` | `docs/backend/specification/usecases/chat/start_chat.md` |
+| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | `docs/backend/specification/usecases/chat/continue_chat.md` |
+| `ChatCommandRepositoryProtocol` | `save_exchange` | `docs/backend/specification/usecases/chat/continue_chat.md` |
+| `ChatTitleRepositoryProtocol` | `update_title` | `docs/backend/specification/usecases/chat/rename_chat.md` |
+| `ChatDeletionRepositoryProtocol` | `delete_chat` | `docs/backend/specification/usecases/chat/delete_chat.md` |
+| `ChatQueryRepositoryProtocol` | `list_chats_by_user_id` | `docs/backend/specification/usecases/chat/list_chats.md` |
+| `ChatQueryRepositoryProtocol` | `list_messages_by_chat_id` | `docs/backend/specification/usecases/chat/list_chat_messages.md` |
 
 ## 接続方式
 
@@ -162,11 +162,11 @@
 
 ## 関連仕様書
 
-- ユースケース仕様書: `docs/backend/specification/chat/start_chat.md`
-- ユースケース仕様書: `docs/backend/specification/chat/continue_chat.md`
-- ユースケース仕様書: `docs/backend/specification/chat/list_chats.md`
-- ユースケース仕様書: `docs/backend/specification/chat/list_chat_messages.md`
-- ドメイン仕様書: `docs/backend/specification/chat/domain.md`
+- ユースケース仕様書: `docs/backend/specification/usecases/chat/start_chat.md`
+- ユースケース仕様書: `docs/backend/specification/usecases/chat/continue_chat.md`
+- ユースケース仕様書: `docs/backend/specification/usecases/chat/list_chats.md`
+- ユースケース仕様書: `docs/backend/specification/usecases/chat/list_chat_messages.md`
+- ドメイン仕様書: `docs/backend/specification/domain/chat/domain.md`
 
 ## 未確定事項
 

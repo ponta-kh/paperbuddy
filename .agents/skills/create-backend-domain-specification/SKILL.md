@@ -9,8 +9,8 @@ description: バックエンドのドメインモデル仕様書またはDomain 
 
 ## 出力規則
 
-- ドメインモデル仕様書は `docs/backend/specification/[domain名]/domain.md` に作成する。
-- Domain Service仕様書は `docs/backend/specification/[domain名]/domain-services/[service名].md` に作成する。
+- ドメインモデル仕様書は `docs/backend/specification/domain/[domain名]/domain.md` に作成する。
+- Domain Service仕様書は `docs/backend/specification/domain/[domain名]/domain-services/[service名].md` に作成する。
 - `[domain名]` は既存コード・仕様書の用語に合わせた英小文字のsnake_caseとする。
 - `[service名]` はDomain Service名に合わせた英小文字のsnake_caseとする。
 - 1つのドメインモデル仕様書には1つのドメインのみを記載する。
@@ -23,6 +23,7 @@ description: バックエンドのドメインモデル仕様書またはDomain 
 ## 必須の参照資料
 
 - 作業開始時と最終確認前に `docs/backend/architecture.md` と `docs/backend/layer/domain.md` を読む。
+- `docs/backend/specification/README.md` を読み、仕様書の配置規則に従う。
 - 関連する責務を確認するため、`docs/backend/layer/application.md` と `docs/backend/layer/infrastructure.md` を読む。
 - `docs/backend/naming-conventions.md` が存在する場合は読む。
 - 同じドメインの既存ユースケース仕様書、コード、テストを調査し、用語と業務ルールを揃える。
