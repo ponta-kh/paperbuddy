@@ -11,6 +11,12 @@ export type ChatMessage = {
     role: "user" | "assistant";
     content: string;
     createdAt: string;
+    status?: "pending" | "revealing" | "completed" | "failed";
+};
+
+export type SendPromptResult = {
+    chat: ChatSummary;
+    answer: string;
 };
 
 type ChatSummaryResponse = {
@@ -96,7 +102,7 @@ export async function getChatMessages(
 export async function sendPrompt(
     prompt: string,
     chatId?: string,
-): Promise<ChatSummary> {
+): Promise<SendPromptResult> {
     const path = chatId
         ? `/chats/${encodeURIComponent(chatId)}/messages`
         : "/chats";
@@ -106,9 +112,12 @@ export async function sendPrompt(
     });
 
     return {
-        id: response.chat_id,
-        title: response.title,
-        updatedAt: response.last_updated_at,
+        chat: {
+            id: response.chat_id,
+            title: response.title,
+            updatedAt: response.last_updated_at,
+        },
+        answer: response.answer,
     };
 }
 

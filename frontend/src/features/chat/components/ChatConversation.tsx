@@ -66,6 +66,11 @@ export function ChatConversation({
                                 >
                                     <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[#e9efeb] px-4 py-3 text-[13px] leading-6 text-[#30463e] sm:max-w-[75%]">
                                         {message.content}
+                                        {message.status === "failed" && (
+                                            <p className="mt-1 text-[10px] text-destructive">
+                                                送信できませんでした
+                                            </p>
+                                        )}
                                     </div>
                                 </section>
                             ) : (

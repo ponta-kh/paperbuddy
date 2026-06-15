@@ -1,4 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { ChatMessagesContainer } from "@/features/chat/containers/ChatMessagesContainer";
@@ -41,12 +47,21 @@ describe("ChatMessagesContainer", () => {
         expect(screen.getByText("質問です")).toBeInTheDocument();
     });
 
-    test("更新キーが変わると再取得する", async () => {
-        vi.mocked(getChatMessages).mockResolvedValue([]);
+    test("チャットを切り替えると履歴を取得する", async () => {
+        vi.mocked(getChatMessages)
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([
+                {
+                    id: "turn-2:user",
+                    role: "user",
+                    content: "切り替え後",
+                    createdAt: "2026-01-02T00:00:00Z",
+                },
+            ]);
 
         const { rerender } = render(
-            <ChatMessagesContainer key={0} selectedChatId="chat-1">
-                {() => <div>messages</div>}
+            <ChatMessagesContainer selectedChatId="chat-1">
+                {({ messages }) => <div>{messages[0]?.content}</div>}
             </ChatMessagesContainer>,
         );
 
@@ -55,13 +70,110 @@ describe("ChatMessagesContainer", () => {
         });
 
         rerender(
-            <ChatMessagesContainer key={1} selectedChatId="chat-1">
-                {() => <div>messages</div>}
+            <ChatMessagesContainer selectedChatId="chat-2">
+                {({ messages }) => <div>{messages[0]?.content}</div>}
             </ChatMessagesContainer>,
         );
 
         await waitFor(() => {
             expect(getChatMessages).toHaveBeenCalledTimes(2);
+        });
+        expect(screen.getByText("切り替え後")).toBeInTheDocument();
+    });
+
+    test("ユーザーメッセージを即時追加し失敗状態へ更新する", async () => {
+        vi.mocked(getChatMessages).mockResolvedValue([]);
+
+        render(
+            <ChatMessagesContainer>
+                {({ messages, onAppendUserMessage, onMarkMessageFailed }) => (
+                    <div>
+                        <span>
+                            {messages
+                                .map(
+                                    (message) =>
+                                        `${message.content}:${message.status}`,
+                                )
+                                .join(",")}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const id = onAppendUserMessage("質問です");
+                                onMarkMessageFailed(id);
+                            }}
+                        >
+                            送信
+                        </button>
+                    </div>
+                )}
+            </ChatMessagesContainer>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "送信" }));
+
+        expect(screen.getByText("質問です:failed")).toBeInTheDocument();
+        expect(getChatMessages).not.toHaveBeenCalled();
+    });
+
+    test("回答を段階的に表示する", () => {
+        vi.useFakeTimers();
+
+        render(
+            <ChatMessagesContainer>
+                {({ messages, onAppendAssistantMessage }) => (
+                    <div>
+                        <span>{messages[0]?.content}</span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onAppendAssistantMessage("回答テキスト")
+                            }
+                        >
+                            回答追加
+                        </button>
+                    </div>
+                )}
+            </ChatMessagesContainer>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "回答追加" }));
+        expect(screen.queryByText("回答テキスト")).not.toBeInTheDocument();
+
+        act(() => vi.advanceTimersByTime(20));
+        expect(screen.getByText("回答")).toBeInTheDocument();
+
+        act(() => vi.runAllTimers());
+        expect(screen.getByText("回答テキスト")).toBeInTheDocument();
+
+        vi.useRealTimers();
+    });
+
+    test("新規チャット採番後は履歴を再取得しない", async () => {
+        vi.mocked(getChatMessages).mockResolvedValue([]);
+
+        const { rerender } = render(
+            <ChatMessagesContainer>
+                {({ onBindCurrentChat }) => (
+                    <button
+                        type="button"
+                        onClick={() => onBindCurrentChat("chat-new")}
+                    >
+                        採番
+                    </button>
+                )}
+            </ChatMessagesContainer>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "採番" }));
+        rerender(
+            <ChatMessagesContainer selectedChatId="chat-new">
+                {() => <div>messages</div>}
+            </ChatMessagesContainer>,
+        );
+
+        await waitFor(() => {
+            expect(getChatMessages).not.toHaveBeenCalled();
         });
     });
 });

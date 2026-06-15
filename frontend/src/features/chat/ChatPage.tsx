@@ -17,25 +17,37 @@ function ChatPage() {
     const [selectedChatId, setSelectedChatId] = useState<string>();
     const [isSending, setIsSending] = useState(false);
     const [sendError, setSendError] = useState(false);
-    const [messageRefreshKey, setMessageRefreshKey] = useState(0);
+    const [messageResetKey, setMessageResetKey] = useState(0);
 
     const handleSubmit = async (
         isContinuationExpired: boolean,
         onUpsertChat: (chat: ChatSummary) => void,
+        onAppendUserMessage: (content: string) => string,
+        onAppendAssistantMessage: (content: string) => void,
+        onBindCurrentChat: (chatId: string) => void,
+        onMarkMessageCompleted: (messageId: string) => void,
+        onMarkMessageFailed: (messageId: string) => void,
     ) => {
         const trimmedMessage = message.trim();
         if (!trimmedMessage || isSending || isContinuationExpired) return;
 
+        const userMessageId = onAppendUserMessage(trimmedMessage);
+        setMessage("");
         setIsSending(true);
         setSendError(false);
 
         try {
-            const chat = await sendPrompt(trimmedMessage, selectedChatId);
+            const { chat, answer } = await sendPrompt(
+                trimmedMessage,
+                selectedChatId,
+            );
+            onBindCurrentChat(chat.id);
             setSelectedChatId(chat.id);
-            setMessage("");
+            onMarkMessageCompleted(userMessageId);
+            onAppendAssistantMessage(answer);
             onUpsertChat(chat);
-            setMessageRefreshKey((current) => current + 1);
         } catch {
+            onMarkMessageFailed(userMessageId);
             setSendError(true);
         } finally {
             setIsSending(false);
@@ -46,6 +58,7 @@ function ChatPage() {
         setSelectedChatId(undefined);
         setMessage("");
         setSendError(false);
+        setMessageResetKey((current) => current + 1);
     };
 
     const handleChatSelect = (chatId: string) => {
@@ -111,38 +124,50 @@ function ChatPage() {
                                     onSidebarOpenChange={setSidebarOpen}
                                 />
                                 <ChatMessagesContainer
-                                    key={messageRefreshKey}
+                                    key={messageResetKey}
                                     selectedChatId={selectedChatId}
                                 >
                                     {({
                                         messages,
                                         isLoading: isMessagesLoading,
                                         loadError: messagesError,
+                                        onAppendUserMessage,
+                                        onAppendAssistantMessage,
+                                        onBindCurrentChat,
+                                        onMarkMessageCompleted,
+                                        onMarkMessageFailed,
                                     }) => (
-                                        <ChatConversation
-                                            isLoading={isMessagesLoading}
-                                            isSending={isSending}
-                                            loadError={messagesError}
-                                            messages={messages}
-                                            onSuggestionSelect={setMessage}
-                                        />
+                                        <>
+                                            <ChatConversation
+                                                isLoading={isMessagesLoading}
+                                                isSending={isSending}
+                                                loadError={messagesError}
+                                                messages={messages}
+                                                onSuggestionSelect={setMessage}
+                                            />
+                                            <ChatComposer
+                                                isContinuationExpired={
+                                                    isContinuationExpired
+                                                }
+                                                isSending={isSending}
+                                                message={message}
+                                                sendError={sendError}
+                                                onMessageChange={setMessage}
+                                                onSubmit={() =>
+                                                    handleSubmit(
+                                                        isContinuationExpired,
+                                                        onUpsertChat,
+                                                        onAppendUserMessage,
+                                                        onAppendAssistantMessage,
+                                                        onBindCurrentChat,
+                                                        onMarkMessageCompleted,
+                                                        onMarkMessageFailed,
+                                                    )
+                                                }
+                                            />
+                                        </>
                                     )}
                                 </ChatMessagesContainer>
-                                <ChatComposer
-                                    isContinuationExpired={
-                                        isContinuationExpired
-                                    }
-                                    isSending={isSending}
-                                    message={message}
-                                    sendError={sendError}
-                                    onMessageChange={setMessage}
-                                    onSubmit={() =>
-                                        handleSubmit(
-                                            isContinuationExpired,
-                                            onUpsertChat,
-                                        )
-                                    }
-                                />
                             </main>
                         </>
                     )}
