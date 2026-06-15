@@ -132,6 +132,7 @@ async def continue_chat(
         chat_id=output.chat_id,
         answer=output.answer,
         title=output.title,
+        last_updated_at=output.last_updated_at,
     )
 
 
@@ -145,5 +146,8 @@ async def start_chat(
         StartChatInput(user_id=user.user_id, prompt=request.prompt)
     )
     return StartChatResponse(
-        chat_id=output.chat_id, answer=output.answer, title=output.title
+        chat_id=output.chat_id,
+        answer=output.answer,
+        title=output.title,
+        last_updated_at=output.last_updated_at,
     )

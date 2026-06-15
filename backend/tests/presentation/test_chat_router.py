@@ -36,13 +36,19 @@ from src.presentation.auth import AuthenticatedUser, get_authenticated_user
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 CHAT_ID_TEXT = str(CHAT_ID)
+LAST_UPDATED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 class StubStartChatUseCase:
     async def execute(self, command: object) -> StartChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.prompt == "question"
-        return StartChatOutput(chat_id=CHAT_ID, answer="answer", title="title")
+        return StartChatOutput(
+            chat_id=CHAT_ID,
+            answer="answer",
+            title="title",
+            last_updated_at=LAST_UPDATED_AT,
+        )
 
 
 class StubContinueChatUseCase:
@@ -50,7 +56,12 @@ class StubContinueChatUseCase:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.chat_id == CHAT_ID
         assert command.prompt == "next question"
-        return ContinueChatOutput(chat_id=CHAT_ID, answer="next answer", title="title")
+        return ContinueChatOutput(
+            chat_id=CHAT_ID,
+            answer="next answer",
+            title="title",
+            last_updated_at=LAST_UPDATED_AT,
+        )
 
 
 class StubRenameChatUseCase:
@@ -233,6 +244,7 @@ def test_continue_chat_endpoint() -> None:
         "chat_id": CHAT_ID_TEXT,
         "answer": "next answer",
         "title": "title",
+        "last_updated_at": "2026-01-01T00:00:00Z",
     }
 
 
@@ -327,6 +339,7 @@ def test_start_chat_endpoint() -> None:
         "chat_id": CHAT_ID_TEXT,
         "answer": "answer",
         "title": "title",
+        "last_updated_at": "2026-01-01T00:00:00Z",
     }
 
 

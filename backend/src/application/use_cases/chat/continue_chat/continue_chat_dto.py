@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -17,3 +18,4 @@ class ContinueChatOutput:
     chat_id: UUID
     answer: str
     title: str
+    last_updated_at: datetime

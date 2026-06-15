@@ -40,6 +40,7 @@ type SendPromptResponse = {
     chat_id: string;
     answer: string;
     title: string;
+    last_updated_at: string;
 };
 
 type RenameChatResponse = {
@@ -95,7 +96,7 @@ export async function getChatMessages(
 export async function sendPrompt(
     prompt: string,
     chatId?: string,
-): Promise<string> {
+): Promise<ChatSummary> {
     const path = chatId
         ? `/chats/${encodeURIComponent(chatId)}/messages`
         : "/chats";
@@ -104,7 +105,11 @@ export async function sendPrompt(
         body: { prompt },
     });
 
-    return response.chat_id;
+    return {
+        id: response.chat_id,
+        title: response.title,
+        updatedAt: response.last_updated_at,
+    };
 }
 
 export async function renameChat(chatId: string, title: string): Promise<void> {

@@ -60,6 +60,7 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
     assert output.chat_id == CHAT_ID
     assert output.answer == "new answer"
     assert output.title == "existing title"
+    assert output.last_updated_at == answered_at
     saved_chat, user_message, llm_message = repository.save_exchange.await_args.args
     assert saved_chat is chat
     assert saved_chat.last_updated_at == answered_at

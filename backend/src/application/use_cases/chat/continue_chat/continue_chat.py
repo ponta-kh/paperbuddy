@@ -68,4 +68,5 @@ class ContinueChatUseCase:
             chat_id=chat.chat_id,
             answer=generated.answer,
             title=chat.title,
+            last_updated_at=chat.last_updated_at,
         )

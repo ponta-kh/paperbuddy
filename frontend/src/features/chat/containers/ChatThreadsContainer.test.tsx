@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { ChatThreadsContainer } from "@/features/chat/containers/ChatThreadsContainer";
@@ -44,7 +44,7 @@ describe("ChatThreadsContainer", () => {
         expect(screen.getByText("最初のチャット")).toBeInTheDocument();
     });
 
-    test("更新キーが変わると再取得する", async () => {
+    test("新しいチャットを一覧の先頭へ追加する", async () => {
         vi.mocked(getChats).mockResolvedValue([
             {
                 id: "chat-1",
@@ -53,24 +53,85 @@ describe("ChatThreadsContainer", () => {
             },
         ]);
 
-        const { rerender } = render(
-            <ChatThreadsContainer key={0}>
-                {() => <div>threads</div>}
+        render(
+            <ChatThreadsContainer>
+                {({ chats, onUpsertChat }) => (
+                    <div>
+                        <span>{chats.map((chat) => chat.id).join(",")}</span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onUpsertChat({
+                                    id: "chat-2",
+                                    title: "新しいチャット",
+                                    updatedAt: "2026-01-02T00:00:00Z",
+                                })
+                            }
+                        >
+                            追加
+                        </button>
+                    </div>
+                )}
             </ChatThreadsContainer>,
         );
 
         await waitFor(() => {
             expect(getChats).toHaveBeenCalledOnce();
         });
+        fireEvent.click(screen.getByRole("button", { name: "追加" }));
 
-        rerender(
-            <ChatThreadsContainer key={1}>
-                {() => <div>threads</div>}
+        expect(screen.getByText("chat-2,chat-1")).toBeInTheDocument();
+        expect(getChats).toHaveBeenCalledOnce();
+    });
+
+    test("既存チャットを更新して一覧の先頭へ移動する", async () => {
+        vi.mocked(getChats).mockResolvedValue([
+            {
+                id: "chat-1",
+                title: "最初のチャット",
+                updatedAt: "2026-01-02T00:00:00Z",
+            },
+            {
+                id: "chat-2",
+                title: "古いタイトル",
+                updatedAt: "2026-01-01T00:00:00Z",
+            },
+        ]);
+
+        render(
+            <ChatThreadsContainer>
+                {({ chats, onUpsertChat }) => (
+                    <div>
+                        <span>
+                            {chats
+                                .map((chat) => `${chat.id}:${chat.title}`)
+                                .join(",")}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onUpsertChat({
+                                    id: "chat-2",
+                                    title: "更新後タイトル",
+                                    updatedAt: "2026-01-03T00:00:00Z",
+                                })
+                            }
+                        >
+                            更新
+                        </button>
+                    </div>
+                )}
             </ChatThreadsContainer>,
         );
 
         await waitFor(() => {
-            expect(getChats).toHaveBeenCalledTimes(2);
+            expect(getChats).toHaveBeenCalledOnce();
         });
+        fireEvent.click(screen.getByRole("button", { name: "更新" }));
+
+        expect(
+            screen.getByText("chat-2:更新後タイトル,chat-1:最初のチャット"),
+        ).toBeInTheDocument();
+        expect(getChats).toHaveBeenCalledOnce();
     });
 });

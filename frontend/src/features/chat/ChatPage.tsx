@@ -8,7 +8,7 @@ import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
 import { ChatMessagesContainer } from "@/features/chat/containers/ChatMessagesContainer";
 import { ChatThreadsContainer } from "@/features/chat/containers/ChatThreadsContainer";
 import { LibraryHeaderActionsContainer } from "@/features/chat/containers/library/LibraryHeaderActionsContainer";
-import { sendPrompt } from "@/lib/chat-api";
+import { type ChatSummary, sendPrompt } from "@/lib/chat-api";
 
 function ChatPage() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -17,10 +17,12 @@ function ChatPage() {
     const [selectedChatId, setSelectedChatId] = useState<string>();
     const [isSending, setIsSending] = useState(false);
     const [sendError, setSendError] = useState(false);
-    const [chatRefreshKey, setChatRefreshKey] = useState(0);
     const [messageRefreshKey, setMessageRefreshKey] = useState(0);
 
-    const handleSubmit = async (isContinuationExpired: boolean) => {
+    const handleSubmit = async (
+        isContinuationExpired: boolean,
+        onUpsertChat: (chat: ChatSummary) => void,
+    ) => {
         const trimmedMessage = message.trim();
         if (!trimmedMessage || isSending || isContinuationExpired) return;
 
@@ -28,10 +30,10 @@ function ChatPage() {
         setSendError(false);
 
         try {
-            const chatId = await sendPrompt(trimmedMessage, selectedChatId);
-            setSelectedChatId(chatId);
+            const chat = await sendPrompt(trimmedMessage, selectedChatId);
+            setSelectedChatId(chat.id);
             setMessage("");
-            setChatRefreshKey((current) => current + 1);
+            onUpsertChat(chat);
             setMessageRefreshKey((current) => current + 1);
         } catch {
             setSendError(true);
@@ -55,10 +57,7 @@ function ChatPage() {
     return (
         <TooltipProvider>
             <div className="flex h-dvh overflow-hidden bg-[#fbfcfa] text-[#263b34]">
-                <ChatThreadsContainer
-                    key={chatRefreshKey}
-                    selectedChatId={selectedChatId}
-                >
+                <ChatThreadsContainer selectedChatId={selectedChatId}>
                     {({
                         chats,
                         chatsError,
@@ -67,6 +66,7 @@ function ChatPage() {
                         title,
                         onDeleteChat,
                         onRenameChat,
+                        onUpsertChat,
                     }) => (
                         <>
                             <aside
@@ -137,7 +137,10 @@ function ChatPage() {
                                     sendError={sendError}
                                     onMessageChange={setMessage}
                                     onSubmit={() =>
-                                        handleSubmit(isContinuationExpired)
+                                        handleSubmit(
+                                            isContinuationExpired,
+                                            onUpsertChat,
+                                        )
                                     }
                                 />
                             </main>

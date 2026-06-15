@@ -14,6 +14,7 @@ class StartChatResponse(BaseModel):
     chat_id: UUID
     answer: str
     title: str
+    last_updated_at: datetime
 
 
 class ContinueChatRequest(BaseModel):
@@ -26,6 +27,7 @@ class ContinueChatResponse(BaseModel):
     chat_id: UUID
     answer: str
     title: str
+    last_updated_at: datetime
 
 
 class RenameChatRequest(BaseModel):

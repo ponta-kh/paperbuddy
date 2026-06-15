@@ -51,6 +51,7 @@ async def test_start_chat_saves_chat_and_turn() -> None:
 
     generation_client.start_chat.assert_awaited_once_with("question")
     assert output.chat_id == CHAT_ID
+    assert output.last_updated_at == ANSWERED_AT
     saved_chat, user_message, llm_message = repository.save_started_chat.await_args.args
     assert isinstance(saved_chat, Chat)
     assert isinstance(user_message, ChatMessage)

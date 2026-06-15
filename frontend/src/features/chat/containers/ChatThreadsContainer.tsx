@@ -21,6 +21,7 @@ type ChatThreadsContainerProps = {
         title?: string;
         onDeleteChat: () => Promise<void>;
         onRenameChat: (title: string) => Promise<void>;
+        onUpsertChat: (chat: ChatSummary) => void;
     }) => ReactNode;
 };
 
@@ -102,6 +103,13 @@ export function ChatThreadsContainer({
         );
     };
 
+    const handleUpsertChat = (chat: ChatSummary) => {
+        setChats((currentChats) => [
+            chat,
+            ...currentChats.filter((currentChat) => currentChat.id !== chat.id),
+        ]);
+    };
+
     return children({
         chats,
         chatsError,
@@ -110,5 +118,6 @@ export function ChatThreadsContainer({
         title: selectedChat?.title,
         onDeleteChat: handleDeleteChat,
         onRenameChat: handleRenameChat,
+        onUpsertChat: handleUpsertChat,
     });
 }

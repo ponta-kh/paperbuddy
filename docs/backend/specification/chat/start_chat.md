@@ -17,7 +17,7 @@
 - `ChatGenerationClientProtocol`から検証済みのセッションID、AI回答、タイトルを取得する
 - アプリケーション内のチャットIDをUUIDで採番する
 - チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する
-- 採番したチャットIDと、`ChatGenerationClientProtocol`から取得したAI回答、タイトルを返す
+- 採番したチャットID、最終更新日時と、`ChatGenerationClientProtocol`から取得したAI回答、タイトルを返す
 
 ### 対象外
 
@@ -42,7 +42,7 @@
 - チャットの作成日時と最終更新日時が、初回の正常なLLM回答日時と一致している
 - 初回ユーザーメッセージの発信日時が、初回LLMメッセージの発信日時より後ではない
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
-- 採番したチャットIDと、`ChatGenerationClientProtocol`が返したAI回答、タイトルが呼び出し元へ返されている
+- 採番したチャットID、最終更新日時と、`ChatGenerationClientProtocol`が返したAI回答、タイトルが呼び出し元へ返されている
 
 ### 異常終了時の事後条件
 
@@ -68,6 +68,7 @@
 | `chat_id` | UUID | 初回登録時にアプリケーションが採番したチャット識別子 |
 | `answer` | `str` | `ChatGenerationClientProtocol`が返す検証済みのAI回答 |
 | `title` | `str` | `ChatGenerationClientProtocol`が返す検証済みのチャットタイトル |
+| `last_updated_at` | タイムゾーンを含む日時 | 初回の正常なLLM回答日時 |
 
 ## 6. 認可要件
 
@@ -101,7 +102,7 @@
 8. 新しい`ChatTurnId`を生成し、同じ`chat_id`と`turn_id`を持つ初回ユーザー・LLMメッセージを生成する。ユーザーメッセージには手順2の日時、LLMメッセージには初回の正常回答日時を設定する。
 9. 初回2メッセージがチャットターンと初回発信順序のルールを満たすことを保証する。
 10. `Chat`本体と初回2メッセージを`ChatCommandRepositoryProtocol.save_started_chat`へ渡し、同一トランザクションで永続化する。
-11. 採番したチャットID、AI回答、タイトルを返す。
+11. 採番したチャットID、AI回答、タイトル、最終更新日時を返す。
 
 ### フロー図
 
@@ -121,7 +122,7 @@ flowchart TD
     E -->|発信順序違反| ERR6["MessageSentAtOutOfOrderError"]
     E -->|有効| G["save_started_chatで同一トランザクション保存"]
     G -->|保存失敗| ERR7["ChatSaveError"]
-    G -->|保存成功| H["chat_id・answer・titleを返す"]
+    G -->|保存成功| H["chat_id・answer・title・last_updated_atを返す"]
     H --> I([完了])
 
     style ERR1 fill:#fdd,stroke:#c66
@@ -163,7 +164,7 @@ flowchart TD
 ## 14. 受け入れ条件
 
 - プロンプトの一般的な前後空白が除去され、整形済みプロンプトのみがチャット生成サービスへ送信される
-- 正常終了時に採番した`chat_id`と、`ChatGenerationClientProtocol`が返した`answer`、`title`が返される
+- 正常終了時に採番した`chat_id`、初回の正常なLLM回答日時である`last_updated_at`と、`ChatGenerationClientProtocol`が返した`answer`、`title`が返される
 - 正常終了時にチャット本体と初回のユーザー・LLMメッセージが永続化される
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
 - チャット本体の`created_at`と`last_updated_at`が、初回の正常なLLM回答日時と一致する

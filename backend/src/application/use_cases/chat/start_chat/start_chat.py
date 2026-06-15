@@ -67,4 +67,5 @@ class StartChatUseCase:
             chat_id=chat.chat_id,
             answer=generated.answer,
             title=generated.title,
+            last_updated_at=chat.last_updated_at,
         )
