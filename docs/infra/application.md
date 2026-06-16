@@ -4,7 +4,7 @@
 実際の初回デプロイからPDF取り込み、動作確認までの作業手順は[AWSデプロイ手順](deployment-guide.md)を参照する。
 PaperBuddyに起因する課金対象を完全に削除する場合は[AWS完全削除手順](deletion-guide.md)を参照する。
 
-## 構成
+## AWS構成
 
 CloudFrontをすべての公開トラフィックの唯一の入口とする。
 
@@ -21,19 +21,25 @@ Browser
 RAG source PDF -> private S3 bucket
 ```
 
-- フロントエンド: 非公開S3バケットへ配置し、CloudFront Origin Access Control経由だけで配信する
-- バックエンド: プライベートサブネットのECS Fargateで起動する
-- ALB: 内部向けとしてプライベートサブネットに配置する
-- CloudFront: `/api/*`をキャッシュせず、VPC Origin経由でALBへ転送する
-- VPC: 2 Availability Zoneの隔離サブネット。CloudFront VPC Origin要件のInternet Gatewayはアタッチするが、NAT Gatewayと外向きインターネットルートは作成しない
-- AWSサービス接続: S3・DynamoDBのGateway Endpointと、ECR・CloudWatch Logs・Bedrock・CognitoのInterface Endpointを使用する
-- 認証: Cognito User Poolとシークレットを持たないWeb App Clientを使用し、フロントエンドはAmplify UI、バックエンドはアクセストークンのJWT検証を行う
-- 永続化: 開発用DynamoDBテーブル`paperbuddy-dev-chat`
-- ライブラリ一覧: 開発用DynamoDBテーブル`paperbuddy-dev-library`
-- RAG材料: 非公開S3バケットの`documents/`配下へPDFを配置し、Bedrock Knowledge BaseのS3 Data Sourceとして使用する
-- Vector Store: OpenSearch Serverless Vector Searchコレクションを使用する。CloudFormationによるインデックス管理のため公開エンドポイントを有効化し、データアクセスはIAMとデータアクセスポリシーで制限する
+| 領域 | 構成 |
+|---|---|
+| 公開入口 | CloudFront |
+| フロントエンド | 非公開S3バケット |
+| バックエンド | 内部ALB、ECS Fargate |
+| ネットワーク | 2 Availability Zoneの隔離サブネット、VPC Endpoint |
+| 認証 | Cognito User Pool、Web App Client |
+| 永続化 | DynamoDBチャットテーブル、DynamoDBライブラリテーブル |
+| RAG材料 | 非公開S3バケットの`documents/`配下 |
+| RAG検索 | Bedrock Knowledge Base、OpenSearch Serverless Vector Search |
+| LLM | Amazon Bedrockの生成モデル、Titan Text Embeddings V2 |
 
-固定AWSアクセスキーは使用しない。ローカルのCDK実行は各端末でログイン済みのAWS CLI認証、Fargateはタスクロールを使用する。
+## 公開範囲
+
+- 利用者はCloudFrontへHTTPSでアクセスする
+- フロントエンドS3バケット、RAG材料PDF用S3バケット、ALBは直接公開しない
+- `/api/*`はCloudFrontから内部ALB経由でECS Fargateへ転送する
+- ECS FargateはVPC Endpoint経由でAWSサービスへ接続する
+- 固定AWSアクセスキーは使用せず、ローカルはAWS CLI認証、ECS Fargateはタスクロールを使用する
 
 ## 前提条件
 
@@ -166,15 +172,10 @@ Fargateタスクロールには以下の権限だけを付与する。
 - DynamoDB: `GetItem`、`Query`、`TransactWriteItems`
 - Bedrock: `RetrieveAndGenerate`、`InvokeModel`
 
-JWT署名鍵はCognito User PoolsのInterface VPC Endpoint経由で取得する。User PoolにはHosted UI用ドメインを設定せず、ブラウザからCognito APIへ接続するAmplify UIの認証フローを使用する。
-
-ECSタスクへ`AWS_PROFILE`や固定AWSアクセスキーは設定しない。
-
 ## 注意事項
 
 - Interface VPC Endpoint、ALB、Fargate、CloudFront、DynamoDBなどのAWS利用料金が発生する。
 - OpenSearch Serverlessは最低稼働コストが発生する。開発環境でも継続課金される点に注意する。
 - DynamoDBは削除保護と保持ポリシーを有効にしているため、スタック削除だけでは削除されない。
 - S3バケットも保持ポリシーを設定しているため、スタック削除後も残る。
-- RAG材料用S3バケットはバージョニングを有効にしている。
 - 現時点では独自ドメインとACM証明書は設定していないため、CloudFront標準ドメインを使用する。

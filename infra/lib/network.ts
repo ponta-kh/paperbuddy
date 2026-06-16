@@ -19,6 +19,8 @@ export function createNetwork(scope: Construct): NetworkResources {
             },
         ],
     });
+    // CloudFront VPC OriginはVPCへのInternet Gatewayアタッチを要求する。
+    // 隔離サブネットにはIGW向けルートを作らないため、ECSから外向きインターネット経路は生えない。
     const internetGateway = new ec2.CfnInternetGateway(
         scope,
         "InternetGateway",
@@ -50,6 +52,7 @@ export function connectBackendToAwsServices(
                 "Allow HTTPS from the backend service to VPC endpoints",
         },
     );
+    // Interface EndpointはECSタスクからのHTTPSだけを受ける。
     endpointSecurityGroup.connections.allowFrom(
         backendService,
         ec2.Port.tcp(443),

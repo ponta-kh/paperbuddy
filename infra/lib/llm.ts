@@ -196,6 +196,8 @@ function createVectorStore(
         {
             name: `${collectionName}-network`,
             type: "network",
+            // CfnIndexがCloudFormationからコレクションエンドポイントへ接続するため公開エンドポイントを使う。
+            // データ操作はAccessPolicyでKnowledge BaseロールとCloudFormation実行ロールに限定する。
             policy: JSON.stringify([
                 {
                     Rules: [
@@ -228,6 +230,7 @@ function createVectorStore(
             resources: [collection.attrArn],
         }),
     );
+    // Knowledge Baseは埋め込みと検索に、CloudFormation実行ロールはインデックス作成に使用する。
     const accessPolicy = new opensearchserverless.CfnAccessPolicy(
         scope,
         "KnowledgeBaseVectorAccessPolicy",

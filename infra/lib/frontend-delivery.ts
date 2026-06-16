@@ -50,6 +50,7 @@ export function createFrontendDelivery(
             compress: true,
         },
         additionalBehaviors: {
+            // APIはCloudFrontを入口にしつつ、レスポンスをキャッシュせず内部ALBへ透過的に転送する。
             "/api/*": {
                 origin: backendOrigin,
                 viewerProtocolPolicy:
@@ -73,6 +74,7 @@ export function createFrontendDelivery(
     ) {
         throw new Error("CloudFront VPC Originの依存関係を設定できません");
     }
+    // Distribution作成時に参照先のVPC Originが先に存在するよう、L1で依存関係を明示する。
     cfnDistribution.addDependency(vpcOrigin);
     new s3Deployment.BucketDeployment(scope, "DeployFrontend", {
         destinationBucket: frontendBucket,

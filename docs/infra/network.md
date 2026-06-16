@@ -13,7 +13,7 @@
 | 通信元 | 通信先 | 経路・制約 |
 |---|---|---|
 | 利用者 | CloudFront | HTTPS。CloudFrontを唯一の公開入口とする |
-| CloudFront | フロントエンドS3 | Origin Access Control経由。S3の公開アクセスは禁止 |
+| CloudFront | フロントエンドS3 | Origin Access Control経由 |
 | CloudFront | 内部ALB | `/api/*`のみCloudFront VPC Origin経由で転送 |
 | 内部ALB | ECS Fargate | TCP 8000。ECS Security GroupはALB Security Groupからのみ許可 |
 | ECS Fargate | DynamoDB / S3 | Gateway VPC Endpoint経由で通信 |
@@ -23,14 +23,11 @@
 
 - ALBは内部向けとしてプライベートApplicationサブネットへ配置する。
 - ECS FargateはプライベートApplicationサブネットへ配置し、Public IPを付与しない。
-- CloudFront VPC Originの要件を満たすためVPCへInternet Gatewayをアタッチするが、隔離サブネットにはInternet Gateway向けルートを作成しない。
-- ALBのHTTP受信は、AWS管理プレフィックスリスト`com.amazonaws.global.cloudfront.origin-facing`からの通信だけを許可する。
 - VPCにはNAT Gatewayとインターネットへの外向き経路を持たせない。
-- Interface VPC EndpointはECS FargateからのHTTPS通信だけを許可する。
 - フロントエンドS3とRAG材料PDF用S3は公開アクセスをすべて遮断する。
 - ECSタスクには固定AWSアクセスキーを設定せず、タスクロールを使用する。
 - RAG材料PDF用S3はBedrock Knowledge BaseのS3 Data Sourceとして接続する。
-- Bedrock Knowledge BaseのVector StoreにはOpenSearch Serverlessを使用する。CloudFormationによるインデックス管理のため公開エンドポイントを有効化し、データアクセスはKnowledge BaseロールとCloudFormation実行ロールに限定する。
+- Bedrock Knowledge BaseのVector StoreにはOpenSearch Serverlessを使用する。
 
 ## 現在の制約
 

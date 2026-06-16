@@ -85,6 +85,8 @@ export function createBackend(
         healthyHttpCodes: "200",
     });
     const stack = cdk.Stack.of(scope);
+    // env非依存のsynthではPrefix List名をlookupできないため、既知IDのダミー参照に寄せる。
+    // 実デプロイ時はAWS管理プレフィックスリストをlookupし、ALBの入口をCloudFront origin-facingへ限定する。
     const cloudFrontOriginFacingPrefixList =
         cdk.Token.isUnresolved(stack.account) ||
         cdk.Token.isUnresolved(stack.region)
@@ -107,6 +109,7 @@ export function createBackend(
         "Allow CloudFront origin-facing traffic",
     );
 
+    // ECSタスクはAWS_PROFILEや固定アクセスキーを持たず、必要なAWS操作だけをタスクロールで許可する。
     service.taskDefinition.taskRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
             actions: ["dynamodb:Scan"],
