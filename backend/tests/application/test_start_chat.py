@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 from uuid import UUID
@@ -97,6 +98,32 @@ async def test_start_chat_does_not_save_when_generation_fails() -> None:
         )
 
     repository.save_started_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_start_chat_logs_generation_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.side_effect = ChatGenerationUnavailableError
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger="src.application.use_cases.chat.start_chat.start_chat",
+        ),
+        pytest.raises(ChatGenerationUnavailableError),
+    ):
+        await _use_case(generation_client, repository).execute(
+            StartChatInput(user_id=USER_ID, prompt="秘密の質問", request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert record.event == "start_chat_generation_failed"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert "秘密の質問" not in caplog.text
 
 
 @pytest.mark.asyncio

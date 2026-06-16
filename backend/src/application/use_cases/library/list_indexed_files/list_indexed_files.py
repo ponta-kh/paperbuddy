@@ -1,3 +1,5 @@
+import logging
+
 from src.application.exceptions import RepositoryNotFoundError
 from src.application.ports.out.indexed_file_catalog_protocol import (
     IndexedFileCatalogProtocol,
@@ -8,6 +10,8 @@ from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto
     ListIndexedFilesOutput,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ListIndexedFilesUseCase:
     def __init__(self, indexed_file_catalog: IndexedFileCatalogProtocol) -> None:
@@ -17,7 +21,23 @@ class ListIndexedFilesUseCase:
         try:
             indexed_files = await self._indexed_file_catalog.list_indexed_files()
         except RepositoryNotFoundError:
+            logger.warning(
+                "インデックス済みファイル一覧が見つからなかったため空一覧を返します",
+                extra={
+                    "event": "list_indexed_files_not_found",
+                    "request_id": str(query.request_id),
+                },
+            )
             indexed_files = ()
+        except Exception:
+            logger.exception(
+                "インデックス済みファイル一覧の取得に失敗しました",
+                extra={
+                    "event": "list_indexed_files_failed",
+                    "request_id": str(query.request_id),
+                },
+            )
+            raise
 
         # 表示順はユースケースで固定し、
         # 取得元の格納順や実装差に依存しない出力にする。

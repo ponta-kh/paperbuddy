@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -57,3 +58,23 @@ async def test_list_chats_converts_not_found_to_empty_list() -> None:
     )
 
     assert output.chats == ()
+
+
+@pytest.mark.asyncio
+async def test_list_chats_logs_not_found(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository = StubChatQueryRepository(None)
+
+    with caplog.at_level(
+        logging.WARNING,
+        logger="src.application.use_cases.chat.list_chats.list_chats",
+    ):
+        await ListChatsUseCase(repository).execute(
+            ListChatsInput(user_id=USER_ID, request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert record.event == "list_chats_not_found"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)

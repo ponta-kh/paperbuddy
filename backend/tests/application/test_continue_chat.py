@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 from uuid import UUID
@@ -99,6 +100,45 @@ async def test_continue_chat_rejects_exactly_24_hours_without_side_effects() -> 
     client.continue_chat.assert_not_awaited()
     repository.save_exchange.assert_not_awaited()
     assert chat.last_updated_at == last_updated_at
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_logs_expired_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    last_updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    chat = _chat(last_updated_at)
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat_for_continuation.return_value = chat
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+    use_case = ContinueChatUseCase(
+        client,
+        repository,
+        now=lambda: last_updated_at + timedelta(hours=24),
+    )
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(ChatContinuationExpiredError),
+    ):
+        await use_case.execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert record.event == "continue_chat_expired"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert record.chat_id == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
 
 
 @pytest.mark.asyncio

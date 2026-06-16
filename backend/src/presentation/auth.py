@@ -4,11 +4,12 @@ from typing import Any, Protocol
 from uuid import UUID
 
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from starlette.concurrency import run_in_threadpool
 
+from src.dependencies.logging_config import set_log_context
 from src.dependencies.settings import Settings, get_settings
 
 
@@ -100,9 +101,13 @@ def get_cognito_jwt_verifier(
 
 
 async def get_authenticated_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> AuthenticatedUser:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AuthenticationError
     verifier = get_cognito_jwt_verifier(get_settings())
-    return await run_in_threadpool(verifier.verify, credentials.credentials)
+    user = await run_in_threadpool(verifier.verify, credentials.credentials)
+    request.state.user_id = user.user_id
+    set_log_context(user_id=user.user_id)
+    return user

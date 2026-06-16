@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -74,3 +75,23 @@ async def test_list_indexed_files_returns_empty_list() -> None:
     )
 
     assert output.files == ()
+
+
+@pytest.mark.asyncio
+async def test_list_indexed_files_logs_not_found(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(
+        logging.WARNING,
+        logger=(
+            "src.application.use_cases.library.list_indexed_files.list_indexed_files"
+        ),
+    ):
+        output = await ListIndexedFilesUseCase(
+            StubNotFoundIndexedFileCatalog()
+        ).execute(ListIndexedFilesInput(request_id=REQUEST_ID))
+
+    assert output.files == ()
+    record = caplog.records[0]
+    assert record.event == "list_indexed_files_not_found"
+    assert record.request_id == str(REQUEST_ID)

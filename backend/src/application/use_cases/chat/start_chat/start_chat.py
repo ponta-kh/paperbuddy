@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from uuid import UUID, uuid7
@@ -15,6 +16,8 @@ from src.domain.repositories.chat_command_repository_protocol import (
 )
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
+
+logger = logging.getLogger(__name__)
 
 
 class StartChatUseCase:
@@ -36,7 +39,18 @@ class StartChatUseCase:
         # 生成待ち時間で発信順序が崩れないようにする。
         user_sent_at = self._now()
 
-        generated = await self._chat_generation_client.start_chat(prompt.value)
+        try:
+            generated = await self._chat_generation_client.start_chat(prompt.value)
+        except Exception:
+            logger.exception(
+                "チャット開始の回答生成に失敗しました",
+                extra={
+                    "event": "start_chat_generation_failed",
+                    "request_id": str(command.request_id),
+                    "user_id": str(command.user_id),
+                },
+            )
+            raise
         # 正常応答を受け取った時点をLLM回答日時とし、
         # チャット本体の作成・更新日時にも使う。
         answered_at = self._now()
@@ -66,7 +80,21 @@ class StartChatUseCase:
         # 永続化層へ不整合な初回ターンを渡さない。
         chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
 
-        await self._chat_repository.save_started_chat(chat, user_message, llm_message)
+        try:
+            await self._chat_repository.save_started_chat(
+                chat, user_message, llm_message
+            )
+        except Exception:
+            logger.exception(
+                "開始したチャットの保存に失敗しました",
+                extra={
+                    "event": "start_chat_save_failed",
+                    "request_id": str(command.request_id),
+                    "user_id": str(command.user_id),
+                    "chat_id": str(chat.chat_id),
+                },
+            )
+            raise
         return StartChatOutput(
             chat_id=chat.chat_id,
             answer=generated.answer,
