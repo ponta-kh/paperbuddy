@@ -1,6 +1,7 @@
 from collections import Counter
 from datetime import datetime, timedelta
 from unittest.mock import Mock
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from boto3.dynamodb.types import TypeDeserializer
@@ -34,6 +35,8 @@ def test_build_seed_items_creates_expected_chat_groups_and_histories() -> None:
     assert groups == {"today": 2, "recent": 3, "older": 6}
     assert len(chats) == 11
     assert len(messages) == 44
+    assert all(UUID(item["chat_id"]).version == 7 for item in chats + messages)
+    assert all(UUID(message["turn_id"]).version == 7 for message in messages)
     assert Counter(message["sender"] for message in messages) == {
         "user": 22,
         "llm": 22,

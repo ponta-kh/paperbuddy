@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 
 
 @dataclass(frozen=True, slots=True)
@@ -8,4 +8,4 @@ class ChatTurnId:
 
     @classmethod
     def generate(cls) -> "ChatTurnId":
-        return cls(value=uuid4())
+        return cls(value=uuid7())

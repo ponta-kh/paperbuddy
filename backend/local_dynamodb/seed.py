@@ -136,9 +136,9 @@ def build_seed_items(*, now: datetime | None = None) -> tuple[dict[str, Any], ..
         zip(_CONVERSATIONS, updated_at_values, strict=True),
         start=1,
     ):
-        chat_id = UUID(int=index)
-        first_turn_id = UUID(int=100 + index * 2)
-        second_turn_id = UUID(int=101 + index * 2)
+        chat_id = _seed_uuid7(index)
+        first_turn_id = _seed_uuid7(100 + index * 2)
+        second_turn_id = _seed_uuid7(101 + index * 2)
         created_at = updated_at - timedelta(minutes=10)
         first_answered_at = created_at + timedelta(minutes=1)
         follow_up_at = updated_at - timedelta(minutes=1)
@@ -234,6 +234,11 @@ def _format_datetime(value: datetime) -> str:
         .isoformat(timespec="microseconds")
         .replace("+00:00", "Z")
     )
+
+
+def _seed_uuid7(index: int) -> UUID:
+    # seedは冪等性が必要なため、固定値のままUUID v7形式に揃える。
+    return UUID(f"019ecde4-0000-7000-8000-{index:012x}")
 
 
 def _serialize(item: dict[str, Any]) -> dict[str, Any]:

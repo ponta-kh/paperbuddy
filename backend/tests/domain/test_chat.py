@@ -149,6 +149,10 @@ def test_started_turn_requires_matching_turn_id() -> None:
         chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
 
 
+def test_chat_turn_id_generate_uses_uuid7() -> None:
+    assert ChatTurnId.generate().value.version == 7
+
+
 def test_started_turn_rejects_user_message_after_llm_answer() -> None:
     answered_at = ANSWERED_AT
     chat = _chat()

@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
@@ -29,7 +29,7 @@ class StartChatUseCase:
         self._chat_generation_client = chat_generation_client
         self._chat_repository = chat_repository
         self._now = now or (lambda: datetime.now(timezone.utc))
-        self._generate_chat_id = generate_chat_id or uuid4
+        self._generate_chat_id = generate_chat_id or uuid7
 
     async def execute(self, command: StartChatInput) -> StartChatOutput:
         prompt = Prompt(command.prompt)

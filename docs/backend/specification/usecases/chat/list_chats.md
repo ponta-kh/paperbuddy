@@ -50,7 +50,7 @@
 | フィールド名 | 型・形式 | 説明 |
 | --- | --- | --- |
 | `chats` | `tuple[ChatSummaryOutput, ...]` | 最終更新日時の降順に並んだチャット一覧。対象なしの場合は空 |
-| `ChatSummaryOutput.chat_id` | UUID | チャット識別子 |
+| `ChatSummaryOutput.chat_id` | UUID v7 | チャット識別子 |
 | `ChatSummaryOutput.title` | `str` | チャットタイトル |
 | `ChatSummaryOutput.created_at` | タイムゾーンを含む日時 | チャット作成日時 |
 | `ChatSummaryOutput.last_updated_at` | タイムゾーンを含む日時 | チャット最終更新日時 |

@@ -1,5 +1,5 @@
 import asyncio
-from uuid import uuid4
+from uuid import uuid7
 
 from src.application.ports.out.chat_generation_client_protocol import (
     ContinueGeneratedChatResult,
@@ -22,7 +22,7 @@ class SimulatedChatGenerationClient:
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult:
         await asyncio.sleep(self._delay_seconds)
         return StartGeneratedChatResult(
-            session_id=f"local-{uuid4()}",
+            session_id=f"local-{uuid7()}",
             answer=self._answer(),
             title=f"{prompt[:10]}...",
         )

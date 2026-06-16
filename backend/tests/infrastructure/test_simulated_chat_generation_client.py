@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import pytest
 
 from src.infrastructure.llm.simulated_chat_generation_client import (
@@ -19,6 +21,7 @@ async def test_start_chat_returns_local_session_title_and_300_character_answer()
     result = await client.start_chat("ローカル検証用の質問です")
 
     assert result.session_id.startswith("local-")
+    assert UUID(result.session_id.removeprefix("local-")).version == 7
     assert result.title == "ローカル検証用の質問..."
     assert len(result.answer) == 300
     assert "ローカル動作確認用" in result.answer

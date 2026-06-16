@@ -46,11 +46,11 @@
 
 開発環境のテーブル名は`paperbuddy-dev-chat`とする。CDKでオンデマンド課金、AWS管理暗号化、PITR、削除保護、保持ポリシーを設定する。
 
-`chat_id`は初回登録時にアプリケーションが採番したUUIDであり、Bedrockが返す識別子は`session_id`属性としてチャット本体に保存する。
+`chat_id`は初回登録時にアプリケーションが採番したUUID v7であり、Bedrockが返す識別子は`session_id`属性としてチャット本体に保存する。
 
 | 項目 | `pk` | `sk` | 用途 |
 | --- | --- | --- | --- |
-| チャット本体 | `CHAT#{chat_id UUID}` | `CHAT` | 継続対象チャットの取得、楽観排他更新。`session_id`を属性として保持する |
+| チャット本体 | `CHAT#{chat_id UUID v7}` | `CHAT` | 継続対象チャットの取得、楽観排他更新。`session_id`を属性として保持する |
 | メッセージ | `CHAT#{chat_id}` | `MESSAGE#{sent_at}#{turn_id}#{sender_order}` | チャット別メッセージ履歴 |
 
 ユーザー別チャット一覧用に、`gsi1`という名前のGSIを使用する。

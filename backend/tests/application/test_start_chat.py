@@ -38,6 +38,27 @@ def _use_case(
 
 
 @pytest.mark.asyncio
+async def test_start_chat_generates_uuid7_chat_id_by_default() -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.return_value = StartGeneratedChatResult(
+        session_id="session-1", answer="answer", title="title"
+    )
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    times = iter((USER_SENT_AT, ANSWERED_AT))
+    use_case = StartChatUseCase(
+        generation_client,
+        repository,
+        now=lambda: next(times),
+    )
+
+    output = await use_case.execute(
+        StartChatInput(user_id=USER_ID, prompt="question")
+    )
+
+    assert output.chat_id.version == 7
+
+
+@pytest.mark.asyncio
 async def test_start_chat_saves_chat_and_turn() -> None:
     generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
     generation_client.start_chat.return_value = StartGeneratedChatResult(
