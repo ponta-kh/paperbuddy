@@ -56,8 +56,9 @@ export function createBackend(
             listenerPort: 80,
             taskImageOptions: {
                 image: ecs.ContainerImage.fromAsset(
-                    props.assetPath ?? path.join(__dirname, "../../backend"),
+                    props.assetPath ?? path.join(__dirname, "../.."),
                     {
+                        file: "docker/backend/Dockerfile",
                         platform: ecrAssets.Platform.LINUX_ARM64,
                     },
                 ),

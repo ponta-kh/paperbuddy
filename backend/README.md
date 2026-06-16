@@ -47,6 +47,9 @@ mise run dev
 - 初期データ: なし
 - 認証: `docker/.env`にAWS上のローカル開発用Cognito User PoolとWeb App Clientを設定する
 
+フロントエンド改修を即時反映したい場合は、`mise run dev:backend`でバックエンドだけをDocker起動し、
+別ターミナルで`mise run dev:frontend`を実行する。
+
 `CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用LLMを注入する。
 DynamoDB RepositoryはAWSデプロイ時と同じ実装を使用し、接続先だけDynamoDB Localへ切り替える。
 

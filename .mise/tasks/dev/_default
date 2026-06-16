@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Docker Composeのバックエンドとフロントエンド開発サーバーを起動する"
-#MISE depends=["dev:backend", "dev:frontend"]
+#MISE description="Docker Composeでフロントエンド、バックエンド、DynamoDB Localを起動する"
+#MISE dir="docker"
+
+docker compose up --build

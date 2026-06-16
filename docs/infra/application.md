@@ -76,7 +76,7 @@ mise run infra:deploy:dev
 このコマンドでは、次の処理が自動的に行われる。
 
 1. `frontend/`で`pnpm build`を実行し、`frontend/dist/`を生成する
-2. `backend/Dockerfile`からバックエンドのDockerイメージをビルドする
+2. `docker/backend/Dockerfile`からバックエンドのDockerイメージをビルドする
 3. DockerイメージをCDK bootstrapが管理するECRアセットリポジトリへpushする
 4. ECS Fargateのタスク定義とサービスを、pushしたイメージを参照するよう更新する
 5. `frontend/dist/`をフロントエンド配信用S3バケットへ配置する

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="docker/.envのCognito設定でVite開発サーバーを起動する"
+#MISE description="即時反映用にpnpm devでフロントエンドを起動する"
 #MISE dir="frontend"
+
+set -euo pipefail
 
 set -a
 source ../docker/.env

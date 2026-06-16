@@ -5,11 +5,11 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY main.py ./
-COPY src ./src
+COPY backend/main.py ./
+COPY backend/src ./src
 
 
 FROM ghcr.io/astral-sh/uv:0.11.19-python3.14-trixie-slim AS runtime

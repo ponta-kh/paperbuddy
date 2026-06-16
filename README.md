@@ -34,7 +34,7 @@ paperbuddy/
 cp docker/.env.example docker/.env
 ```
 
-フロントエンドとバックエンドは、リポジトリルートから次のコマンドで同時に起動する。
+フロントエンドとバックエンドは、リポジトリルートから次のコマンドでDocker経由で同時に起動する。
 
 ```sh
 mise run dev
@@ -44,6 +44,14 @@ mise run dev
 - バックエンドヘルスチェック: `http://localhost:8000/api/health`
 - フロントエンドからの `/api/*` リクエストは、Viteがバックエンドへプロキシする
 - CognitoはAWS上のローカル開発用User PoolとWeb App Clientを使用する
+
+フロントエンド改修を即時反映したい場合は、バックエンドだけをDocker経由で起動し、
+フロントエンドをホスト上の`pnpm dev`で起動する。
+
+```sh
+mise run dev:backend
+mise run dev:frontend
+```
 
 ローカルバックエンドはDynamoDB Localを使用する。Repository実装はAWS上のDynamoDB接続時と同じものを使い、
 エンドポイントだけをDocker Composeの環境変数で切り替える。
