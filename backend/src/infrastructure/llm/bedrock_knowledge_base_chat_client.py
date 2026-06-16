@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +11,8 @@ from src.application.ports.out.chat_generation_client_protocol import (
     InvalidChatGenerationResponseError,
     StartGeneratedChatResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +68,7 @@ class BedrockKnowledgeBaseChatClient:
                 },
             )
         except (BotoCoreError, ClientError) as error:
+            logger.exception("Bedrock Knowledge Baseによる回答生成に失敗しました")
             raise ChatGenerationUnavailableError from error
 
         try:
@@ -97,6 +101,7 @@ class BedrockKnowledgeBaseChatClient:
                 sessionId=session_id,
             )
         except (BotoCoreError, ClientError) as error:
+            logger.exception("Bedrock Knowledge Baseによる継続回答生成に失敗しました")
             raise ChatGenerationUnavailableError from error
 
         try:

@@ -52,7 +52,7 @@
         <mxCell id="fargate" value="ECS Fargate&lt;br&gt;FastAPI :8000&lt;br&gt;Public IPなし" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fargate;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;aspect=fixed;" vertex="1" parent="1">
           <mxGeometry x="1055" y="745" width="78" height="78" as="geometry"/>
         </mxCell>
-        <mxCell id="note" value="NAT GatewayとInternet Gatewayは作成しない。&lt;br&gt;Fargateから必要なAWSサービスへの通信はVPC Endpointだけを経由する。" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=13;" vertex="1" parent="1">
+        <mxCell id="note" value="CloudFront VPC Origin要件のInternet GatewayはVPCへアタッチするが、隔離サブネットに外向きルートは作成しない。&lt;br&gt;Fargateから必要なAWSサービスへの通信はVPC Endpointだけを経由する。" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=13;" vertex="1" parent="1">
           <mxGeometry x="250" y="965" width="620" height="65" as="geometry"/>
         </mxCell>
         <mxCell id="edge-user-cloudfront" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#232F3E;" edge="1" parent="1" source="user" target="cloudfront">

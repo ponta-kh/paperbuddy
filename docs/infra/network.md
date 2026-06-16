@@ -23,12 +23,14 @@
 
 - ALBは内部向けとしてプライベートApplicationサブネットへ配置する。
 - ECS FargateはプライベートApplicationサブネットへ配置し、Public IPを付与しない。
-- VPCにはNAT GatewayとInternet Gatewayを作成せず、インターネットへの外向き経路を持たせない。
+- CloudFront VPC Originの要件を満たすためVPCへInternet Gatewayをアタッチするが、隔離サブネットにはInternet Gateway向けルートを作成しない。
+- ALBのHTTP受信は、AWS管理プレフィックスリスト`com.amazonaws.global.cloudfront.origin-facing`からの通信だけを許可する。
+- VPCにはNAT Gatewayとインターネットへの外向き経路を持たせない。
 - Interface VPC EndpointはECS FargateからのHTTPS通信だけを許可する。
 - フロントエンドS3とRAG材料PDF用S3は公開アクセスをすべて遮断する。
 - ECSタスクには固定AWSアクセスキーを設定せず、タスクロールを使用する。
 - RAG材料PDF用S3はBedrock Knowledge BaseのS3 Data Sourceとして接続する。
-- Bedrock Knowledge BaseのVector StoreにはOpenSearch Serverlessを使用し、ネットワークポリシーでBedrockサービスからのアクセスだけを許可する。
+- Bedrock Knowledge BaseのVector StoreにはOpenSearch Serverlessを使用する。CloudFormationによるインデックス管理のため公開エンドポイントを有効化し、データアクセスはKnowledge BaseロールとCloudFormation実行ロールに限定する。
 
 ## 現在の制約
 

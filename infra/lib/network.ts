@@ -4,6 +4,7 @@ import type { Construct } from "constructs";
 
 export interface NetworkResources {
     readonly vpc: ec2.Vpc;
+    readonly internetGatewayAttachment: ec2.CfnVPCGatewayAttachment;
 }
 
 export function createNetwork(scope: Construct): NetworkResources {
@@ -18,8 +19,20 @@ export function createNetwork(scope: Construct): NetworkResources {
             },
         ],
     });
+    const internetGateway = new ec2.CfnInternetGateway(
+        scope,
+        "InternetGateway",
+    );
+    const internetGatewayAttachment = new ec2.CfnVPCGatewayAttachment(
+        scope,
+        "InternetGatewayAttachment",
+        {
+            vpcId: vpc.vpcId,
+            internetGatewayId: internetGateway.ref,
+        },
+    );
 
-    return { vpc };
+    return { vpc, internetGatewayAttachment };
 }
 
 export function connectBackendToAwsServices(

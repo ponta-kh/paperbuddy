@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as ecrAssets from "aws-cdk-lib/aws-ecr-assets";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -48,10 +49,17 @@ export function createBackend(
             circuitBreaker: {
                 rollback: true,
             },
+            runtimePlatform: {
+                cpuArchitecture: ecs.CpuArchitecture.ARM64,
+                operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
+            },
             listenerPort: 80,
             taskImageOptions: {
                 image: ecs.ContainerImage.fromAsset(
                     props.assetPath ?? path.join(__dirname, "../../backend"),
+                    {
+                        platform: ecrAssets.Platform.LINUX_ARM64,
+                    },
                 ),
                 containerPort: 8000,
                 environment: {
@@ -76,10 +84,27 @@ export function createBackend(
         path: "/api/health",
         healthyHttpCodes: "200",
     });
+    const stack = cdk.Stack.of(scope);
+    const cloudFrontOriginFacingPrefixList =
+        cdk.Token.isUnresolved(stack.account) ||
+        cdk.Token.isUnresolved(stack.region)
+            ? ec2.PrefixList.fromPrefixListId(
+                  scope,
+                  "CloudFrontOriginFacingPrefixList",
+                  "pl-cloudfront-origin-facing",
+              )
+            : ec2.PrefixList.fromLookup(
+                  scope,
+                  "CloudFrontOriginFacingPrefixList",
+                  {
+                      prefixListName:
+                          "com.amazonaws.global.cloudfront.origin-facing",
+                  },
+              );
     service.loadBalancer.connections.allowFrom(
-        ec2.Peer.ipv4(props.network.vpc.vpcCidrBlock),
+        cloudFrontOriginFacingPrefixList,
         ec2.Port.tcp(80),
-        "Allow CloudFront VPC origin traffic inside the VPC",
+        "Allow CloudFront origin-facing traffic",
     );
 
     service.taskDefinition.taskRole.addToPrincipalPolicy(

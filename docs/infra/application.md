@@ -25,13 +25,13 @@ RAG source PDF -> private S3 bucket
 - バックエンド: プライベートサブネットのECS Fargateで起動する
 - ALB: 内部向けとしてプライベートサブネットに配置する
 - CloudFront: `/api/*`をキャッシュせず、VPC Origin経由でALBへ転送する
-- VPC: 2 Availability Zoneの隔離サブネット。NAT GatewayとInternet Gatewayは作成しない
+- VPC: 2 Availability Zoneの隔離サブネット。CloudFront VPC Origin要件のInternet Gatewayはアタッチするが、NAT Gatewayと外向きインターネットルートは作成しない
 - AWSサービス接続: S3・DynamoDBのGateway Endpointと、ECR・CloudWatch Logs・Bedrock・CognitoのInterface Endpointを使用する
 - 認証: Cognito User Poolとシークレットを持たないWeb App Clientを使用し、フロントエンドはAmplify UI、バックエンドはアクセストークンのJWT検証を行う
 - 永続化: 開発用DynamoDBテーブル`paperbuddy-dev-chat`
 - ライブラリ一覧: 開発用DynamoDBテーブル`paperbuddy-dev-library`
 - RAG材料: 非公開S3バケットの`documents/`配下へPDFを配置し、Bedrock Knowledge BaseのS3 Data Sourceとして使用する
-- Vector Store: 非公開のOpenSearch Serverless Vector Searchコレクションを使用する
+- Vector Store: OpenSearch Serverless Vector Searchコレクションを使用する。CloudFormationによるインデックス管理のため公開エンドポイントを有効化し、データアクセスはIAMとデータアクセスポリシーで制限する
 
 固定AWSアクセスキーは使用しない。ローカルのCDK実行は各端末でログイン済みのAWS CLI認証、Fargateはタスクロールを使用する。
 

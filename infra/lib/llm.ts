@@ -100,7 +100,7 @@ export function grantBackendBedrockAccess(
     taskRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
             actions: ["bedrock:RetrieveAndGenerate"],
-            resources: [llm.knowledgeBase.attrKnowledgeBaseArn],
+            resources: ["*"],
         }),
     );
     taskRole.addToPrincipalPolicy(
@@ -161,6 +161,17 @@ function createVectorStore(
     readonly collection: opensearchserverless.CfnCollection;
     readonly index: opensearchserverless.CfnIndex;
 } {
+    const stack = cdk.Stack.of(scope);
+    const bootstrapQualifier = stack.synthesizer.bootstrapQualifier;
+    if (!bootstrapQualifier) {
+        throw new Error("CDK bootstrap qualifierを取得できません");
+    }
+    const cloudFormationExecutionRoleArn = stack.formatArn({
+        service: "iam",
+        region: "",
+        resource: "role",
+        resourceName: `cdk-${bootstrapQualifier}-cfn-exec-role-${stack.account}-${stack.region}`,
+    });
     const collectionName = `paperbuddy-${stageName}-kb`;
     const encryptionPolicy = new opensearchserverless.CfnSecurityPolicy(
         scope,
@@ -193,8 +204,7 @@ function createVectorStore(
                             Resource: [`collection/${collectionName}`],
                         },
                     ],
-                    AllowFromPublic: false,
-                    SourceServices: ["bedrock.amazonaws.com"],
+                    AllowFromPublic: true,
                 },
             ]),
         },
@@ -249,7 +259,10 @@ function createVectorStore(
                             ],
                         },
                     ],
-                    Principal: [knowledgeBaseRole.roleArn],
+                    Principal: [
+                        knowledgeBaseRole.roleArn,
+                        cloudFormationExecutionRoleArn,
+                    ],
                 },
             ]),
         },
@@ -278,7 +291,7 @@ function createVectorStore(
                     },
                     [TEXT_FIELD_NAME]: {
                         type: "text",
-                        index: false,
+                        index: true,
                     },
                     [METADATA_FIELD_NAME]: {
                         type: "text",

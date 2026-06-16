@@ -36,6 +36,9 @@ export class InfraStack extends cdk.Stack {
             network,
             database,
         });
+        backend.backendService.loadBalancer.node.addDependency(
+            network.internetGatewayAttachment,
+        );
         grantBackendBedrockAccess(
             backend.backendService.taskDefinition.taskRole,
             llm,

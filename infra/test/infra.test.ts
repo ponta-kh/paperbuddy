@@ -102,15 +102,11 @@ describe("InfraStack", () => {
                 Type: "application",
             },
         );
-        template.hasResourceProperties("AWS::EC2::SecurityGroup", {
-            SecurityGroupIngress: Match.arrayWith([
-                Match.objectLike({
-                    Description:
-                        "Allow CloudFront VPC origin traffic inside the VPC",
-                    FromPort: 80,
-                    ToPort: 80,
-                }),
-            ]),
+        template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+            Description: "Allow CloudFront origin-facing traffic",
+            FromPort: 80,
+            SourcePrefixListId: "pl-cloudfront-origin-facing",
+            ToPort: 80,
         });
         template.hasResourceProperties("AWS::ECS::Service", {
             DesiredCount: 1,
@@ -145,6 +141,16 @@ describe("InfraStack", () => {
         const taskDefinitions = template.findResources(
             "AWS::ECS::TaskDefinition",
         );
+        expect(Object.values(taskDefinitions)).toContainEqual(
+            expect.objectContaining({
+                Properties: expect.objectContaining({
+                    RuntimePlatform: {
+                        CpuArchitecture: "ARM64",
+                        OperatingSystemFamily: "LINUX",
+                    },
+                }),
+            }),
+        );
         const environments = Object.values(taskDefinitions).flatMap(
             (resource) =>
                 (resource.Properties?.ContainerDefinitions ?? []).flatMap(
@@ -176,12 +182,23 @@ describe("InfraStack", () => {
         });
     });
 
-    test("NATとインターネット接続を作成せずVPC Endpointを使用する", () => {
+    test("外向きインターネット経路を作成せずVPC Endpointを使用する", () => {
         template.resourceCountIs("AWS::EC2::NatGateway", 0);
         template.resourceCountIs("AWS::EC2::EIP", 0);
-        template.resourceCountIs("AWS::EC2::InternetGateway", 0);
-        template.resourceCountIs("AWS::EC2::VPCGatewayAttachment", 0);
+        template.resourceCountIs("AWS::EC2::InternetGateway", 1);
+        template.resourceCountIs("AWS::EC2::VPCGatewayAttachment", 1);
         template.resourceCountIs("AWS::EC2::VPCEndpoint", 8);
+
+        const loadBalancers = template.findResources(
+            "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        );
+        expect(Object.values(loadBalancers)).toContainEqual(
+            expect.objectContaining({
+                DependsOn: expect.arrayContaining([
+                    "InternetGatewayAttachment",
+                ]),
+            }),
+        );
 
         const routes = template.findResources("AWS::EC2::Route");
         expect(Object.values(routes)).not.toContainEqual(
@@ -259,6 +276,16 @@ describe("InfraStack", () => {
                 ]),
             }),
         });
+        const distributions = template.findResources(
+            "AWS::CloudFront::Distribution",
+        );
+        expect(Object.values(distributions)).toContainEqual(
+            expect.objectContaining({
+                DependsOn: expect.arrayContaining([
+                    expect.stringMatching("VpcOrigin"),
+                ]),
+            }),
+        );
     });
 
     test("grants the backend task required DynamoDB and Bedrock permissions", () => {
@@ -282,6 +309,7 @@ describe("InfraStack", () => {
                     Match.objectLike({
                         Action: "bedrock:RetrieveAndGenerate",
                         Effect: "Allow",
+                        Resource: "*",
                     }),
                     Match.objectLike({
                         Action: "bedrock:InvokeModel",
@@ -326,7 +354,7 @@ describe("InfraStack", () => {
         });
     });
 
-    test("Knowledge Base用の非公開OpenSearch Serverlessを作成する", () => {
+    test("Knowledge Base用のOpenSearch Serverlessを作成する", () => {
         template.hasResourceProperties(
             "AWS::OpenSearchServerless::Collection",
             {
@@ -353,6 +381,10 @@ describe("InfraStack", () => {
                         },
                         Type: "knn_vector",
                     },
+                    AMAZON_BEDROCK_TEXT_CHUNK: {
+                        Index: true,
+                        Type: "text",
+                    },
                 }),
             },
         });
@@ -360,11 +392,15 @@ describe("InfraStack", () => {
             "AWS::OpenSearchServerless::SecurityPolicy",
             {
                 Type: "network",
-                Policy: Match.stringLikeRegexp(
-                    '"AllowFromPublic":false.*"SourceServices":\\["bedrock.amazonaws.com"\\]',
-                ),
+                Policy: Match.stringLikeRegexp('"AllowFromPublic":true'),
             },
         );
+        const accessPolicies = template.findResources(
+            "AWS::OpenSearchServerless::AccessPolicy",
+        );
+        const accessPolicy = JSON.stringify(Object.values(accessPolicies)[0]);
+        expect(accessPolicy).toContain("cdk-hnb659fds-cfn-exec-role");
+        expect(accessPolicy).toContain("KnowledgeBaseRole");
     });
 
     test("Knowledge Baseロールへ埋め込みモデル・S3・Vector Store権限を付与する", () => {

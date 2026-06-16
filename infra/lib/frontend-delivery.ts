@@ -63,6 +63,17 @@ export function createFrontendDelivery(
             },
         },
     });
+    const cfnDistribution = distribution.node.defaultChild;
+    const vpcOrigin = distribution.node
+        .findAll()
+        .find((child) => child instanceof cloudfront.CfnVpcOrigin);
+    if (
+        !(cfnDistribution instanceof cloudfront.CfnDistribution) ||
+        !vpcOrigin
+    ) {
+        throw new Error("CloudFront VPC Originの依存関係を設定できません");
+    }
+    cfnDistribution.addDependency(vpcOrigin);
     new s3Deployment.BucketDeployment(scope, "DeployFrontend", {
         destinationBucket: frontendBucket,
         sources: [

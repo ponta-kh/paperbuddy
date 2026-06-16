@@ -2,6 +2,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
 )
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
@@ -10,12 +11,18 @@ from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
 
 
 class StubKnowledgeBaseClient:
-    def __init__(self, response: dict) -> None:
+    def __init__(
+        self, response: dict | None = None, error: Exception | None = None
+    ) -> None:
         self.response = response
+        self.error = error
         self.request: dict | None = None
 
     def retrieve_and_generate(self, **kwargs: object) -> dict:
         self.request = kwargs
+        if self.error is not None:
+            raise self.error
+        assert self.response is not None
         return self.response
 
 
@@ -88,6 +95,25 @@ async def test_start_chat_uses_fallback_when_title_generation_fails() -> None:
     result = await _client(knowledge_base, model).start_chat("1234567890abcdef")
 
     assert result.title == "1234567890..."
+
+
+@pytest.mark.asyncio
+async def test_start_chat_logs_sdk_error_without_prompt(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        error=ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
+            "RetrieveAndGenerate",
+        )
+    )
+    model = StubModelClient({"output": {"message": {"content": [{"text": "title"}]}}})
+
+    with pytest.raises(ChatGenerationUnavailableError):
+        await _client(knowledge_base, model).start_chat("秘密の質問")
+
+    assert "AccessDeniedException" in caplog.text
+    assert "秘密の質問" not in caplog.text
 
 
 @pytest.mark.asyncio

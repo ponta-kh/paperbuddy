@@ -1,6 +1,7 @@
 *.js
 *.d.ts
 node_modules
+pdf
 
 # CDK asset staging directory
 .cdk.staging
