@@ -18,6 +18,8 @@ class ListIndexedFilesUseCase:
         except RepositoryNotFoundError:
             indexed_files = ()
 
+        # 表示順はユースケースで固定し、
+        # 取得元の格納順や実装差に依存しない出力にする。
         sorted_files = sorted(
             indexed_files,
             key=lambda indexed_file: (indexed_file.category, indexed_file.name),

@@ -33,9 +33,13 @@ class StartChatUseCase:
 
     async def execute(self, command: StartChatInput) -> StartChatOutput:
         prompt = Prompt(command.prompt)
+        # 外部生成前の時刻をユーザー発信日時として固定し、
+        # 生成待ち時間で発信順序が崩れないようにする。
         user_sent_at = self._now()
 
         generated = await self._chat_generation_client.start_chat(prompt.value)
+        # 正常応答を受け取った時点をLLM回答日時とし、
+        # チャット本体の作成・更新日時にも使う。
         answered_at = self._now()
 
         chat = Chat.create(
@@ -60,6 +64,8 @@ class StartChatUseCase:
             content=generated.answer,
             sent_at=answered_at,
         )
+        # 保存前にDomainルールを通し、
+        # 永続化層へ不整合な初回ターンを渡さない。
         chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
 
         await self._chat_repository.save_started_chat(chat, user_message, llm_message)

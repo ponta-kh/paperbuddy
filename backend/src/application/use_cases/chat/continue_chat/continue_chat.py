@@ -33,11 +33,15 @@ class ContinueChatUseCase:
 
     async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
         prompt = Prompt(command.prompt)
+        # 所有者確認済みのチャットを取得してから外部生成を呼び、
+        # 権限外リクエストで副作用を起こさない。
         chat = await self._chat_command_repository.get_chat_for_continuation(
             chat_id=command.chat_id,
             user_id=command.user_id,
         )
         user_sent_at = self._now()
+        # 会話継続期限は外部生成前に判定し、
+        # 期限切れのチャットで回答だけが生成される状態を避ける。
         if user_sent_at - chat.last_updated_at >= self._CONTINUATION_LIMIT:
             raise ChatContinuationExpiredError
 
@@ -60,6 +64,8 @@ class ContinueChatUseCase:
             content=generated.answer,
             sent_at=answered_at,
         )
+        # Domain側で発信順序と更新バージョンを確定してから、
+        # Repository側の楽観排他保存へ渡す。
         chat.record_exchange(user_message=user_message, llm_message=llm_message)
         await self._chat_command_repository.save_exchange(
             chat, user_message, llm_message

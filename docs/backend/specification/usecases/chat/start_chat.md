@@ -14,10 +14,10 @@
 - 最初のプロンプトを受け付ける
 - プロンプトの一般的な前後空白を除去し、ドメインルールに従って検証する
 - チャット生成サービスへ整形済みプロンプトを送信する
-- `ChatGenerationClientProtocol`から検証済みのセッションID、AI回答、タイトルを取得する
+- チャット生成結果として検証済みのセッションID、AI回答、タイトルを取得する
 - アプリケーション内のチャットIDをUUIDで採番する
 - チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する
-- 採番したチャットID、最終更新日時と、`ChatGenerationClientProtocol`から取得したAI回答、タイトルを返す
+- 採番したチャットID、最終更新日時、AI回答、タイトルを返す
 
 ### 対象外
 
@@ -42,7 +42,7 @@
 - チャットの作成日時と最終更新日時が、初回の正常なLLM回答日時と一致している
 - 初回ユーザーメッセージの発信日時が、初回LLMメッセージの発信日時より後ではない
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
-- 採番したチャットID、最終更新日時と、`ChatGenerationClientProtocol`が返したAI回答、タイトルが呼び出し元へ返されている
+- 採番したチャットID、最終更新日時、AI回答、タイトルが呼び出し元へ返されている
 
 ### 異常終了時の事後条件
 
@@ -66,8 +66,8 @@
 | フィールド名 | 型・形式 | 説明 |
 | --- | --- | --- |
 | `chat_id` | UUID | 初回登録時にアプリケーションが採番したチャット識別子 |
-| `answer` | `str` | `ChatGenerationClientProtocol`が返す検証済みのAI回答 |
-| `title` | `str` | `ChatGenerationClientProtocol`が返す検証済みのチャットタイトル |
+| `answer` | `str` | 検証済みのAI回答 |
+| `title` | `str` | 検証済みのチャットタイトル |
 | `last_updated_at` | タイムゾーンを含む日時 | 初回の正常なLLM回答日時 |
 
 ## 6. 認可要件
@@ -83,25 +83,25 @@
 - 複数の永続化対象を更新する場合: `Chat`本体と初回2メッセージを同一トランザクションで保存する
 - チャット生成サービス上でのチャット作成はローカルトランザクションでロールバックできない
 
-## 8. 使用する出力ポート
+## 8. 使用するポート
 
-| Protocol | 操作 | 用途 | 送出する可能性のある例外 |
+| Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
 | `ChatGenerationClientProtocol` | `start_chat` | 整形済みプロンプトからチャットを開始し、検証済みのセッションID、AI回答、タイトルを取得する | `ChatGenerationUnavailableError`, `InvalidChatGenerationResponseError` |
-| `ChatCommandRepositoryProtocol` | `save_started_chat` | `Chat`本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError` |
+| `ChatCommandRepositoryProtocol` | `save_started_chat` | チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError` |
 
 ## 9. 基本フロー
 
 1. 入力されたプロンプトから`Prompt` Value Objectを生成し、一般的な前後空白の除去と文字数制約を適用する。
 2. 初回ユーザーメッセージの発信日時を記録する。
-3. `ChatGenerationClientProtocol`へ`Prompt`の整形済みの値のみを渡し、チャットを開始する。
-4. 出力ポートから検証済みのセッションID、AI回答、タイトルを取得する。
+3. 整形済みのプロンプトのみを渡し、チャット生成を開始する。
+4. 検証済みのセッションID、AI回答、タイトルを取得する。
 5. アプリケーション内のチャットIDをUUIDで採番する。
 6. 検証済み応答を受領した時点の日時を、初回の正常回答日時として記録する。
 7. 採番したチャットID、セッションID、初回の正常回答日時を基準として、`created_at`と`last_updated_at`が一致する`Chat`を生成する。
 8. 新しい`ChatTurnId`を生成し、同じ`chat_id`と`turn_id`を持つ初回ユーザー・LLMメッセージを生成する。ユーザーメッセージには手順2の日時、LLMメッセージには初回の正常回答日時を設定する。
 9. 初回2メッセージがチャットターンと初回発信順序のルールを満たすことを保証する。
-10. `Chat`本体と初回2メッセージを`ChatCommandRepositoryProtocol.save_started_chat`へ渡し、同一トランザクションで永続化する。
+10. チャット本体と初回2メッセージを同一トランザクションで永続化する。
 11. 採番したチャットID、AI回答、タイトル、最終更新日時を返す。
 
 ### フロー図
@@ -112,7 +112,7 @@ flowchart TD
     B -->|空文字| ERR1["InvalidPromptError"]
     B -->|1,000文字超過| ERR2["PromptTooLongError"]
     B -->|有効| C["初回ユーザーメッセージの発信日時を記録"]
-    C --> D["ChatGenerationClientProtocol.start_chat"]
+    C --> D["チャット生成を開始"]
     D -->|利用不可| ERR3["ChatGenerationUnavailableError"]
     D -->|不正な応答| ERR4["InvalidChatGenerationResponseError"]
     D -->|検証済み応答| ID["UUIDのchat_idを採番"]
@@ -120,7 +120,7 @@ flowchart TD
     T --> E["chat_id・session_idを持つChat本体と\n同じchat_id・turn_idを持つ初回2メッセージを生成\n[DR-01@chat] [DR-06@chat] [DR-07@chat] [DR-08@chat]"]
     E -->|ターン不整合| ERR5["InvalidChatTurnError"]
     E -->|発信順序違反| ERR6["MessageSentAtOutOfOrderError"]
-    E -->|有効| G["save_started_chatで同一トランザクション保存"]
+    E -->|有効| G["同一トランザクションで保存"]
     G -->|保存失敗| ERR7["ChatSaveError"]
     G -->|保存成功| H["chat_id・answer・title・last_updated_atを返す"]
     H --> I([完了])
@@ -145,7 +145,7 @@ flowchart TD
 | `InvalidPromptError` | 一般的な前後空白を除去した後の`prompt`が空文字 | チャット生成サービスを呼び出さず、永続化しない | 例外を送出する |
 | `PromptTooLongError` | 一般的な前後空白を除去した後の`prompt`が1,000文字を超える | チャット生成サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatGenerationUnavailableError` | チャット生成サービスのタイムアウト、接続障害、サービス障害などにより応答を取得できない | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
-| `InvalidChatGenerationResponseError` | `ChatGenerationClientProtocol`がセッションID、AI回答、タイトルを有効な応答へ変換できない | 永続化しない。チャット生成サービス側で作成されたチャットは取り消せない | 例外を送出する |
+| `InvalidChatGenerationResponseError` | セッションID、AI回答、タイトルを有効な応答として扱えない | 永続化しない。チャット生成サービス側で作成されたチャットは取り消せない | 例外を送出する |
 | `InvalidSessionIdError` | チャット生成サービスから取得したセッションIDが空文字または空白文字のみ | 永続化しない | 例外を送出する |
 | `InvalidChatTurnError` | 初回のユーザー・LLMメッセージの`chat_id`または`turn_id`が一致しない | 永続化しない | 例外を送出する |
 | `MessageSentAtOutOfOrderError` | 初回ユーザーメッセージの発信日時が初回LLMメッセージの発信日時より後、またはLLMメッセージ日時とチャットの作成・最終更新日時が一致しない | 永続化しない | 例外を送出する |
@@ -153,7 +153,7 @@ flowchart TD
 
 ## 12. ビジネスルール
 
-該当なし。プロンプト、チャット、メッセージ、チャットターン、日時の制約はドメイン仕様書で定義し、外部応答の妥当性は出力ポート契約で保証する。
+該当なし。プロンプト、チャット、メッセージ、チャットターン、日時の制約はドメイン仕様書で定義し、外部応答の妥当性はチャット生成結果の契約で保証する。
 
 ## 13. 副作用
 
@@ -164,12 +164,12 @@ flowchart TD
 ## 14. 受け入れ条件
 
 - プロンプトの一般的な前後空白が除去され、整形済みプロンプトのみがチャット生成サービスへ送信される
-- 正常終了時に採番した`chat_id`、初回の正常なLLM回答日時である`last_updated_at`と、`ChatGenerationClientProtocol`が返した`answer`、`title`が返される
+- 正常終了時に採番した`chat_id`、初回の正常なLLM回答日時である`last_updated_at`、`answer`、`title`が返される
 - 正常終了時にチャット本体と初回のユーザー・LLMメッセージが永続化される
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
 - チャット本体の`created_at`と`last_updated_at`が、初回の正常なLLM回答日時と一致する
 - TRIM後に空文字または1,000文字を超えるプロンプトは拒否され、チャット生成サービスは呼び出されない
-- `ChatGenerationClientProtocol`が有効なセッションID、AI回答、タイトルを返せない場合は異常終了し、永続化されない
+- チャット生成結果が有効なセッションID、AI回答、タイトルを含まない場合は異常終了し、永続化されない
 - 初回ユーザーメッセージの発信日時は、初回LLMメッセージの発信日時より後にならない
 - 永続化に失敗した場合は異常終了し、ローカルの変更はロールバックされる
 
@@ -195,4 +195,4 @@ flowchart TD
 
 ## 18. 備考
 
-- `ChatGenerationClientProtocol`および関連例外は、RAG・LLM実装を置き換えられるよう、特定サービスに依存しない名称とする
+- なし

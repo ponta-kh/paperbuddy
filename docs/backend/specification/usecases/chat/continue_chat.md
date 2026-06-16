@@ -12,7 +12,7 @@
 ### 対象
 
 - 既存チャットへ追加するプロンプトの整形と検証
-- Command Repositoryを通した所有ユーザーに紐づく更新対象チャット本体の取得
+- 所有ユーザーに紐づく更新対象チャット本体の取得
 - 最終更新日時から24時間未満であることの確認
 - チャット生成サービスによる既存チャットの会話継続
 - 新しいユーザー・LLMメッセージと更新後のチャット本体の永続化
@@ -76,24 +76,24 @@
 - 保証する整合性: 楽観排他を適用し、`Chat.last_updated_at`・`version`の更新と新しい2メッセージを同一トランザクションで永続化する
 - 複数の永続化対象を更新する場合: 更新後の`Chat`本体と同じチャットターンIDを持つ2メッセージを同時に保存する
 
-## 8. 使用する出力ポート
+## 8. 使用するポート
 
-| Protocol | 操作 | 用途 | 送出する可能性のある例外 |
+| Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
 | `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | 所有ユーザーに紐づく更新対象チャットを取得する | `ChatNotFoundError`, `ChatLoadError` |
 | `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答を取得する | `ChatGenerationUnavailableError`, `InvalidChatGenerationResponseError` |
-| `ChatCommandRepositoryProtocol` | `save_exchange` | 楽観排他を適用し、更新済みチャット本体と新しいユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError`, `ChatConflictError` |
+| `ChatCommandRepositoryProtocol` | `save_exchange` | 更新済みチャット本体と新しいユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError`, `ChatConflictError` |
 
 ## 9. 基本フロー
 
 1. 入力されたプロンプトから`Prompt`を生成し、一般的な前後空白の除去と文字数制約を適用する。
-2. `ChatCommandRepositoryProtocol.get_chat_for_continuation`で認証済みユーザーに紐づく更新対象チャットを取得する。
+2. 認証済みユーザーに紐づく更新対象チャットを取得する。
 3. 現在日時と`Chat.last_updated_at`の差が24時間未満であることを確認する。[BR-01]
 4. ユーザーメッセージの発信日時を記録する。
-5. 永続化済みのセッションIDと整形済みプロンプトを`ChatGenerationClientProtocol.continue_chat`へ渡す。
+5. 永続化済みのセッションIDと整形済みプロンプトを渡し、既存チャットを継続する。
 6. 検証済み回答を受領した日時を正常回答日時として記録する。
 7. 同じチャットIDと新しいチャットターンIDを持つユーザー・LLMメッセージを生成する。
-8. `Chat.record_exchange`で発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
+8. 発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
 9. 取得時の更新バージョンから変更されていないことを楽観排他で確認し、更新済みチャット本体と新しい2メッセージを同一トランザクションで保存する。
 10. チャットID、AI回答、既存タイトル、更新後の最終更新日時を返す。
 
@@ -103,16 +103,16 @@
 flowchart TD
     A([開始]) --> B["Promptを生成・整形・検証\n[DR-03@chat] [DR-04@chat]"]
     B -->|不正| ERR1["InvalidPromptError / PromptTooLongError"]
-    B -->|有効| C["get_chat_for_continuationで更新対象チャットを取得"]
+    B -->|有効| C["更新対象チャットを取得"]
     C -->|対象なし・所有者不一致| ERR2["ChatNotFoundError"]
     C --> D{"最終更新から24時間未満か\n[BR-01]"}
     D -->|No| ERR3["ChatContinuationExpiredError"]
-    D -->|Yes| E["ChatGenerationClientProtocol.continue_chat"]
+    D -->|Yes| E["既存チャットを継続"]
     E -->|利用不可| ERR4["ChatGenerationUnavailableError"]
     E -->|不正な応答| ERR5["InvalidChatGenerationResponseError"]
-    E -->|検証済み応答| F["新しい2メッセージを生成しChat.record_exchange\n[DR-05@chat] [DR-07@chat]"]
+    E -->|検証済み応答| F["新しい2メッセージを生成し発信順序を検証\n[DR-05@chat] [DR-07@chat]"]
     F -->|不整合| ERR6["InvalidChatTurnError / MessageSentAtOutOfOrderError"]
-    F -->|有効| G["save_exchangeで楽観排他・同一トランザクション保存"]
+    F -->|有効| G["楽観排他・同一トランザクション保存"]
     G -->|競合| ERR8["ChatConflictError"]
     G -->|保存失敗| ERR7["ChatSaveError"]
     G -->|保存成功| H["chat_id・answer・title・last_updated_atを返す"]
@@ -140,7 +140,7 @@ flowchart TD
 | `InvalidPromptError` | 整形後のプロンプトが空文字 | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `PromptTooLongError` | 整形後のプロンプトが1,000文字を超える | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatNotFoundError` | 指定チャットが存在しない、または認証済みユーザーが所有しない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
-| `ChatLoadError` | Repositoryの接続障害やサービス障害により更新対象チャットを取得できない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
+| `ChatLoadError` | チャット取得元の接続障害やサービス障害により更新対象チャットを取得できない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatContinuationExpiredError` | 最終更新日時から現在日時までが24時間以上 | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatGenerationUnavailableError` | チャット生成サービスから応答を取得できない | 永続化しない | 例外を送出する |
 | `InvalidChatGenerationResponseError` | チャット生成サービスから有効な回答を取得できない | 永続化しない | 例外を送出する |

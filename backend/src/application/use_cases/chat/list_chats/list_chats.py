@@ -15,6 +15,8 @@ class ListChatsUseCase:
         try:
             chats = await self._chat_repository.list_chats_by_user_id(query.user_id)
         except RepositoryNotFoundError:
+            # 一覧取得では対象なしを正常な空一覧として扱い、
+            # 呼び出し元に削除済み状態を意識させない。
             return ListChatsOutput(chats=())
 
         return ListChatsOutput(

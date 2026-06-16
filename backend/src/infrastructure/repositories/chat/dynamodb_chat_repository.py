@@ -131,6 +131,8 @@ class _DynamoDbChatRepositoryOperations:
         title: str,
     ) -> None:
         try:
+            # 所有者条件を更新式に含め、
+            # 存在有無と所有者不一致を同じNotFoundとして扱う。
             await asyncio.to_thread(
                 self._client.update_item,
                 TableName=self._table_name,
@@ -167,6 +169,8 @@ class _DynamoDbChatRepositoryOperations:
                 ConsistentRead=True,
             )
             for start in range(0, len(items), 25):
+                # DynamoDB BatchWriteItemの上限に合わせて分割する。
+                # 複数バッチは原子的ではない。
                 delete_requests = [
                     {
                         "DeleteRequest": {
