@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="FastAPI開発サーバーを起動する"
-#MISE dir="backend"
+#MISE description="Docker ComposeでバックエンドとDynamoDB Localを起動する"
+#MISE dir="docker"
 
-uv run uvicorn main:app --reload --env-file .env
+docker compose up --build

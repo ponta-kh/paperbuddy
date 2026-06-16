@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="DynamoDB Localと疑似LLMを使用するバックエンドを起動する"
-#MISE dir="backend"
-
-docker compose -f compose.local.yaml up --build

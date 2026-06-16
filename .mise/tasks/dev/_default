@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-#MISE description="フロントエンドとバックエンドの開発サーバーを起動する"
+#MISE description="Docker Composeのバックエンドとフロントエンド開発サーバーを起動する"
 #MISE depends=["dev:backend", "dev:frontend"]

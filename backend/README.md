@@ -3,11 +3,10 @@
 ## Prerequisites
 
 - Python 3.14 and uv
-- AWS CLIで対象アカウントへログイン済みであること
-- Model access enabled in the AWS region used by the Knowledge Base
+- Docker
+- Cognito User PoolとWeb App Clientを作成済みであること
 
-The application uses boto3's standard AWS credential provider chain. Do not put
-AWS access keys in `.env`.
+AWSアクセスキーは`.env`へ保存しない。
 
 アプリケーション固有の環境変数は
 `src/dependencies/settings.py`のPydantic Settingsへ集約している。
@@ -17,55 +16,19 @@ AWS access keys in `.env`.
 - AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
 - ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
 - 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
-- Boto3認証: 各端末でログイン済みのAWS CLI認証を標準認証チェーンから使用する
 
 ## Local Configuration
 
-Create the local environment file and replace the Bedrock identifiers:
+Docker Composeで起動する場合は、`docker/.env`へCognitoの識別子を設定する。
 
-```sh
-cp .env.example .env
-```
+ローカル環境とデプロイ環境は、どちらも永続化用のDynamoDB Repository実装を使用する。
+ローカルのDocker Composeでは、同じRepository実装の接続先をDynamoDB Localへ切り替える。
 
-バックエンド起動前に、現在ログインしているAWSアカウントを確認する。
-
-```sh
-aws sts get-caller-identity
-```
-
-AWS CLIの認証方式とログイン操作は各端末の責務とし、`.env`ではAWS認証情報を管理しない。
-
-The local and deployed backends both use the persistent DynamoDB repository.
-Deploy the development table and set:
-
-```dotenv
-DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
-DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
-```
-
-See `docs/infra/dynamodb.md` for deployment, authentication, and IAM
-requirements. The chat table and `gsi1` key schema are defined in
-`docs/backend/specification/infrastructure/dynamodb_chat_repository.md`.
-The library table is defined in
-`docs/backend/specification/infrastructure/dynamodb_indexed_file_catalog.md`.
-
-## Run on the Host
-
-```sh
-uv sync
-uv run uvicorn main:app --reload --env-file .env
-```
-
-## Run with Docker Compose
-
-The Compose service mounts the host's `~/.aws` directory read-only so boto3 can
-use the configured profile and AWS SSO cache. It overrides the container user
-to root locally so AWS files with `0600` permissions remain readable. The
-production Docker image still runs as a non-root user.
-
-```sh
-docker compose up --build
-```
+DynamoDBのデプロイ、認証、IAM要件は`docs/infra/dynamodb.md`を参照する。
+デプロイ環境のチャットテーブルと`gsi1`のキー構造は
+`docs/backend/specification/infrastructure/dynamodb_chat_repository.md`に記載している。
+ライブラリ一覧テーブルは
+`docs/backend/specification/infrastructure/dynamodb_indexed_file_catalog.md`に記載している。
 
 ## ローカル全体動作確認
 
@@ -73,7 +36,7 @@ docker compose up --build
 以下を実行する。
 
 ```sh
-mise run dev:local
+mise run dev
 ```
 
 - バックエンド: `http://localhost:8000`
@@ -82,49 +45,27 @@ mise run dev:local
 - DynamoDB Localのテーブル作成: Docker Composeの`dynamodb-init`サービス
 - LLM: 既定で2秒待機し、300文字の疑似回答を返す
 - 初期データ: なし
-- 認証: `backend/.env`と`frontend/.env`に同じCognito User PoolとWeb App Clientを設定する
+- 認証: `docker/.env`と`frontend/.env`に同じCognito User PoolとWeb App Clientを設定する
 
-`CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用Infrastructureを注入する。
-通常起動およびAWSデプロイでは、既存のDynamoDB・Bedrock実装を使用する。
+`CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用LLMを注入する。
+DynamoDB RepositoryはAWSデプロイ時と同じ実装を使用し、接続先だけDynamoDB Localへ切り替える。
 
 バックエンドとDynamoDB Localを停止する場合は以下を実行する。
 
 ```sh
-docker compose -f backend/compose.local.yaml down
+docker compose -f docker/compose.yaml down
 ```
 
 DynamoDB Localの保存データも初期化する場合は、`--volumes`を追加する。
 
-## Test the Bedrock Connection
+## 自動テスト
 
-Start the backend, then create a chat. This calls both Knowledge Base
-`RetrieveAndGenerate` and Bedrock Runtime `Converse`.
-
-```sh
-access_token=replace-with-cognito-access-token
-
-curl --fail-with-body \
-  -X POST http://localhost:8000/api/chats \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${access_token}" \
-  -d '{"prompt":"このナレッジベースの内容を簡潔に説明してください"}'
-```
-
-Required permissions for the AWS identity include:
-
-- `bedrock:RetrieveAndGenerate`
-- `bedrock:InvokeModel`
-
-The Bedrock Knowledge Base and model must be available in `AWS_REGION`.
-
-## Automated Tests
-
-Run the backend test suite with the domain and use-case coverage gates:
+ドメイン層とユースケース層のカバレッジ条件を含めて、バックエンドテストを実行する。
 
 ```sh
 mise run backend:test
 ```
 
-- `backend:test:domain` enforces 100% statement and branch coverage for executable Domain code.
-- `backend:test:application` tests use cases with output-port mocks and enforces 100% statement and branch coverage.
-- Repository Protocol declarations are excluded from runtime coverage because they contain no executable domain behavior.
+- `backend:test:domain`は、実行可能なDomainコードに対してstatementとbranchの100%カバレッジを要求する。
+- `backend:test:application`は、出力ポートをモック化してユースケースをテストし、statementとbranchの100%カバレッジを要求する。
+- Repository Protocol宣言は実行可能なドメイン振る舞いを持たないため、実行時カバレッジの対象外とする。

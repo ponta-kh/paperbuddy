@@ -1,3 +1,5 @@
+name: paperbuddy
+
 services:
   dynamodb-local:
     image: amazon/dynamodb-local:latest
@@ -12,7 +14,7 @@ services:
     image: amazon/aws-cli:latest
     entrypoint: ["/bin/sh", "/docker/dynamodb/init.sh"]
     volumes:
-      - ./docker/dynamodb/init.sh:/docker/dynamodb/init.sh:ro
+      - ./dynamodb/init.sh:/docker/dynamodb/init.sh:ro
     environment: &local-environment
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
@@ -21,8 +23,6 @@ services:
       DYNAMODB_LIBRARY_TABLE_NAME: paperbuddy-local-library
       DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
       CHAT_INFRASTRUCTURE_MODE: local
-      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID}
-      COGNITO_USER_POOL_CLIENT_ID: ${COGNITO_USER_POOL_CLIENT_ID}
       SIMULATED_LLM_DELAY_SECONDS: "2"
     depends_on:
       - dynamodb-local
@@ -30,7 +30,9 @@ services:
 
   backend:
     build:
-      context: .
+      context: ../backend
+    env_file:
+      - .env
     environment: *local-environment
     depends_on:
       dynamodb-init:

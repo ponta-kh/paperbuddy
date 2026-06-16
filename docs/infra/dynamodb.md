@@ -2,17 +2,19 @@
 
 ## 方針
 
-ローカルバックエンドとECS上のバックエンドは、同じDynamoDBテーブル群と実AWSの開発用DynamoDBテーブルを使用する。
+ECS上のバックエンドは、AWS上の開発用DynamoDBテーブルを使用する。
+ローカルバックエンドはDocker Composeで起動するDynamoDB Localを使用する。
+どちらも同じRepository実装とデータ形式を使用し、接続先だけを環境変数で切り替える。
 
 - テーブル名: `paperbuddy-dev-chat`
 - ライブラリ一覧テーブル名: `paperbuddy-dev-library`
 - リージョン: 既定値は`ap-northeast-1`
-- ローカル認証: 各端末でログイン済みのAWS CLI認証をboto3標準認証チェーンから使用する
+- ローカル認証: DynamoDB Local用の固定ダミー認証情報
 - ECS認証: ECSタスクロール
 - 課金モード: オンデマンド
 - 保護: AWS管理暗号化、PITR、削除保護、CloudFormation削除時の保持
 
-ローカルとAWS上で異なるのは認証方式だけであり、Repository実装、テーブル、データ形式は共通となる。
+ローカルとAWS上で異なるのは接続先と認証方式であり、Repository実装、テーブル構造、データ形式は共通となる。
 
 ## 初回デプロイ
 
@@ -35,23 +37,16 @@ mise run infra:bootstrap:dev
 
 ## ローカル接続
 
-`backend/.env`を次のように設定し、`mise run dev`でフロントエンドとバックエンドを起動する。
+`docker/.env`へCognitoの識別子を設定し、`mise run dev`でフロントエンドとバックエンドを起動する。
+DynamoDB LocalのテーブルはDocker Composeの`dynamodb-init`サービスが作成する。
 
 ```dotenv
 AWS_REGION=ap-northeast-1
-DYNAMODB_CHAT_TABLE_NAME=paperbuddy-dev-chat
-DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
+COGNITO_USER_POOL_ID=ap-northeast-1_replace-with-user-pool-id
+COGNITO_USER_POOL_CLIENT_ID=replace-with-user-pool-client-id
 ```
 
-ローカルでログインしているAWS Identityには、テーブルに対する次の権限が必要となる。
-
-- `dynamodb:GetItem`
-- `dynamodb:Query`
-- `dynamodb:Scan`
-- `dynamodb:TransactWriteItems`
-
-`dynamodb:Query`のResourceには、テーブル本体に加えて`paperbuddy-dev-chat/index/gsi1`を含める。
-`dynamodb:Scan`のResourceには`paperbuddy-dev-library`を含める。
+ローカル起動時はDynamoDB Localへ接続するため、DynamoDB用のAWS IAM権限は不要となる。
 
 ## ECS接続
 
@@ -67,6 +62,6 @@ DYNAMODB_LIBRARY_TABLE_NAME=paperbuddy-dev-library
 
 ## 注意事項
 
-- 実AWSのDynamoDBを使用するため、ローカル実行でもAWS利用料金が発生する。
-- 開発者間で同じテーブルとデータを共有する。テストデータはユーザーIDを分けて識別する。
+- ローカル起動ではDynamoDB Localを使用するため、DynamoDBのAWS利用料金は発生しない。
+- ローカルデータはDocker Volumeへ保存する。初期化する場合は`docker compose -f docker/compose.yaml down --volumes`を実行する。
 - 自動テストは実AWSへ接続せず、DynamoDBクライアントをスタブ化する。

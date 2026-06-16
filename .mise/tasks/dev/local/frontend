@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Cognito認証を使用してフロントエンドを起動する"
-#MISE dir="frontend"
-
-pnpm dev

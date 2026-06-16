@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="ローカル検証用のフロントエンドとバックエンドを起動する"
-#MISE depends=["dev:local:backend", "dev:local:frontend"]
