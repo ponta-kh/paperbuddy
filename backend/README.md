@@ -45,7 +45,7 @@ mise run dev
 - DynamoDB Localのテーブル作成: Docker Composeの`dynamodb-init`サービス
 - LLM: 既定で2秒待機し、300文字の疑似回答を返す
 - 初期データ: なし
-- 認証: `docker/.env`と`frontend/.env`に同じCognito User PoolとWeb App Clientを設定する
+- 認証: `docker/.env`にAWS上のローカル開発用Cognito User PoolとWeb App Clientを設定する
 
 `CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用LLMを注入する。
 DynamoDB RepositoryはAWSデプロイ時と同じ実装を使用し、接続先だけDynamoDB Localへ切り替える。
