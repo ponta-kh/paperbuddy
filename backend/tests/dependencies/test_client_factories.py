@@ -42,28 +42,6 @@ def test_create_dynamodb_client_uses_local_endpoint(
     )
 
 
-def test_create_local_dynamodb_client_rejects_aws_mode() -> None:
-    with pytest.raises(ValueError, match="requires local mode"):
-        client_factories.create_local_dynamodb_client(_aws_settings())
-
-
-def test_create_local_dynamodb_client_uses_local_endpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    client = Mock()
-    boto3_client = Mock(return_value=client)
-    monkeypatch.setattr(client_factories.boto3, "client", boto3_client)
-
-    result = client_factories.create_local_dynamodb_client(_local_settings())
-
-    assert result is client
-    boto3_client.assert_called_once_with(
-        "dynamodb",
-        region_name="ap-northeast-1",
-        endpoint_url="http://dynamodb-local:8000",
-    )
-
-
 def test_create_chat_generation_client_uses_simulated_client_locally(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

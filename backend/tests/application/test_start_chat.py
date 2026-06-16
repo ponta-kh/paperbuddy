@@ -20,6 +20,7 @@ from src.domain.value_objects.chat.message_sender import MessageSender
 
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 USER_SENT_AT = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
 ANSWERED_AT = datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc)
 
@@ -52,7 +53,7 @@ async def test_start_chat_generates_uuid7_chat_id_by_default() -> None:
     )
 
     output = await use_case.execute(
-        StartChatInput(user_id=USER_ID, prompt="question")
+        StartChatInput(user_id=USER_ID, prompt="question", request_id=REQUEST_ID)
     )
 
     assert output.chat_id.version == 7
@@ -67,7 +68,7 @@ async def test_start_chat_saves_chat_and_turn() -> None:
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
 
     output = await _use_case(generation_client, repository).execute(
-        StartChatInput(user_id=USER_ID, prompt="  question  ")
+        StartChatInput(user_id=USER_ID, prompt="  question  ", request_id=REQUEST_ID)
     )
 
     generation_client.start_chat.assert_awaited_once_with("question")
@@ -79,7 +80,7 @@ async def test_start_chat_saves_chat_and_turn() -> None:
     assert isinstance(llm_message, ChatMessage)
     assert saved_chat.session_id == "session-1"
     assert saved_chat.created_at == saved_chat.last_updated_at == ANSWERED_AT
-    assert user_message.turn_id == llm_message.turn_id
+    assert user_message.request_id == llm_message.request_id == REQUEST_ID
     assert user_message.sender is MessageSender.USER
     assert llm_message.sender is MessageSender.LLM
 
@@ -92,7 +93,7 @@ async def test_start_chat_does_not_save_when_generation_fails() -> None:
 
     with pytest.raises(ChatGenerationUnavailableError):
         await _use_case(generation_client, repository).execute(
-            StartChatInput(user_id=USER_ID, prompt="question")
+            StartChatInput(user_id=USER_ID, prompt="question", request_id=REQUEST_ID)
         )
 
     repository.save_started_chat.assert_not_awaited()
@@ -109,5 +110,5 @@ async def test_start_chat_propagates_repository_save_error() -> None:
 
     with pytest.raises(ChatSaveError):
         await _use_case(generation_client, repository).execute(
-            StartChatInput(user_id=USER_ID, prompt="question")
+            StartChatInput(user_id=USER_ID, prompt="question", request_id=REQUEST_ID)
         )

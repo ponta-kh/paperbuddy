@@ -8,6 +8,11 @@ from src.application.ports.out.indexed_file_catalog_protocol import IndexedFile
 from src.application.use_cases.library.list_indexed_files.list_indexed_files import (
     ListIndexedFilesUseCase,
 )
+from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto import (
+    ListIndexedFilesInput,
+)
+
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 class StubIndexedFileCatalog:
@@ -50,7 +55,9 @@ async def test_list_indexed_files_returns_catalog_results() -> None:
         )
     )
 
-    output = await ListIndexedFilesUseCase(catalog).execute()
+    output = await ListIndexedFilesUseCase(catalog).execute(
+        ListIndexedFilesInput(request_id=REQUEST_ID)
+    )
 
     assert catalog.called
     assert tuple(file.name for file in output.files) == (
@@ -62,6 +69,8 @@ async def test_list_indexed_files_returns_catalog_results() -> None:
 
 @pytest.mark.asyncio
 async def test_list_indexed_files_returns_empty_list() -> None:
-    output = await ListIndexedFilesUseCase(StubNotFoundIndexedFileCatalog()).execute()
+    output = await ListIndexedFilesUseCase(StubNotFoundIndexedFileCatalog()).execute(
+        ListIndexedFilesInput(request_id=REQUEST_ID)
+    )
 
     assert output.files == ()

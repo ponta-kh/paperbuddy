@@ -8,3 +8,4 @@ class DeleteChatInput(BaseModel):
 
     chat_id: UUID
     user_id: UUID
+    request_id: UUID

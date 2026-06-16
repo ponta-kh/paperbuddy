@@ -7,6 +7,7 @@ from src.application.use_cases.chat.delete_chat.delete_chat_dto import DeleteCha
 
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 class StubChatRepository:
@@ -23,7 +24,7 @@ async def test_delete_chat_deletes_items_for_chat_id() -> None:
     repository = StubChatRepository()
 
     await DeleteChatUseCase(repository).execute(
-        DeleteChatInput(chat_id=CHAT_ID, user_id=USER_ID)
+        DeleteChatInput(chat_id=CHAT_ID, user_id=USER_ID, request_id=REQUEST_ID)
     )
 
     assert repository.deleted_chat_id == CHAT_ID

@@ -25,6 +25,7 @@ from src.domain.repositories.chat_command_repository_protocol import (
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 def _chat(answered_at: datetime) -> Chat:
@@ -53,7 +54,12 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
     use_case = ContinueChatUseCase(client, repository, now=lambda: next(times))
 
     output = await use_case.execute(
-        ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="  next  ")
+        ContinueChatInput(
+            user_id=USER_ID,
+            chat_id=CHAT_ID,
+            prompt="  next  ",
+            request_id=REQUEST_ID,
+        )
     )
 
     client.continue_chat.assert_awaited_once_with("session-1", "next")
@@ -64,7 +70,7 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
     saved_chat, user_message, llm_message = repository.save_exchange.await_args.args
     assert saved_chat is chat
     assert saved_chat.last_updated_at == answered_at
-    assert user_message.turn_id == llm_message.turn_id
+    assert user_message.request_id == llm_message.request_id == REQUEST_ID
 
 
 @pytest.mark.asyncio
@@ -82,7 +88,12 @@ async def test_continue_chat_rejects_exactly_24_hours_without_side_effects() -> 
 
     with pytest.raises(ChatContinuationExpiredError):
         await use_case.execute(
-            ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="next")
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="next",
+                request_id=REQUEST_ID,
+            )
         )
 
     client.continue_chat.assert_not_awaited()
@@ -98,7 +109,12 @@ async def test_continue_chat_does_not_generate_when_chat_is_not_found() -> None:
 
     with pytest.raises(ChatNotFoundError):
         await ContinueChatUseCase(client, repository).execute(
-            ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="next")
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="next",
+                request_id=REQUEST_ID,
+            )
         )
 
     client.continue_chat.assert_not_awaited()
@@ -119,7 +135,14 @@ async def test_continue_chat_does_not_save_when_generation_fails() -> None:
             client,
             repository,
             now=lambda: datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
-        ).execute(ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="next"))
+        ).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="next",
+                request_id=REQUEST_ID,
+            )
+        )
 
     repository.save_exchange.assert_not_awaited()
 
@@ -144,5 +167,10 @@ async def test_continue_chat_propagates_repository_conflict() -> None:
 
     with pytest.raises(ChatConflictError):
         await ContinueChatUseCase(client, repository, now=lambda: next(times)).execute(
-            ContinueChatInput(user_id=USER_ID, chat_id=CHAT_ID, prompt="next")
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="next",
+                request_id=REQUEST_ID,
+            )
         )

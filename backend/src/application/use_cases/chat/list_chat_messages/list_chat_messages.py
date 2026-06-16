@@ -19,7 +19,7 @@ class ListChatMessagesUseCase:
             chat_id=query.chat_id,
             messages=tuple(
                 ChatMessageOutput(
-                    turn_id=message.turn_id,
+                    request_id=message.request_id,
                     sender=message.sender,
                     content=message.content,
                     sent_at=message.sent_at,

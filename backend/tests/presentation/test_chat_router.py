@@ -32,10 +32,12 @@ from src.dependencies.chat_deps import (
 )
 from src.domain.repositories.chat_command_repository_protocol import ChatConflictError
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
+from src.presentation.request_id import get_request_id
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 CHAT_ID_TEXT = str(CHAT_ID)
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 LAST_UPDATED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
@@ -43,6 +45,7 @@ class StubStartChatUseCase:
     async def execute(self, command: object) -> StartChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.prompt == "question"
+        assert command.request_id == REQUEST_ID
         return StartChatOutput(
             chat_id=CHAT_ID,
             answer="answer",
@@ -56,6 +59,7 @@ class StubContinueChatUseCase:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.chat_id == CHAT_ID
         assert command.prompt == "next question"
+        assert command.request_id == REQUEST_ID
         return ContinueChatOutput(
             chat_id=CHAT_ID,
             answer="next answer",
@@ -69,6 +73,7 @@ class StubRenameChatUseCase:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.chat_id == CHAT_ID
         assert command.title == "変更後"
+        assert command.request_id == REQUEST_ID
         return RenameChatOutput(chat_id=CHAT_ID, title="変更後")
 
 
@@ -79,6 +84,7 @@ class StubDeleteChatUseCase:
     async def execute(self, command: object) -> None:
         assert command.chat_id == CHAT_ID
         assert command.user_id == USER_ID
+        assert command.request_id == REQUEST_ID
         self.called = True
 
 
@@ -95,6 +101,7 @@ class StubConflictContinueChatUseCase:
 class StubListChatsUseCase:
     async def execute(self, query: object) -> ListChatsOutput:
         assert query.user_id == UUID("00000000-0000-0000-0000-000000000001")
+        assert query.request_id == REQUEST_ID
         created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
         return ListChatsOutput(
             chats=(
@@ -112,11 +119,12 @@ class StubListChatMessagesUseCase:
     async def execute(self, query: object) -> ListChatMessagesOutput:
         assert query.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert query.chat_id == CHAT_ID
+        assert query.request_id == REQUEST_ID
         return ListChatMessagesOutput(
             chat_id=CHAT_ID,
             messages=(
                 ChatMessageOutput(
-                    turn_id=UUID("00000000-0000-0000-0000-000000000010"),
+                    request_id=UUID("00000000-0000-0000-0000-000000000010"),
                     sender="user",
                     content="question",
                     sent_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
@@ -140,6 +148,7 @@ def test_list_chats_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.get(
@@ -167,6 +176,7 @@ def test_list_chats_endpoint_returns_service_unavailable_for_repository_error() 
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.get(
@@ -185,6 +195,7 @@ def test_list_chat_messages_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.get(
@@ -197,7 +208,7 @@ def test_list_chat_messages_endpoint() -> None:
         "chat_id": CHAT_ID_TEXT,
         "messages": [
             {
-                "turn_id": "00000000-0000-0000-0000-000000000010",
+                "request_id": "00000000-0000-0000-0000-000000000010",
                 "sender": "user",
                 "content": "question",
                 "sent_at": "2026-01-01T00:00:00Z",
@@ -213,6 +224,7 @@ def test_list_chat_messages_endpoint_returns_not_found() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.get(
@@ -231,6 +243,7 @@ def test_continue_chat_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.post(
@@ -253,6 +266,7 @@ def test_rename_chat_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.patch(
@@ -271,6 +285,7 @@ def test_delete_chat_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.delete(
@@ -326,6 +341,7 @@ def test_start_chat_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.post(
@@ -344,9 +360,19 @@ def test_start_chat_endpoint() -> None:
 
 
 def test_start_chat_endpoint_rejects_missing_authentication() -> None:
+    called = False
+
+    def override_request_id() -> UUID:
+        nonlocal called
+        called = True
+        return REQUEST_ID
+
+    app.dependency_overrides[get_request_id] = override_request_id
     client = TestClient(app)
 
     response = client.post("/api/chats", json={"prompt": "question"})
 
+    app.dependency_overrides.clear()
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_failed"
+    assert called

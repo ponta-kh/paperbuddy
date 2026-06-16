@@ -44,6 +44,7 @@
 | --- | --- | --- | --- |
 | `user_id` | UUID | 必須 | 認証済みユーザーを識別する値 |
 | `chat_id` | UUID v7 | 必須 | 取得対象チャットの識別子 |
+| `request_id` | UUID v7 | 必須 | Presentationで採番されたリクエスト識別子。将来のログ出力で処理を関連付けるために使用する |
 
 ## 5. 出力
 
@@ -53,7 +54,7 @@
 | --- | --- | --- |
 | `chat_id` | UUID v7 | 取得対象チャットの識別子 |
 | `messages` | `tuple[ChatMessageOutput, ...]` | 発信日時の昇順に並んだチャットメッセージ一覧 |
-| `ChatMessageOutput.turn_id` | UUID v7 | ユーザー質問とLLM回答を関連付ける識別子 |
+| `ChatMessageOutput.request_id` | UUID v7 | ユーザー質問とLLM回答を関連付ける識別子 |
 | `ChatMessageOutput.sender` | `str` | メッセージ発信者 |
 | `ChatMessageOutput.content` | `str` | メッセージ内容 |
 | `ChatMessageOutput.sent_at` | タイムゾーンを含む日時 | メッセージ発信日時 |

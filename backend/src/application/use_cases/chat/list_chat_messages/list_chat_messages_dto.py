@@ -10,11 +10,12 @@ class ListChatMessagesInput(BaseModel):
 
     user_id: UUID
     chat_id: UUID
+    request_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
 class ChatMessageOutput:
-    turn_id: UUID
+    request_id: UUID
     sender: str
     content: str
     sent_at: datetime

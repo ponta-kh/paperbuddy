@@ -51,7 +51,7 @@
 | 項目 | `pk` | `sk` | 用途 |
 | --- | --- | --- | --- |
 | チャット本体 | `CHAT#{chat_id UUID v7}` | `CHAT` | 継続対象チャットの取得、楽観排他更新。`session_id`を属性として保持する |
-| メッセージ | `CHAT#{chat_id}` | `MESSAGE#{sent_at}#{turn_id}#{sender_order}` | チャット別メッセージ履歴 |
+| メッセージ | `CHAT#{chat_id}` | `MESSAGE#{sent_at}#{request_id}#{sender_order}` | チャット別メッセージ履歴 |
 
 ユーザー別チャット一覧用に、`gsi1`という名前のGSIを使用する。
 

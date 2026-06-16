@@ -10,6 +10,7 @@ class StartChatInput(BaseModel):
 
     user_id: UUID
     prompt: str
+    request_id: UUID
 
 
 @dataclass(frozen=True, slots=True)

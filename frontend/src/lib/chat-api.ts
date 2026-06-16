@@ -27,7 +27,7 @@ type ChatSummaryResponse = {
 };
 
 type ChatMessageResponse = {
-    turn_id: string;
+    request_id: string;
     sender: "user" | "llm";
     content: string;
     sent_at: string;
@@ -87,7 +87,7 @@ export async function getChatMessages(
 
     return chat.messages
         .map<ChatMessage>((message) => ({
-            id: `${message.turn_id}:${message.sender}`,
+            id: `${message.request_id}:${message.sender}`,
             role: message.sender === "user" ? "user" : "assistant",
             content: message.content,
             createdAt: message.sent_at,

@@ -58,6 +58,7 @@
 | --- | --- | --- | --- |
 | `user_id` | UUID | 必須 | 認証済みユーザーを識別する値 |
 | `prompt` | `str` | 必須 | `Prompt` Value Objectへ変換し、Domainルールに従って整形・検証する |
+| `request_id` | UUID v7 | 必須 | Presentationで採番されたリクエスト識別子。初回のユーザー質問とLLM回答の関連付けに使用する |
 
 ## 5. 出力
 
@@ -99,7 +100,7 @@
 5. アプリケーション内のチャットIDをUUID v7で採番する。
 6. 検証済み応答を受領した時点の日時を、初回の正常回答日時として記録する。
 7. 採番したチャットID、セッションID、初回の正常回答日時を基準として、`created_at`と`last_updated_at`が一致する`Chat`を生成する。
-8. 新しい`ChatTurnId`を生成し、同じ`chat_id`と`turn_id`を持つ初回ユーザー・LLMメッセージを生成する。ユーザーメッセージには手順2の日時、LLMメッセージには初回の正常回答日時を設定する。
+8. 同じ`chat_id`と`request_id`を持つ初回ユーザー・LLMメッセージを生成する。ユーザーメッセージには手順2の日時、LLMメッセージには初回の正常回答日時を設定する。
 9. 初回2メッセージがチャットターンと初回発信順序のルールを満たすことを保証する。
 10. チャット本体と初回2メッセージを同一トランザクションで永続化する。
 11. 採番したチャットID、AI回答、タイトル、最終更新日時を返す。
@@ -117,7 +118,7 @@ flowchart TD
     D -->|不正な応答| ERR4["InvalidChatGenerationResponseError"]
     D -->|検証済み応答| ID["UUID v7のchat_idを採番"]
     ID --> T["初回の正常回答日時を記録"]
-    T --> E["chat_id・session_idを持つChat本体と\n同じchat_id・turn_idを持つ初回2メッセージを生成\n[DR-01@chat] [DR-06@chat] [DR-07@chat] [DR-08@chat]"]
+    T --> E["chat_id・session_idを持つChat本体と\n同じchat_id・request_idを持つ初回2メッセージを生成\n[DR-01@chat] [DR-06@chat] [DR-07@chat] [DR-08@chat]"]
     E -->|ターン不整合| ERR5["InvalidChatTurnError"]
     E -->|発信順序違反| ERR6["MessageSentAtOutOfOrderError"]
     E -->|有効| G["同一トランザクションで保存"]
@@ -147,7 +148,7 @@ flowchart TD
 | `ChatGenerationUnavailableError` | チャット生成サービスのタイムアウト、接続障害、サービス障害などにより応答を取得できない | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
 | `InvalidChatGenerationResponseError` | セッションID、AI回答、タイトルを有効な応答として扱えない | 永続化しない。チャット生成サービス側で作成されたチャットは取り消せない | 例外を送出する |
 | `InvalidSessionIdError` | チャット生成サービスから取得したセッションIDが空文字または空白文字のみ | 永続化しない | 例外を送出する |
-| `InvalidChatTurnError` | 初回のユーザー・LLMメッセージの`chat_id`または`turn_id`が一致しない | 永続化しない | 例外を送出する |
+| `InvalidChatTurnError` | 初回のユーザー・LLMメッセージの`chat_id`または`request_id`が一致しない | 永続化しない | 例外を送出する |
 | `MessageSentAtOutOfOrderError` | 初回ユーザーメッセージの発信日時が初回LLMメッセージの発信日時より後、またはLLMメッセージ日時とチャットの作成・最終更新日時が一致しない | 永続化しない | 例外を送出する |
 | `ChatSaveError` | チャット本体または初回2メッセージの永続化に失敗する | チャット本体と初回2メッセージの変更をすべてロールバックする。チャット生成サービス側で作成されたチャットは取り消せない | 例外を送出する |
 

@@ -53,7 +53,7 @@ class ListChatsResponse(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    turn_id: UUID
+    request_id: UUID
     sender: str
     content: str
     sent_at: datetime

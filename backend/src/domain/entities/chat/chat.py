@@ -9,7 +9,6 @@ from src.domain.exceptions.chat_exception import (
     InvalidSessionIdError,
     MessageSentAtOutOfOrderError,
 )
-from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
 
@@ -17,7 +16,7 @@ from src.domain.value_objects.chat.prompt import Prompt
 @dataclass(frozen=True, slots=True)
 class ChatMessage:
     chat_id: UUID
-    turn_id: ChatTurnId
+    request_id: UUID
     sender: MessageSender
     content: Prompt | str
     sent_at: datetime
@@ -27,7 +26,7 @@ class ChatMessage:
         # 生成時にターンID、発信者、内容の対応を確定する。
         if not isinstance(self.chat_id, UUID):
             raise InvalidChatIdError
-        if not isinstance(self.turn_id, ChatTurnId):
+        if not isinstance(self.request_id, UUID):
             raise InvalidChatTurnError
         if self.sent_at.tzinfo is None:
             raise ValueError("sent_at must be timezone-aware")
@@ -117,7 +116,7 @@ class Chat:
         if (
             user_message.chat_id != self.chat_id
             or llm_message.chat_id != self.chat_id
-            or user_message.turn_id != llm_message.turn_id
+            or user_message.request_id != llm_message.request_id
             or user_message.sender is not MessageSender.USER
             or llm_message.sender is not MessageSender.LLM
         ):

@@ -15,7 +15,6 @@ from src.domain.repositories.chat_command_repository_protocol import (
 )
 from src.domain.repositories.chat_deletion_repository_protocol import ChatDeleteError
 from src.domain.repositories.chat_title_repository_protocol import ChatTitleUpdateError
-from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
 from src.infrastructure.repositories.chat.dynamodb_chat_repository import (
@@ -27,6 +26,7 @@ OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 ANSWERED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 SECOND_CHAT_ID = UUID("10000000-0000-0000-0000-000000000002")
+REQUEST_ID = UUID("00000000-0000-0000-0000-000000000010")
 
 
 def _chat() -> Chat:
@@ -44,16 +44,21 @@ def _messages(
     user_sent_at: datetime = ANSWERED_AT,
     llm_sent_at: datetime = ANSWERED_AT,
 ) -> tuple[ChatMessage, ChatMessage]:
-    turn_id = ChatTurnId(UUID("00000000-0000-0000-0000-000000000010"))
     return (
         ChatMessage(
             CHAT_ID,
-            turn_id,
+            REQUEST_ID,
             MessageSender.USER,
             Prompt("question"),
             user_sent_at,
         ),
-        ChatMessage(CHAT_ID, turn_id, MessageSender.LLM, "answer", llm_sent_at),
+        ChatMessage(
+            CHAT_ID,
+            REQUEST_ID,
+            MessageSender.LLM,
+            "answer",
+            llm_sent_at,
+        ),
     )
 
 
@@ -90,6 +95,10 @@ async def test_save_started_chat_writes_chat_and_messages_atomically() -> None:
     assert stored[0]["session_id"] == "session-1"
     assert stored[0]["gsi1pk"] == f"USER#{USER_ID}"
     assert [item["sender"] for item in stored[1:]] == ["user", "llm"]
+    assert [item["request_id"] for item in stored[1:]] == [
+        str(REQUEST_ID),
+        str(REQUEST_ID),
+    ]
     assert stored[1]["sk"] < stored[2]["sk"]
 
 
@@ -417,6 +426,7 @@ async def test_list_messages_checks_owner_and_returns_records() -> None:
 
     assert [message.sender for message in messages] == ["user", "llm"]
     assert [message.content for message in messages] == ["question", "answer"]
+    assert [message.request_id for message in messages] == [REQUEST_ID, REQUEST_ID]
     assert client.query.call_args.kwargs["ConsistentRead"] is True
 
 

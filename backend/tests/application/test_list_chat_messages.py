@@ -15,6 +15,7 @@ from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto im
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 class StubChatQueryRepository:
@@ -36,19 +37,23 @@ class StubChatQueryRepository:
 
 @pytest.mark.asyncio
 async def test_list_chat_messages_returns_repository_results() -> None:
-    turn_id = UUID("00000000-0000-0000-0000-000000000010")
+    message_request_id = UUID("00000000-0000-0000-0000-000000000010")
     sent_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     repository = StubChatQueryRepository(
-        (ChatMessageRecord(turn_id, "user", "question", sent_at),)
+        (ChatMessageRecord(message_request_id, "user", "question", sent_at),)
     )
 
     output = await ListChatMessagesUseCase(repository).execute(
-        ListChatMessagesInput(user_id=USER_ID, chat_id=CHAT_ID)
+        ListChatMessagesInput(
+            user_id=USER_ID,
+            chat_id=CHAT_ID,
+            request_id=REQUEST_ID,
+        )
     )
 
     assert repository.received == (USER_ID, CHAT_ID)
     assert output.chat_id == CHAT_ID
-    assert output.messages[0].turn_id == turn_id
+    assert output.messages[0].request_id == message_request_id
     assert output.messages[0].content == "question"
 
 
@@ -58,11 +63,15 @@ async def test_list_chat_messages_propagates_not_found() -> None:
 
     with pytest.raises(RepositoryNotFoundError):
         await ListChatMessagesUseCase(repository).execute(
-            ListChatMessagesInput(user_id=USER_ID, chat_id=CHAT_ID)
+            ListChatMessagesInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                request_id=REQUEST_ID,
+            )
         )
 
 
 @pytest.mark.parametrize("chat_id", ["", "not-a-uuid", 1])
 def test_list_chat_messages_input_rejects_invalid_chat_id(chat_id: object) -> None:
     with pytest.raises(ValidationError):
-        ListChatMessagesInput(user_id=USER_ID, chat_id=chat_id)
+        ListChatMessagesInput(user_id=USER_ID, chat_id=chat_id, request_id=REQUEST_ID)

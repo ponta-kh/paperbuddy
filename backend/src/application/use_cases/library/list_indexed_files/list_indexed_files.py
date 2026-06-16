@@ -4,6 +4,7 @@ from src.application.ports.out.indexed_file_catalog_protocol import (
 )
 from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto import (
     IndexedFileOutput,
+    ListIndexedFilesInput,
     ListIndexedFilesOutput,
 )
 
@@ -12,7 +13,7 @@ class ListIndexedFilesUseCase:
     def __init__(self, indexed_file_catalog: IndexedFileCatalogProtocol) -> None:
         self._indexed_file_catalog = indexed_file_catalog
 
-    async def execute(self) -> ListIndexedFilesOutput:
+    async def execute(self, query: ListIndexedFilesInput) -> ListIndexedFilesOutput:
         try:
             indexed_files = await self._indexed_file_catalog.list_indexed_files()
         except RepositoryNotFoundError:

@@ -10,12 +10,15 @@ from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto
 )
 from src.dependencies.library_deps import get_list_indexed_files_use_case
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
+from src.presentation.request_id import get_request_id
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 class StubListIndexedFilesUseCase:
-    async def execute(self) -> ListIndexedFilesOutput:
+    async def execute(self, query: object) -> ListIndexedFilesOutput:
+        assert query.request_id == REQUEST_ID
         return ListIndexedFilesOutput(
             files=(
                 IndexedFileOutput(
@@ -47,6 +50,7 @@ def test_list_indexed_files_endpoint() -> None:
     app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
         user_id=USER_ID
     )
+    app.dependency_overrides[get_request_id] = lambda: REQUEST_ID
     client = TestClient(app)
 
     response = client.get(

@@ -2,6 +2,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict
+
+
+class ListIndexedFilesInput(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    request_id: UUID
+
 
 @dataclass(frozen=True, slots=True)
 class IndexedFileOutput:

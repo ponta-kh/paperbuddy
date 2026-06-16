@@ -32,6 +32,7 @@ from src.dependencies.chat_deps import (
     get_start_chat_use_case,
 )
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
+from src.presentation.request_id import get_request_id
 from src.presentation.schemas.chat_schema import (
     ChatMessageResponse,
     ChatSummaryResponse,
@@ -52,11 +53,17 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 async def rename_chat(
     chat_id: UUID,
     request: RenameChatRequest,
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[RenameChatProtocol, Depends(get_rename_chat_use_case)],
 ) -> RenameChatResponse:
     output = await use_case.execute(
-        RenameChatInput(user_id=user.user_id, chat_id=chat_id, title=request.title)
+        RenameChatInput(
+            user_id=user.user_id,
+            chat_id=chat_id,
+            title=request.title,
+            request_id=request_id,
+        )
     )
     return RenameChatResponse(chat_id=output.chat_id, title=output.title)
 
@@ -64,18 +71,28 @@ async def rename_chat(
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_chat(
     chat_id: UUID,
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[DeleteChatProtocol, Depends(get_delete_chat_use_case)],
 ) -> None:
-    await use_case.execute(DeleteChatInput(chat_id=chat_id, user_id=user.user_id))
+    await use_case.execute(
+        DeleteChatInput(
+            chat_id=chat_id,
+            user_id=user.user_id,
+            request_id=request_id,
+        )
+    )
 
 
 @router.get("", response_model=ListChatsResponse)
 async def list_chats(
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[ListChatsProtocol, Depends(get_list_chats_use_case)],
 ) -> ListChatsResponse:
-    output = await use_case.execute(ListChatsInput(user_id=user.user_id))
+    output = await use_case.execute(
+        ListChatsInput(user_id=user.user_id, request_id=request_id)
+    )
     return ListChatsResponse(
         chats=[
             ChatSummaryResponse(
@@ -92,19 +109,24 @@ async def list_chats(
 @router.get("/{chat_id}/messages", response_model=ListChatMessagesResponse)
 async def list_chat_messages(
     chat_id: UUID,
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[
         ListChatMessagesProtocol, Depends(get_list_chat_messages_use_case)
     ],
 ) -> ListChatMessagesResponse:
     output = await use_case.execute(
-        ListChatMessagesInput(user_id=user.user_id, chat_id=chat_id)
+        ListChatMessagesInput(
+            user_id=user.user_id,
+            chat_id=chat_id,
+            request_id=request_id,
+        )
     )
     return ListChatMessagesResponse(
         chat_id=output.chat_id,
         messages=[
             ChatMessageResponse(
-                turn_id=message.turn_id,
+                request_id=message.request_id,
                 sender=message.sender,
                 content=message.content,
                 sent_at=message.sent_at,
@@ -118,6 +140,7 @@ async def list_chat_messages(
 async def continue_chat(
     chat_id: UUID,
     request: ContinueChatRequest,
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[ContinueChatProtocol, Depends(get_continue_chat_use_case)],
 ) -> ContinueChatResponse:
@@ -126,6 +149,7 @@ async def continue_chat(
             user_id=user.user_id,
             chat_id=chat_id,
             prompt=request.prompt,
+            request_id=request_id,
         )
     )
     return ContinueChatResponse(
@@ -139,11 +163,16 @@ async def continue_chat(
 @router.post("", response_model=StartChatResponse, status_code=status.HTTP_201_CREATED)
 async def start_chat(
     request: StartChatRequest,
+    request_id: Annotated[UUID, Depends(get_request_id)],
     user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
     use_case: Annotated[StartChatProtocol, Depends(get_start_chat_use_case)],
 ) -> StartChatResponse:
     output = await use_case.execute(
-        StartChatInput(user_id=user.user_id, prompt=request.prompt)
+        StartChatInput(
+            user_id=user.user_id,
+            prompt=request.prompt,
+            request_id=request_id,
+        )
     )
     return StartChatResponse(
         chat_id=output.chat_id,

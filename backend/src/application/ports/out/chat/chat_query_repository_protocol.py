@@ -14,7 +14,7 @@ class ChatSummary:
 
 @dataclass(frozen=True, slots=True)
 class ChatMessageRecord:
-    turn_id: UUID
+    request_id: UUID
     sender: str
     content: str
     sent_at: datetime

@@ -249,7 +249,7 @@ class _DynamoDbChatRepositoryOperations:
             raise RepositoryNotFoundError
         return tuple(
             ChatMessageRecord(
-                turn_id=UUID(item["turn_id"]),
+                request_id=UUID(item["request_id"]),
                 sender=item["sender"],
                 content=item["content"],
                 sent_at=self._parse_datetime(item["sent_at"]),
@@ -313,11 +313,11 @@ class _DynamoDbChatRepositoryOperations:
             "pk": cls._chat_key(message.chat_id),
             "sk": (
                 f"{_MESSAGE_SORT_KEY_PREFIX}{sent_at}#"
-                f"{message.turn_id.value}#{sender_order}"
+                f"{message.request_id}#{sender_order}"
             ),
             "entity_type": "message",
             "chat_id": str(message.chat_id),
-            "turn_id": str(message.turn_id.value),
+            "request_id": str(message.request_id),
             "sender": message.sender.value,
             "content": content,
             "sent_at": sent_at,

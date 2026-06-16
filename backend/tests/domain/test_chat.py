@@ -11,12 +11,12 @@ from src.domain.exceptions.chat_exception import (
     InvalidSessionIdError,
     MessageSentAtOutOfOrderError,
 )
-from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
 
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 ANSWERED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
@@ -75,18 +75,18 @@ def test_chat_message_rejects_non_uuid_chat_id() -> None:
     with pytest.raises(InvalidChatIdError):
         ChatMessage(  # type: ignore[arg-type]
             "chat-1",
-            ChatTurnId.generate(),
+            REQUEST_ID,
             MessageSender.USER,
             Prompt("question"),
             ANSWERED_AT,
         )
 
 
-def test_chat_message_rejects_invalid_turn_id() -> None:
+def test_chat_message_rejects_invalid_request_id() -> None:
     with pytest.raises(InvalidChatTurnError):
         ChatMessage(  # type: ignore[arg-type]
             CHAT_ID,
-            "turn-1",
+            "request-1",
             MessageSender.USER,
             Prompt("question"),
             ANSWERED_AT,
@@ -97,7 +97,7 @@ def test_chat_message_rejects_naive_sent_at() -> None:
     with pytest.raises(ValueError, match="sent_at must be timezone-aware"):
         ChatMessage(
             CHAT_ID,
-            ChatTurnId.generate(),
+            REQUEST_ID,
             MessageSender.USER,
             Prompt("question"),
             datetime(2026, 1, 1),
@@ -116,7 +116,13 @@ def test_chat_message_rejects_content_for_wrong_sender(
     content: Prompt | str,
 ) -> None:
     with pytest.raises(InvalidMessageSenderError):
-        ChatMessage(CHAT_ID, ChatTurnId.generate(), sender, content, ANSWERED_AT)
+        ChatMessage(
+            CHAT_ID,
+            REQUEST_ID,
+            sender,
+            content,
+            ANSWERED_AT,
+        )
 
 
 def _message_pair(
@@ -124,22 +130,31 @@ def _message_pair(
     user_sent_at: datetime,
     llm_sent_at: datetime,
 ) -> tuple[ChatMessage, ChatMessage]:
-    turn_id = ChatTurnId.generate()
     return (
         ChatMessage(
-            chat_id, turn_id, MessageSender.USER, Prompt("question"), user_sent_at
+            chat_id,
+            REQUEST_ID,
+            MessageSender.USER,
+            Prompt("question"),
+            user_sent_at,
         ),
-        ChatMessage(chat_id, turn_id, MessageSender.LLM, "answer", llm_sent_at),
+        ChatMessage(
+            chat_id,
+            REQUEST_ID,
+            MessageSender.LLM,
+            "answer",
+            llm_sent_at,
+        ),
     )
 
 
-def test_started_turn_requires_matching_turn_id() -> None:
+def test_started_turn_requires_matching_request_id() -> None:
     answered_at = ANSWERED_AT
     chat = _chat()
     user_message, llm_message = _message_pair(CHAT_ID, answered_at, answered_at)
     llm_message = ChatMessage(
         llm_message.chat_id,
-        ChatTurnId.generate(),
+        UUID("019ecde4-0000-7000-8000-000000000002"),
         llm_message.sender,
         llm_message.content,
         llm_message.sent_at,
@@ -147,10 +162,6 @@ def test_started_turn_requires_matching_turn_id() -> None:
 
     with pytest.raises(InvalidChatTurnError):
         chat.validate_started_turn(user_message=user_message, llm_message=llm_message)
-
-
-def test_chat_turn_id_generate_uses_uuid7() -> None:
-    assert ChatTurnId.generate().value.version == 7
 
 
 def test_started_turn_rejects_user_message_after_llm_answer() -> None:

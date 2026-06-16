@@ -13,7 +13,6 @@ from src.domain.entities.chat.chat import ChatMessage
 from src.domain.repositories.chat_command_repository_protocol import (
     ChatCommandRepositoryProtocol,
 )
-from src.domain.value_objects.chat.chat_turn_id import ChatTurnId
 from src.domain.value_objects.chat.message_sender import MessageSender
 from src.domain.value_objects.chat.prompt import Prompt
 
@@ -49,17 +48,16 @@ class ContinueChatUseCase:
             chat.session_id, prompt.value
         )
         answered_at = self._now()
-        turn_id = ChatTurnId.generate()
         user_message = ChatMessage(
             chat_id=chat.chat_id,
-            turn_id=turn_id,
+            request_id=command.request_id,
             sender=MessageSender.USER,
             content=prompt,
             sent_at=user_sent_at,
         )
         llm_message = ChatMessage(
             chat_id=chat.chat_id,
-            turn_id=turn_id,
+            request_id=command.request_id,
             sender=MessageSender.LLM,
             content=generated.answer,
             sent_at=answered_at,

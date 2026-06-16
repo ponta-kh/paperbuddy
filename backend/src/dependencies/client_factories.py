@@ -22,12 +22,6 @@ def create_dynamodb_client(settings: Settings) -> Any:
     return boto3.client("dynamodb", **client_options)
 
 
-def create_local_dynamodb_client(settings: Settings) -> Any:
-    if not settings.is_local_mode:
-        raise ValueError("Local DynamoDB initialization requires local mode")
-    return create_dynamodb_client(settings)
-
-
 def create_chat_generation_client(settings: Settings) -> ChatGenerationClientProtocol:
     if settings.is_local_mode:
         return SimulatedChatGenerationClient(

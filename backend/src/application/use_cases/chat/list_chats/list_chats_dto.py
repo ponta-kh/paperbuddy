@@ -9,6 +9,7 @@ class ListChatsInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     user_id: UUID
+    request_id: UUID
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,6 +10,7 @@ class RenameChatInput(BaseModel):
     user_id: UUID
     chat_id: UUID
     title: str
+    request_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
