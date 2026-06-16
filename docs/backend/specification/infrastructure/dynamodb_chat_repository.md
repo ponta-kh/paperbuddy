@@ -111,20 +111,20 @@
 - 内部出力への変換: 成功時は戻り値なし
 - 制約: 複数バッチにまたがる削除は原子的ではない
 
-日時はUTCへ変換したISO 8601文字列として保存する。メッセージのソートキー末尾には、同一発信日時でもユーザー、LLMの順序になる発信者順序を含める。
+日時はUTCへ変換したISO 8601文字列として保存する。メッセージ履歴は同一発信日時でもユーザー、LLMの順序で取得できることを保証する。
 
-## 例外変換
+## エラー変換
 
-| 外部・実装固有の失敗 | 契約上の例外 | 備考 |
+| 外部・実装固有の失敗 | 契約上のエラー | 備考 |
 | --- | --- | --- |
 | 初回保存の条件違反またはその他の`ClientError` | `ChatSaveError` | いずれの項目も保存しない |
 | 継続保存のトランザクション条件違反 | `ChatConflictError` | 更新バージョン競合またはメッセージ重複 |
 | 継続保存のその他の`ClientError` | `ChatSaveError` | いずれの項目も保存しない |
-| 継続対象取得の`ClientError` | `ChatLoadError` | SDK例外を外部へ漏らさない |
-| Query操作の`ClientError` | `RepositoryAccessError` | SDK例外を外部へ漏らさない |
+| 継続対象取得の`ClientError` | `ChatLoadError` | SDKエラーを外部へ漏らさない |
+| Query操作の`ClientError` | `RepositoryAccessError` | SDKエラーを外部へ漏らさない |
 | タイトル更新の条件違反 | `ChatNotFoundError` | 項目なしまたは所有ユーザー不一致 |
-| タイトル更新のその他の`ClientError` | `ChatTitleUpdateError` | SDK例外を外部へ漏らさない |
-| 削除Query・BatchWriteの`ClientError`または未処理項目 | `ChatDeleteError` | SDK例外を外部へ漏らさない |
+| タイトル更新のその他の`ClientError` | `ChatTitleUpdateError` | SDKエラーを外部へ漏らさない |
+| 削除Query・BatchWriteの`ClientError`または未処理項目 | `ChatDeleteError` | SDKエラーを外部へ漏らさない |
 | 削除対象の項目なしまたは所有ユーザー不一致 | `ChatNotFoundError` | 対象の存在を他ユーザーへ開示しない |
 
 ## 該当データなし
@@ -158,7 +158,7 @@
 
 - 正常系: 各Domain型・読み取りモデルとDynamoDB項目の相互変換、トランザクション書き込み、取得順序
 - 境界値: 0件、同一発信日時のユーザー・LLMメッセージ、更新バージョン0と1
-- 異常系: 該当データなし、所有ユーザー不一致、楽観排他競合、SDK例外変換
+- 異常系: 該当データなし、所有ユーザー不一致、楽観排他競合、SDKエラー変換
 
 ## 関連仕様書
 

@@ -37,9 +37,9 @@
 - `s3_uploaded_at` と `rag_indexed_at` はタイムゾーン付き日時に変換する
 - `rag_indexed_at` が存在しない場合は `null` とする
 
-## 6. 例外変換
+## 6. エラー変換
 
-- DynamoDBのクライアント例外は `RepositoryAccessError` に変換する
+- DynamoDBのクライアントエラーは `RepositoryAccessError` に変換する
 - 取得件数が0件の場合は `RepositoryNotFoundError` を送出する
 - 変換不能なレスポンスは `RepositoryAccessError` に変換する
 
@@ -47,5 +47,4 @@
 
 - 正常系: 1件、複数件、ページネーションあり
 - 代替系: 0件
-- 異常系: クライアント例外、属性欠落、型不整合
-
+- 異常系: クライアントエラー、属性欠落、型不整合

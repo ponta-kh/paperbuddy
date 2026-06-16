@@ -52,6 +52,8 @@ class DynamoDbIndexedFileCatalog:
             if last_evaluated_key is None:
                 return items
 
+            # ライブラリ一覧はポート契約上ページを持たないため、
+            # DynamoDBの全ページを集約する。
             scan_kwargs["ExclusiveStartKey"] = last_evaluated_key
 
     @staticmethod
@@ -80,6 +82,8 @@ class DynamoDbIndexedFileCatalog:
     def _parse_datetime(value: Any) -> datetime:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         if parsed.tzinfo is None:
+            # 既存データにタイムゾーンがない場合も、
+            # 外側へはタイムゾーン付き日時だけを返す。
             return parsed.replace(tzinfo=timezone.utc)
         return parsed
 

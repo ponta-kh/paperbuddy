@@ -275,6 +275,8 @@ class _DynamoDbChatRepositoryOperations:
             last_evaluated_key = response.get("LastEvaluatedKey")
             if last_evaluated_key is None:
                 return items
+            # 呼び出し側へDynamoDBのページ境界を見せず、
+            # ポート契約上は全件取得として扱う。
             request["ExclusiveStartKey"] = last_evaluated_key
 
     @classmethod
@@ -298,6 +300,8 @@ class _DynamoDbChatRepositoryOperations:
 
     @classmethod
     def _message_item(cls, message: ChatMessage) -> dict[str, Any]:
+        # 同一発信日時でも履歴取得時に、
+        # ユーザー発信、LLM回答の順になるようにする。
         sender_order = "0" if message.sender.value == "user" else "1"
         sent_at = cls._format_datetime(message.sent_at)
         content = (
