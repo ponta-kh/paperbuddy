@@ -82,6 +82,17 @@ def test_chat_message_rejects_non_uuid_chat_id() -> None:
         )
 
 
+def test_chat_message_rejects_invalid_turn_id() -> None:
+    with pytest.raises(InvalidChatTurnError):
+        ChatMessage(  # type: ignore[arg-type]
+            CHAT_ID,
+            "turn-1",
+            MessageSender.USER,
+            Prompt("question"),
+            ANSWERED_AT,
+        )
+
+
 def test_chat_message_rejects_naive_sent_at() -> None:
     with pytest.raises(ValueError, match="sent_at must be timezone-aware"):
         ChatMessage(

@@ -15,4 +15,6 @@ class Prompt:
             raise InvalidPromptError
         if len(normalized) > MAX_PROMPT_LENGTH:
             raise PromptTooLongError
+        # frozenなValue Objectとして扱うため、
+        # 生成時だけ正規化後の値に差し替える。
         object.__setattr__(self, "value", normalized)

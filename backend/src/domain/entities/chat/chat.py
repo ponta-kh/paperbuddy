@@ -23,8 +23,12 @@ class ChatMessage:
     sent_at: datetime
 
     def __post_init__(self) -> None:
+        # ChatMessageは保存後に更新しない前提のため、
+        # 生成時にターンID、発信者、内容の対応を確定する。
         if not isinstance(self.chat_id, UUID):
             raise InvalidChatIdError
+        if not isinstance(self.turn_id, ChatTurnId):
+            raise InvalidChatTurnError
         if self.sent_at.tzinfo is None:
             raise ValueError("sent_at must be timezone-aware")
         if self.sender is MessageSender.USER and not isinstance(self.content, Prompt):
@@ -59,6 +63,8 @@ class Chat:
             raise InvalidSessionIdError
         if answered_at.tzinfo is None:
             raise ValueError("answered_at must be timezone-aware")
+        # 初回回答日時を作成日時と最終更新日時の単一の基準にし、
+        # 初期状態の時刻ずれを防ぐ。
         return cls(
             chat_id=chat_id,
             session_id=session_id,
@@ -95,6 +101,8 @@ class Chat:
             raise MessageSentAtOutOfOrderError
         if llm_message.sent_at < user_message.sent_at:
             raise MessageSentAtOutOfOrderError
+        # 保存前にDomain内で次バージョンへ進め、
+        # Repositoryの楽観排他条件に使える状態にする。
         self.last_updated_at = llm_message.sent_at
         self.version += 1
 
@@ -104,6 +112,8 @@ class Chat:
         user_message: ChatMessage,
         llm_message: ChatMessage,
     ) -> None:
+        # 初回開始と継続会話で同じターン構成チェックを使い、
+        # 検証条件のずれを避ける。
         if (
             user_message.chat_id != self.chat_id
             or llm_message.chat_id != self.chat_id
