@@ -1,7 +1,11 @@
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 
 from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationConfigurationError,
+    ChatGenerationPermissionDeniedError,
+    ChatGenerationRateLimitError,
+    ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
 )
@@ -54,6 +58,13 @@ def _client(
     )
 
 
+def _client_error(code: str, message: str = "bedrock error") -> ClientError:
+    return ClientError(
+        {"Error": {"Code": code, "Message": message}},
+        "RetrieveAndGenerate",
+    )
+
+
 @pytest.mark.asyncio
 async def test_start_chat_generates_answer_and_title() -> None:
     knowledge_base = StubKnowledgeBaseClient(
@@ -86,11 +97,11 @@ async def test_start_chat_generates_answer_and_title() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_chat_uses_fallback_when_title_generation_fails() -> None:
+async def test_start_chat_uses_fallback_when_title_generation_is_unavailable() -> None:
     knowledge_base = StubKnowledgeBaseClient(
         {"sessionId": "session-1", "output": {"text": "answer"}}
     )
-    model = StubModelClient(error=RuntimeError("title generation failed"))
+    model = StubModelClient(error=EndpointConnectionError(endpoint_url="bedrock"))
 
     result = await _client(knowledge_base, model).start_chat("1234567890abcdef")
 
@@ -98,22 +109,48 @@ async def test_start_chat_uses_fallback_when_title_generation_fails() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_chat_logs_sdk_error_without_prompt(
+async def test_start_chat_raises_permission_denied_for_access_denied(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    knowledge_base = StubKnowledgeBaseClient(error=_client_error("AccessDeniedException"))
+    model = StubModelClient({"output": {"message": {"content": [{"text": "title"}]}}})
+
+    with pytest.raises(ChatGenerationPermissionDeniedError):
+        await _client(knowledge_base, model).start_chat("秘密の質問")
+
+    record = caplog.records[0]
+    assert record.event == "bedrock_knowledge_base_permission_denied"
+    assert record.error_code == "AccessDeniedException"
+    assert "秘密の質問" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_start_chat_raises_rate_limit_for_throttling() -> None:
+    knowledge_base = StubKnowledgeBaseClient(error=_client_error("ThrottlingException"))
+    model = StubModelClient({"output": {"message": {"content": [{"text": "title"}]}}})
+
+    with pytest.raises(ChatGenerationRateLimitError):
+        await _client(knowledge_base, model).start_chat("question")
+
+
+@pytest.mark.asyncio
+async def test_start_chat_raises_configuration_error_for_invalid_request() -> None:
+    knowledge_base = StubKnowledgeBaseClient(error=_client_error("ValidationException"))
+    model = StubModelClient({"output": {"message": {"content": [{"text": "title"}]}}})
+
+    with pytest.raises(ChatGenerationConfigurationError):
+        await _client(knowledge_base, model).start_chat("question")
+
+
+@pytest.mark.asyncio
+async def test_start_chat_raises_unavailable_for_connection_error() -> None:
     knowledge_base = StubKnowledgeBaseClient(
-        error=ClientError(
-            {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
-            "RetrieveAndGenerate",
-        )
+        error=EndpointConnectionError(endpoint_url="bedrock")
     )
     model = StubModelClient({"output": {"message": {"content": [{"text": "title"}]}}})
 
     with pytest.raises(ChatGenerationUnavailableError):
-        await _client(knowledge_base, model).start_chat("秘密の質問")
-
-    assert "AccessDeniedException" in caplog.text
-    assert "秘密の質問" not in caplog.text
+        await _client(knowledge_base, model).start_chat("question")
 
 
 @pytest.mark.asyncio
@@ -191,4 +228,24 @@ async def test_continue_chat_rejects_changed_session_id() -> None:
     model = StubModelClient()
 
     with pytest.raises(InvalidChatGenerationResponseError):
+        await _client(knowledge_base, model).continue_chat("session-1", "next question")
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_raises_session_unavailable_for_validation_error() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        error=_client_error("ValidationException", "Session is expired")
+    )
+    model = StubModelClient()
+
+    with pytest.raises(ChatGenerationSessionUnavailableError):
+        await _client(knowledge_base, model).continue_chat("session-1", "next question")
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_raises_configuration_error_for_non_session_validation() -> None:
+    knowledge_base = StubKnowledgeBaseClient(error=_client_error("ValidationException"))
+    model = StubModelClient()
+
+    with pytest.raises(ChatGenerationConfigurationError):
         await _client(knowledge_base, model).continue_chat("session-1", "next question")

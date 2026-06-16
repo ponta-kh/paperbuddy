@@ -88,7 +88,7 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
-| `ChatGenerationClientProtocol` | `start_chat` | 整形済みプロンプトからチャットを開始し、検証済みのセッションID、AI回答、タイトルを取得する | `ChatGenerationUnavailableError`, `InvalidChatGenerationResponseError` |
+| `ChatGenerationClientProtocol` | `start_chat` | 整形済みプロンプトからチャットを開始し、検証済みのセッションID、AI回答、タイトルを取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `InvalidChatGenerationResponseError` |
 | `ChatCommandRepositoryProtocol` | `save_started_chat` | チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError` |
 
 ## 9. 基本フロー
@@ -146,6 +146,9 @@ flowchart TD
 | `InvalidPromptError` | 一般的な前後空白を除去した後の`prompt`が空文字 | チャット生成サービスを呼び出さず、永続化しない | 例外を送出する |
 | `PromptTooLongError` | 一般的な前後空白を除去した後の`prompt`が1,000文字を超える | チャット生成サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatGenerationUnavailableError` | チャット生成サービスのタイムアウト、接続障害、サービス障害などにより応答を取得できない | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
+| `ChatGenerationRateLimitError` | チャット生成サービスのレート制限またはクォータ制限により応答を取得できない | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
+| `ChatGenerationPermissionDeniedError` | チャット生成サービスの呼び出し権限が不足している | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
+| `ChatGenerationConfigurationError` | チャット生成サービスの設定またはリクエスト構成が不正で応答を取得できない | 永続化しない。チャット生成サービス側でチャットが作成された可能性は残る | 例外を送出する |
 | `InvalidChatGenerationResponseError` | セッションID、AI回答、タイトルを有効な応答として扱えない | 永続化しない。チャット生成サービス側で作成されたチャットは取り消せない | 例外を送出する |
 | `InvalidSessionIdError` | チャット生成サービスから取得したセッションIDが空文字または空白文字のみ | 永続化しない | 例外を送出する |
 | `InvalidChatTurnError` | 初回のユーザー・LLMメッセージの`chat_id`または`request_id`が一致しない | 永続化しない | 例外を送出する |
@@ -176,10 +179,11 @@ flowchart TD
 
 ## 15. テスト観点
 
-- 正常系: TRIM後に1文字、一般的な長さ、1,000文字となるプロンプトでチャットを開始し、チャット本体と初回2メッセージを保存できる
-- 境界値: TRIM後の空文字、1文字、1,000文字、1,001文字、および前後に空白文字を持つプロンプトを検証する
+- 正常系: 一般的な長さ、1,000文字となるプロンプトでチャットを開始し、チャット本体と初回2メッセージを保存できる
+- 境界値: TRIM後の空文字、1,000文字、1,001文字
+- 同値クラス: 前後に空白文字を持つプロンプト
 - 代替系: 該当なし
-- 異常系: Domainルール違反、チャット生成サービス利用不可、不正なチャット生成応答、初回ターン不整合、発信順序違反、永続化失敗を検証する
+- 異常系: Domainルール違反、チャット生成サービス利用不可、レート制限、権限不足、設定不備、不正なチャット生成応答、初回ターン不整合、発信順序違反、永続化失敗を検証する
 - トランザクション: 正常終了時にチャット本体と初回2メッセージがコミットされ、いずれかの永続化失敗時にすべてのローカル変更がロールバックされることを検証する
 - LLM・RAG: チャット生成サービス呼び出しはスタブまたはモックへ差し替え、TRIM済みプロンプトのみが送信されることと、応答スキーマを検証する
 

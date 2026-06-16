@@ -6,6 +6,10 @@ from typing import Any
 from botocore.exceptions import BotoCoreError, ClientError
 
 from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationConfigurationError,
+    ChatGenerationPermissionDeniedError,
+    ChatGenerationRateLimitError,
+    ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     ContinueGeneratedChatResult,
     InvalidChatGenerationResponseError,
@@ -13,6 +17,29 @@ from src.application.ports.out.chat_generation_client_protocol import (
 )
 
 logger = logging.getLogger(__name__)
+
+_RATE_LIMIT_ERROR_CODES = {
+    "ThrottlingException",
+    "TooManyRequestsException",
+    "ServiceQuotaExceededException",
+}
+_PERMISSION_ERROR_CODES = {
+    "AccessDeniedException",
+    "AccessDenied",
+    "UnauthorizedException",
+}
+_CONFIGURATION_ERROR_CODES = {
+    "ResourceNotFoundException",
+    "ValidationException",
+    "ConflictException",
+}
+_UNAVAILABLE_CLIENT_ERROR_CODES = {
+    "BadGatewayException",
+    "DependencyFailedException",
+    "InternalServerException",
+    "ModelTimeoutException",
+    "ServiceUnavailableException",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +94,20 @@ class BedrockKnowledgeBaseChatClient:
                     },
                 },
             )
-        except (BotoCoreError, ClientError) as error:
-            logger.exception("Bedrock Knowledge Baseによる回答生成に失敗しました")
+        except ClientError as error:
+            self._raise_client_error(
+                error,
+                operation="start_chat",
+                validation_error=ChatGenerationConfigurationError,
+            )
+        except BotoCoreError as error:
+            logger.exception(
+                "Bedrock Knowledge Baseへの接続に失敗しました",
+                extra={
+                    "event": "bedrock_knowledge_base_unavailable",
+                    "operation": "start_chat",
+                },
+            )
             raise ChatGenerationUnavailableError from error
 
         try:
@@ -80,6 +119,10 @@ class BedrockKnowledgeBaseChatClient:
             ):
                 raise ValueError
         except (KeyError, TypeError, ValueError) as error:
+            logger.warning(
+                "Bedrock Knowledge Baseの回答生成レスポンスが不正です",
+                extra={"event": "bedrock_knowledge_base_invalid_response"},
+            )
             raise InvalidChatGenerationResponseError from error
 
         return _KnowledgeBaseChatResult(session_id=session_id, answer=answer)
@@ -100,8 +143,20 @@ class BedrockKnowledgeBaseChatClient:
                 },
                 sessionId=session_id,
             )
-        except (BotoCoreError, ClientError) as error:
-            logger.exception("Bedrock Knowledge Baseによる継続回答生成に失敗しました")
+        except ClientError as error:
+            self._raise_client_error(
+                error,
+                operation="continue_chat",
+                validation_error=ChatGenerationSessionUnavailableError,
+            )
+        except BotoCoreError as error:
+            logger.exception(
+                "Bedrock Knowledge Baseへの接続に失敗しました",
+                extra={
+                    "event": "bedrock_knowledge_base_unavailable",
+                    "operation": "continue_chat",
+                },
+            )
             raise ChatGenerationUnavailableError from error
 
         try:
@@ -114,6 +169,10 @@ class BedrockKnowledgeBaseChatClient:
             ):
                 raise ValueError
         except (KeyError, TypeError, ValueError) as error:
+            logger.warning(
+                "Bedrock Knowledge Baseの継続回答生成レスポンスが不正です",
+                extra={"event": "bedrock_knowledge_base_invalid_continue_response"},
+            )
             raise InvalidChatGenerationResponseError from error
 
         return _KnowledgeBaseChatResult(session_id=returned_session_id, answer=answer)
@@ -144,11 +203,121 @@ class BedrockKnowledgeBaseChatClient:
     async def _generate_title_or_fallback(self, prompt: str) -> str:
         try:
             return await self._generate_title(prompt)
-        except BotoCoreError, ClientError, InvalidChatGenerationResponseError:
+        except ClientError as error:
+            logger.warning(
+                "Bedrockによるタイトル生成に失敗したためフォールバックします",
+                extra={
+                    "event": "bedrock_title_generation_client_error",
+                    "error_code": self._client_error_code(error),
+                },
+            )
             return self._fallback_title(prompt)
-        except Exception:
+        except BotoCoreError:
+            logger.warning(
+                "Bedrockによるタイトル生成に接続できないためフォールバックします",
+                extra={"event": "bedrock_title_generation_unavailable"},
+                exc_info=True,
+            )
+            return self._fallback_title(prompt)
+        except InvalidChatGenerationResponseError:
+            logger.warning(
+                "Bedrockのタイトル生成レスポンスが不正なためフォールバックします",
+                extra={"event": "bedrock_title_generation_invalid_response"},
+                exc_info=True,
+            )
             return self._fallback_title(prompt)
 
     @staticmethod
     def _fallback_title(prompt: str) -> str:
         return f"{prompt[:10]}..."
+
+    @staticmethod
+    def _client_error_code(error: ClientError) -> str:
+        code = error.response.get("Error", {}).get("Code")
+        if isinstance(code, str) and code:
+            return code
+        return "Unknown"
+
+    @staticmethod
+    def _client_error_message(error: ClientError) -> str:
+        message = error.response.get("Error", {}).get("Message")
+        if isinstance(message, str):
+            return message
+        return ""
+
+    @classmethod
+    def _raise_client_error(
+        cls,
+        error: ClientError,
+        *,
+        operation: str,
+        validation_error: type[Exception],
+    ) -> None:
+        error_code = cls._client_error_code(error)
+        if error_code in _RATE_LIMIT_ERROR_CODES:
+            logger.warning(
+                "Bedrock Knowledge Baseの呼び出しが制限されました",
+                extra={
+                    "event": "bedrock_knowledge_base_rate_limited",
+                    "operation": operation,
+                    "error_code": error_code,
+                },
+            )
+            raise ChatGenerationRateLimitError from error
+        if error_code in _PERMISSION_ERROR_CODES:
+            logger.exception(
+                "Bedrock Knowledge Baseの呼び出し権限がありません",
+                extra={
+                    "event": "bedrock_knowledge_base_permission_denied",
+                    "operation": operation,
+                    "error_code": error_code,
+                },
+            )
+            raise ChatGenerationPermissionDeniedError from error
+        if (
+            error_code == "ValidationException"
+            and validation_error is ChatGenerationSessionUnavailableError
+            and "session" in cls._client_error_message(error).lower()
+        ):
+            logger.warning(
+                "Bedrock Knowledge Baseのセッションを継続できません",
+                extra={
+                    "event": "bedrock_knowledge_base_session_unavailable",
+                    "operation": operation,
+                    "error_code": error_code,
+                },
+            )
+            raise ChatGenerationSessionUnavailableError from error
+        if error_code in _CONFIGURATION_ERROR_CODES:
+            logger.exception(
+                "Bedrock Knowledge Baseの呼び出し設定が不正です",
+                extra={
+                    "event": "bedrock_knowledge_base_configuration_error",
+                    "operation": operation,
+                    "error_code": error_code,
+                },
+            )
+            if validation_error is ChatGenerationSessionUnavailableError:
+                raise ChatGenerationConfigurationError from error
+            raise validation_error from error
+
+        if error_code in _UNAVAILABLE_CLIENT_ERROR_CODES:
+            logger.exception(
+                "Bedrock Knowledge Baseが利用できません",
+                extra={
+                    "event": "bedrock_knowledge_base_unavailable",
+                    "operation": operation,
+                    "error_code": error_code,
+                },
+            )
+            raise ChatGenerationUnavailableError from error
+
+        logger.exception(
+            "Bedrock Knowledge Baseによる回答生成に失敗しました",
+            extra={
+                "event": "bedrock_knowledge_base_unavailable",
+                "operation": operation,
+                "error_code": error_code,
+            },
+        )
+        raise ChatGenerationUnavailableError from error

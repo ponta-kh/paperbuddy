@@ -5,6 +5,8 @@ import pytest
 
 from src.domain.entities.chat.chat import Chat, ChatMessage
 from src.domain.exceptions.chat_exception import (
+    ChatContinuationExpiredError,
+    ChatOwnershipMismatchError,
     InvalidChatIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
@@ -16,6 +18,7 @@ from src.domain.value_objects.chat.prompt import Prompt
 
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 ANSWERED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -69,6 +72,19 @@ def test_chat_create_sets_initial_state() -> None:
     assert chat.created_at == ANSWERED_AT
     assert chat.last_updated_at == ANSWERED_AT
     assert chat.version == 0
+
+
+def test_chat_accepts_owner() -> None:
+    chat = _chat()
+
+    chat.ensure_owned_by(USER_ID)
+
+
+def test_chat_rejects_owner_mismatch() -> None:
+    chat = _chat()
+
+    with pytest.raises(ChatOwnershipMismatchError):
+        chat.ensure_owned_by(OTHER_USER_ID)
 
 
 def test_chat_message_rejects_non_uuid_chat_id() -> None:
@@ -208,6 +224,26 @@ def test_record_exchange_updates_last_updated_at_and_version() -> None:
 
     assert chat.last_updated_at == next_answered_at
     assert chat.version == 1
+
+
+def test_chat_allows_continuation_at_24_hours_boundary() -> None:
+    chat = _chat()
+
+    chat.ensure_continuable_at(ANSWERED_AT + timedelta(hours=24))
+
+
+def test_chat_rejects_continuation_after_24_hours_boundary() -> None:
+    chat = _chat()
+
+    with pytest.raises(ChatContinuationExpiredError):
+        chat.ensure_continuable_at(ANSWERED_AT + timedelta(hours=24, seconds=1))
+
+
+def test_chat_rejects_naive_continuation_time() -> None:
+    chat = _chat()
+
+    with pytest.raises(ValueError, match="requested_at must be timezone-aware"):
+        chat.ensure_continuable_at(datetime(2026, 1, 2))
 
 
 def test_record_exchange_rejects_user_message_before_last_update() -> None:

@@ -59,12 +59,12 @@ class _DynamoDbChatRepositoryOperations:
         except ClientError as error:
             raise ChatSaveError from error
 
-    async def get_chat_for_continuation(self, *, chat_id: UUID, user_id: UUID) -> Chat:
+    async def get_chat(self, *, chat_id: UUID) -> Chat:
         try:
             item = await self._get_chat_item(chat_id)
         except ClientError as error:
             raise ChatLoadError from error
-        if item is None or item["user_id"] != str(user_id):
+        if item is None:
             raise ChatNotFoundError
         return self._to_chat(item)
 
@@ -385,11 +385,8 @@ class DynamoDbChatCommandRepository(_DynamoDbChatRepository):
     ) -> None:
         await self._operations.save_started_chat(chat, user_message, llm_message)
 
-    async def get_chat_for_continuation(self, *, chat_id: UUID, user_id: UUID) -> Chat:
-        return await self._operations.get_chat_for_continuation(
-            chat_id=chat_id,
-            user_id=user_id,
-        )
+    async def get_chat(self, *, chat_id: UUID) -> Chat:
+        return await self._operations.get_chat(chat_id=chat_id)
 
     async def save_exchange(
         self,

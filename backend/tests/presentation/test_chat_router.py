@@ -9,6 +9,10 @@ from src.application.exceptions import (
     RepositoryAccessError,
     RepositoryNotFoundError,
 )
+from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationConfigurationError,
+    ChatGenerationRateLimitError,
+)
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
     ContinueChatOutput,
 )
@@ -96,6 +100,16 @@ class StubExpiredContinueChatUseCase:
 class StubConflictContinueChatUseCase:
     async def execute(self, command: object) -> ContinueChatOutput:
         raise ChatConflictError
+
+
+class StubRateLimitedStartChatUseCase:
+    async def execute(self, command: object) -> StartChatOutput:
+        raise ChatGenerationRateLimitError
+
+
+class StubConfigurationErrorStartChatUseCase:
+    async def execute(self, command: object) -> StartChatOutput:
+        raise ChatGenerationConfigurationError
 
 
 class StubListChatsUseCase:
@@ -376,3 +390,35 @@ def test_start_chat_endpoint_rejects_missing_authentication() -> None:
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_failed"
     assert called
+
+
+def test_start_chat_endpoint_returns_too_many_requests_when_generation_rate_limited() -> None:
+    app.dependency_overrides[get_start_chat_use_case] = lambda: (
+        StubRateLimitedStartChatUseCase()
+    )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/chats", json={"prompt": "question"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 429
+    assert response.json()["code"] == "chat_generation_rate_limited"
+
+
+def test_start_chat_endpoint_returns_unavailable_when_generation_config_is_invalid() -> None:
+    app.dependency_overrides[get_start_chat_use_case] = lambda: (
+        StubConfigurationErrorStartChatUseCase()
+    )
+    app.dependency_overrides[get_authenticated_user] = lambda: AuthenticatedUser(
+        user_id=USER_ID
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/chats", json={"prompt": "question"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 503
+    assert response.json()["code"] == "chat_generation_configuration_error"

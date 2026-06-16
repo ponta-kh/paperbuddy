@@ -113,12 +113,12 @@ async def test_save_started_chat_converts_client_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_chat_for_continuation_returns_domain_entity() -> None:
+async def test_get_chat_returns_domain_entity() -> None:
     client = Mock()
     repository = DynamoDbChatRepository(client, table_name="chat-table")
     client.get_item.return_value = {"Item": _serialized_chat_item(repository)}
 
-    chat = await repository.get_chat_for_continuation(chat_id=CHAT_ID, user_id=USER_ID)
+    chat = await repository.get_chat(chat_id=CHAT_ID)
 
     assert chat.chat_id == CHAT_ID
     assert chat.session_id == "session-1"
@@ -129,42 +129,41 @@ async def test_get_chat_for_continuation_returns_domain_entity() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "response",
-    [
-        {},
-        pytest.param(
-            {
-                "Item": DynamoDbChatRepository._serialize(
-                    {
-                        **DynamoDbChatRepository._chat_item(_chat()),
-                        "user_id": str(OTHER_USER_ID),
-                    }
-                )
-            },
-            id="other-user",
-        ),
-    ],
-)
-async def test_get_chat_for_continuation_hides_missing_or_other_users_chat(
-    response: dict[str, object],
-) -> None:
+async def test_get_chat_raises_not_found_when_missing() -> None:
     client = Mock()
-    client.get_item.return_value = response
+    client.get_item.return_value = {}
     repository = DynamoDbChatRepository(client, table_name="chat-table")
 
     with pytest.raises(ChatNotFoundError):
-        await repository.get_chat_for_continuation(chat_id=CHAT_ID, user_id=USER_ID)
+        await repository.get_chat(chat_id=CHAT_ID)
 
 
 @pytest.mark.asyncio
-async def test_get_chat_for_continuation_converts_client_error() -> None:
+async def test_get_chat_returns_other_users_chat_without_owner_decision() -> None:
+    client = Mock()
+    repository = DynamoDbChatRepository(client, table_name="chat-table")
+    client.get_item.return_value = {
+        "Item": DynamoDbChatRepository._serialize(
+            {
+                **DynamoDbChatRepository._chat_item(_chat()),
+                "user_id": str(OTHER_USER_ID),
+            }
+        )
+    }
+
+    chat = await repository.get_chat(chat_id=CHAT_ID)
+
+    assert chat.user_id == OTHER_USER_ID
+
+
+@pytest.mark.asyncio
+async def test_get_chat_converts_client_error() -> None:
     client = Mock()
     client.get_item.side_effect = _client_error("InternalServerError")
     repository = DynamoDbChatRepository(client, table_name="chat-table")
 
     with pytest.raises(ChatLoadError):
-        await repository.get_chat_for_continuation(chat_id=CHAT_ID, user_id=USER_ID)
+        await repository.get_chat(chat_id=CHAT_ID)
 
 
 @pytest.mark.asyncio

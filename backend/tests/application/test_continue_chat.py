@@ -8,6 +8,8 @@ import pytest
 from src.application.exceptions import ChatContinuationExpiredError
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
+    ChatGenerationRateLimitError,
+    ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     ContinueGeneratedChatResult,
 )
@@ -25,28 +27,29 @@ from src.domain.repositories.chat_command_repository_protocol import (
 )
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
-def _chat(answered_at: datetime) -> Chat:
+def _chat(answered_at: datetime, user_id: UUID = USER_ID) -> Chat:
     return Chat.create(
         chat_id=CHAT_ID,
         session_id="session-1",
         title="existing title",
-        user_id=USER_ID,
+        user_id=user_id,
         answered_at=answered_at,
     )
 
 
 @pytest.mark.asyncio
-async def test_continue_chat_saves_exchange_before_24_hours() -> None:
+async def test_continue_chat_saves_exchange_at_24_hours_boundary() -> None:
     last_updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    user_sent_at = last_updated_at + timedelta(hours=24) - timedelta(microseconds=1)
+    user_sent_at = last_updated_at + timedelta(hours=24)
     answered_at = user_sent_at + timedelta(seconds=1)
     chat = _chat(last_updated_at)
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.return_value = chat
+    repository.get_chat.return_value = chat
     client = AsyncMock(spec=ChatGenerationClientProtocol)
     client.continue_chat.return_value = ContinueGeneratedChatResult(
         session_id="session-1", answer="new answer"
@@ -75,16 +78,16 @@ async def test_continue_chat_saves_exchange_before_24_hours() -> None:
 
 
 @pytest.mark.asyncio
-async def test_continue_chat_rejects_exactly_24_hours_without_side_effects() -> None:
+async def test_continue_chat_rejects_after_24_hours_boundary_without_side_effects() -> None:
     last_updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     chat = _chat(last_updated_at)
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.return_value = chat
+    repository.get_chat.return_value = chat
     client = AsyncMock(spec=ChatGenerationClientProtocol)
     use_case = ContinueChatUseCase(
         client,
         repository,
-        now=lambda: last_updated_at + timedelta(hours=24),
+        now=lambda: last_updated_at + timedelta(hours=24, seconds=1),
     )
 
     with pytest.raises(ChatContinuationExpiredError):
@@ -109,12 +112,12 @@ async def test_continue_chat_logs_expired_error(
     last_updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     chat = _chat(last_updated_at)
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.return_value = chat
+    repository.get_chat.return_value = chat
     client = AsyncMock(spec=ChatGenerationClientProtocol)
     use_case = ContinueChatUseCase(
         client,
         repository,
-        now=lambda: last_updated_at + timedelta(hours=24),
+        now=lambda: last_updated_at + timedelta(hours=24, seconds=1),
     )
 
     with (
@@ -144,7 +147,29 @@ async def test_continue_chat_logs_expired_error(
 @pytest.mark.asyncio
 async def test_continue_chat_does_not_generate_when_chat_is_not_found() -> None:
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.side_effect = ChatNotFoundError
+    repository.get_chat.side_effect = ChatNotFoundError
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+
+    with pytest.raises(ChatNotFoundError):
+        await ContinueChatUseCase(client, repository).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="next",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    client.continue_chat.assert_not_awaited()
+    repository.save_exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_does_not_generate_when_chat_owner_mismatches() -> None:
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat.return_value = _chat(
+        datetime(2026, 1, 1, tzinfo=timezone.utc), user_id=OTHER_USER_ID
+    )
     client = AsyncMock(spec=ChatGenerationClientProtocol)
 
     with pytest.raises(ChatNotFoundError):
@@ -164,7 +189,7 @@ async def test_continue_chat_does_not_generate_when_chat_is_not_found() -> None:
 @pytest.mark.asyncio
 async def test_continue_chat_does_not_save_when_generation_fails() -> None:
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.return_value = _chat(
+    repository.get_chat.return_value = _chat(
         datetime(2026, 1, 1, tzinfo=timezone.utc)
     )
     client = AsyncMock(spec=ChatGenerationClientProtocol)
@@ -188,6 +213,86 @@ async def test_continue_chat_does_not_save_when_generation_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_continue_chat_treats_unavailable_session_as_expired(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    chat = _chat(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    repository.get_chat.return_value = chat
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+    client.continue_chat.side_effect = ChatGenerationSessionUnavailableError
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(ChatContinuationExpiredError),
+    ):
+        await ContinueChatUseCase(
+            client,
+            repository,
+            now=lambda: datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+        ).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert record.event == "continue_chat_generation_session_unavailable"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert record.chat_id == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_exchange.assert_not_awaited()
+    assert chat.last_updated_at == datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_logs_rate_limit_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat.return_value = _chat(
+        datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+    client.continue_chat.side_effect = ChatGenerationRateLimitError
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(ChatGenerationRateLimitError),
+    ):
+        await ContinueChatUseCase(
+            client,
+            repository,
+            now=lambda: datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+        ).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert record.event == "continue_chat_generation_rate_limited"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert record.chat_id == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_continue_chat_propagates_repository_conflict() -> None:
     times = iter(
         (
@@ -196,7 +301,7 @@ async def test_continue_chat_propagates_repository_conflict() -> None:
         )
     )
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
-    repository.get_chat_for_continuation.return_value = _chat(
+    repository.get_chat.return_value = _chat(
         datetime(2026, 1, 1, tzinfo=timezone.utc)
     )
     repository.save_exchange.side_effect = ChatConflictError

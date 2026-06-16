@@ -7,6 +7,8 @@ import pytest
 
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
+    ChatGenerationConfigurationError,
+    ChatGenerationRateLimitError,
     ChatGenerationUnavailableError,
     StartGeneratedChatResult,
 )
@@ -120,10 +122,64 @@ async def test_start_chat_logs_generation_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "start_chat_generation_failed"
+    assert record.event == "start_chat_generation_unavailable"
     assert record.request_id == str(REQUEST_ID)
     assert record.user_id == str(USER_ID)
     assert "秘密の質問" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_start_chat_logs_rate_limit_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.side_effect = ChatGenerationRateLimitError
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger="src.application.use_cases.chat.start_chat.start_chat",
+        ),
+        pytest.raises(ChatGenerationRateLimitError),
+    ):
+        await _use_case(generation_client, repository).execute(
+            StartChatInput(user_id=USER_ID, prompt="秘密の質問", request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert record.event == "start_chat_generation_rate_limited"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_started_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_start_chat_logs_configuration_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.side_effect = ChatGenerationConfigurationError
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger="src.application.use_cases.chat.start_chat.start_chat",
+        ),
+        pytest.raises(ChatGenerationConfigurationError),
+    ):
+        await _use_case(generation_client, repository).execute(
+            StartChatInput(user_id=USER_ID, prompt="秘密の質問", request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert record.event == "start_chat_generation_configuration_error"
+    assert record.request_id == str(REQUEST_ID)
+    assert record.user_id == str(USER_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_started_chat.assert_not_awaited()
 
 
 @pytest.mark.asyncio

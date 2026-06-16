@@ -12,7 +12,7 @@
 - チャット本体と初回2メッセージの原子的な新規保存
 - チャット本体更新と追加2メッセージの原子的な保存
 - 更新バージョンによる楽観排他
-- 所有ユーザーを検証した継続対象チャットの取得
+- チャットIDを指定したチャット本体の取得
 - ユーザー別チャット一覧の最終更新日時降順取得
 - 所有ユーザーを検証したチャットメッセージ履歴の発信日時昇順取得
 - 所有ユーザーを検証したチャットタイトルの更新
@@ -28,7 +28,7 @@
 | Protocol | 操作 | 利用ユースケース |
 | --- | --- | --- |
 | `ChatCommandRepositoryProtocol` | `save_started_chat` | `docs/backend/specification/usecases/chat/start_chat.md` |
-| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | `docs/backend/specification/usecases/chat/continue_chat.md` |
+| `ChatCommandRepositoryProtocol` | `get_chat` | `docs/backend/specification/usecases/chat/continue_chat.md` |
 | `ChatCommandRepositoryProtocol` | `save_exchange` | `docs/backend/specification/usecases/chat/continue_chat.md` |
 | `ChatTitleRepositoryProtocol` | `update_title` | `docs/backend/specification/usecases/chat/rename_chat.md` |
 | `ChatDeletionRepositoryProtocol` | `delete_chat` | `docs/backend/specification/usecases/chat/delete_chat.md` |
@@ -70,12 +70,12 @@
 - 外部出力: 書き込み成功または`ClientError`
 - 内部出力への変換: 成功時は戻り値なし
 
-### get_chat_for_continuation
+### get_chat
 
-- 内部入力: `chat_id`、`user_id`
+- 内部入力: `chat_id`
 - 外部入力への変換: チャット本体の主キーを指定した強い整合性の`GetItem`
 - 外部出力: DynamoDB項目
-- 内部出力への変換: 所有ユーザー一致を確認後、UUIDの`chat_id`と文字列の`session_id`を持つ`Chat`へ変換する
+- 内部出力への変換: UUIDの`chat_id`と文字列の`session_id`を持つ`Chat`へ変換する。所有ユーザー判定はユースケース層で行う
 
 ### save_exchange
 
@@ -129,7 +129,7 @@
 
 ## 該当データなし
 
-- `get_chat_for_continuation`: 項目なしまたは所有ユーザー不一致の場合は`ChatNotFoundError`
+- `get_chat`: 項目なしの場合は`ChatNotFoundError`
 - `list_chats_by_user_id`: DynamoDB Queryの全ページを内部で走査し、合計0件の場合は`RepositoryNotFoundError`
 - `list_messages_by_chat_id`: DynamoDB Queryの全ページを内部で走査し、チャットなし、所有ユーザー不一致、またはメッセージ合計0件の場合は`RepositoryNotFoundError`
 - `delete_chat`: チャットなしまたは所有ユーザー不一致の場合は`ChatNotFoundError`
@@ -157,7 +157,9 @@
 ## テスト観点
 
 - 正常系: 各Domain型・読み取りモデルとDynamoDB項目の相互変換、トランザクション書き込み、取得順序
-- 境界値: 0件、同一発信日時のユーザー・LLMメッセージ、更新バージョン0と1
+- 境界値: 削除対象25件と26件
+- 同値クラス: 0件、1件、複数件、同一発信日時のユーザー・LLMメッセージ
+- 状態遷移: 更新前バージョン0から更新後バージョン1への楽観排他保存
 - 異常系: 該当データなし、所有ユーザー不一致、楽観排他競合、SDKエラー変換
 
 ## 関連仕様書

@@ -27,3 +27,11 @@ class InvalidChatTurnError(DomainError):
 
 class MessageSentAtOutOfOrderError(DomainError):
     pass
+
+
+class ChatContinuationExpiredError(DomainError):
+    pass
+
+
+class ChatOwnershipMismatchError(DomainError):
+    pass

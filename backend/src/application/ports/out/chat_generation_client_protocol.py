@@ -2,11 +2,31 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
-class ChatGenerationUnavailableError(Exception):
+class ChatGenerationError(Exception):
     pass
 
 
-class InvalidChatGenerationResponseError(Exception):
+class ChatGenerationUnavailableError(ChatGenerationError):
+    pass
+
+
+class ChatGenerationRateLimitError(ChatGenerationUnavailableError):
+    pass
+
+
+class ChatGenerationPermissionDeniedError(ChatGenerationError):
+    pass
+
+
+class ChatGenerationConfigurationError(ChatGenerationError):
+    pass
+
+
+class ChatGenerationSessionUnavailableError(ChatGenerationError):
+    pass
+
+
+class InvalidChatGenerationResponseError(ChatGenerationError):
     pass
 
 

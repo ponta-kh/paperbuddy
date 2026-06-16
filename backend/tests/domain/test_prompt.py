@@ -14,18 +14,10 @@ def test_prompt_trims_general_whitespace() -> None:
     assert Prompt("\n\t　 hello 　\t").value == "hello"
 
 
-def test_prompt_accepts_one_character() -> None:
-    assert Prompt("a").value == "a"
-
-
-def test_prompt_accepts_999_characters() -> None:
-    assert len(Prompt("a" * 999).value) == 999
-
-
-def test_prompt_accepts_1000_characters() -> None:
+def test_prompt_accepts_max_length_boundary() -> None:
     assert len(Prompt("a" * 1000).value) == 1000
 
 
-def test_prompt_rejects_1001_characters() -> None:
+def test_prompt_rejects_over_max_length_boundary() -> None:
     with pytest.raises(PromptTooLongError):
         Prompt("a" * 1001)

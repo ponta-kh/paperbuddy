@@ -81,22 +81,23 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
-| `ChatCommandRepositoryProtocol` | `get_chat_for_continuation` | 所有ユーザーに紐づく更新対象チャットを取得する | `ChatNotFoundError`, `ChatLoadError` |
-| `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答を取得する | `ChatGenerationUnavailableError`, `InvalidChatGenerationResponseError` |
+| `ChatCommandRepositoryProtocol` | `get_chat` | `chat_id`に対応するチャット本体を取得する | `ChatNotFoundError`, `ChatLoadError` |
+| `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答を取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `ChatGenerationSessionUnavailableError`, `InvalidChatGenerationResponseError` |
 | `ChatCommandRepositoryProtocol` | `save_exchange` | 更新済みチャット本体と新しいユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError`, `ChatConflictError` |
 
 ## 9. 基本フロー
 
 1. 入力されたプロンプトから`Prompt`を生成し、一般的な前後空白の除去と文字数制約を適用する。
-2. 認証済みユーザーに紐づく更新対象チャットを取得する。
-3. 現在日時と`Chat.last_updated_at`の差が24時間未満であることを確認する。[BR-01]
-4. ユーザーメッセージの発信日時を記録する。
-5. 永続化済みのセッションIDと整形済みプロンプトを渡し、既存チャットを継続する。
-6. 検証済み回答を受領した日時を正常回答日時として記録する。
-7. 同じチャットIDとリクエストIDを持つユーザー・LLMメッセージを生成する。
-8. 発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
-9. 取得時の更新バージョンから変更されていないことを楽観排他で確認し、更新済みチャット本体と新しい2メッセージを同一トランザクションで保存する。
-10. チャットID、AI回答、既存タイトル、更新後の最終更新日時を返す。
+2. `chat_id`に対応する更新対象チャットを取得する。
+3. 取得した`Chat.user_id`が認証済みユーザーと一致することを確認する。一致しない場合は存在しない場合と同じ`ChatNotFoundError`として扱う。
+4. `Chat`のDomainルールとして、現在日時と`Chat.last_updated_at`の差が24時間以内であることを確認する。[DR-10@chat]
+5. ユーザーメッセージの発信日時を記録する。
+6. 永続化済みのセッションIDと整形済みプロンプトを渡し、既存チャットを継続する。
+7. 検証済み回答を受領した日時を正常回答日時として記録する。
+8. 同じチャットIDとリクエストIDを持つユーザー・LLMメッセージを生成する。
+9. 発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
+10. 取得時の更新バージョンから変更されていないことを楽観排他で確認し、更新済みチャット本体と新しい2メッセージを同一トランザクションで保存する。
+11. チャットID、AI回答、既存タイトル、更新後の最終更新日時を返す。
 
 ### フロー図
 
@@ -105,8 +106,10 @@ flowchart TD
     A([開始]) --> B["Promptを生成・整形・検証\n[DR-03@chat] [DR-04@chat]"]
     B -->|不正| ERR1["InvalidPromptError / PromptTooLongError"]
     B -->|有効| C["更新対象チャットを取得"]
-    C -->|対象なし・所有者不一致| ERR2["ChatNotFoundError"]
-    C --> D{"最終更新から24時間未満か\n[BR-01]"}
+    C -->|対象なし| ERR2["ChatNotFoundError"]
+    C --> OWNER["所有者確認"]
+    OWNER -->|所有者不一致| ERR2
+    OWNER --> D{"最終更新から24時間以内か\n[DR-10@chat]"}
     D -->|No| ERR3["ChatContinuationExpiredError"]
     D -->|Yes| E["既存チャットを継続"]
     E -->|利用不可| ERR4["ChatGenerationUnavailableError"]
@@ -142,8 +145,12 @@ flowchart TD
 | `PromptTooLongError` | 整形後のプロンプトが1,000文字を超える | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatNotFoundError` | 指定チャットが存在しない、または認証済みユーザーが所有しない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatLoadError` | チャット取得元の接続障害やサービス障害により更新対象チャットを取得できない | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
-| `ChatContinuationExpiredError` | 最終更新日時から現在日時までが24時間以上 | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
+| `ChatContinuationExpiredError` | 最終更新日時から現在日時までが24時間を超過している | 外部サービスを呼び出さず、永続化しない | 例外を送出する |
 | `ChatGenerationUnavailableError` | チャット生成サービスから応答を取得できない | 永続化しない | 例外を送出する |
+| `ChatGenerationRateLimitError` | チャット生成サービスのレート制限またはクォータ制限により応答を取得できない | 永続化しない | 例外を送出する |
+| `ChatGenerationPermissionDeniedError` | チャット生成サービスの呼び出し権限が不足している | 永続化しない | 例外を送出する |
+| `ChatGenerationConfigurationError` | チャット生成サービスの設定またはリクエスト構成が不正で応答を取得できない | 永続化しない | 例外を送出する |
+| `ChatGenerationSessionUnavailableError` | チャット生成サービス上のセッションが期限切れまたは無効で継続できない | 永続化しない | `ChatContinuationExpiredError`へ変換して送出する |
 | `InvalidChatGenerationResponseError` | チャット生成サービスから有効な回答を取得できない | 永続化しない | 例外を送出する |
 | `InvalidChatTurnError`, `MessageSentAtOutOfOrderError` | 新しいチャットターンまたは発信順序がDomainルールへ違反する | 永続化しない | 例外を送出する |
 | `ChatSaveError` | 更新済みチャット本体または新しい2メッセージの保存に失敗する | ローカル変更をロールバックする | 例外を送出する |
@@ -151,10 +158,16 @@ flowchart TD
 
 ## 12. ビジネスルール
 
-### BR-01: 会話継続可能期間
+### BR-01: 所有チャットのみ継続可能
 
-- 内容: チャットは`last_updated_at`から現在日時までが24時間未満の場合のみ継続できる。ちょうど24時間経過した時点から継続不可とする
-- 違反時の例外: `ChatContinuationExpiredError`
+- 内容: 認証済みユーザーは自身が所有するチャットのみ継続できる。指定チャットが存在しない場合と所有者不一致の場合は区別しない
+- 違反時の例外: `ChatNotFoundError`
+
+### BR-02: 会話継続可能期間
+
+- 内容: チャットは`last_updated_at`から現在日時までが24時間以内の場合のみ継続できる。この判定は`Chat`のDomainルールで行う
+- 違反時のDomain例外: `ChatContinuationExpiredError`
+- ユースケース上の結果: `ChatContinuationExpiredError`を送出する
 
 ## 13. 副作用
 
@@ -164,19 +177,19 @@ flowchart TD
 
 ## 14. 受け入れ条件
 
-- 最終更新日時から24時間未満の所有チャットを継続できる
+- 最終更新日時から24時間以内の所有チャットを継続できる
 - 正常回答後に最終更新日時と新しい2メッセージが保存される
 - 既存タイトルは変更されず、出力に含まれる
-- 24時間以上経過したチャットでは外部サービスが呼び出されず、状態も変更されない
+- 24時間を超過したチャットでは外部サービスが呼び出されず、状態も変更されない
 - プロンプトには初回チャットと同じ整形・検証が適用される
 - 同じ更新バージョンから開始した複数処理では、最初の保存のみ成功し、競合した保存はチャット本体とメッセージを変更しない
 
 ## 15. テスト観点
 
-- 正常系: 最終更新直後、24時間経過直前に有効なプロンプトで継続できる
-- 境界値: 23時間59分59秒、24時間、24時間超過、整形後0文字・1文字・1,000文字・1,001文字
+- 正常系: 最終更新直後、24時間経過時点に有効なプロンプトで継続できる
+- 境界値: 24時間、24時間1秒、整形後0文字、1,000文字、1,001文字
 - 代替系: 該当なし
-- 異常系: 対象なし、所有者不一致、継続期限超過、外部サービス利用不可、不正応答、保存失敗、楽観排他競合
+- 異常系: 対象なし、所有者不一致、継続期限超過、外部サービス利用不可、レート制限、権限不足、設定不備、外部セッション継続不可、不正応答、保存失敗、楽観排他競合
 - トランザクション: 正常時のみチャット本体と新しい2メッセージが同時に保存される
 
 ## 16. 関連仕様書
@@ -191,4 +204,4 @@ flowchart TD
 
 ## 18. 備考
 
-- 24時間の会話継続可能期間は外部依存の制約に由来するが、本ユースケースの事前判定として扱う
+- 24時間の会話継続可能期間は外部依存の制約に由来するが、`Chat`のDomainルールとして扱う

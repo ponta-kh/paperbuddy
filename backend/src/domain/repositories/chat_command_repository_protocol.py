@@ -21,11 +21,10 @@ class ChatNotFoundError(Exception):
 
 
 class ChatCommandRepositoryProtocol(Protocol):
-    async def get_chat_for_continuation(
+    async def get_chat(
         self,
         *,
         chat_id: UUID,
-        user_id: UUID,
     ) -> Chat: ...
 
     async def save_started_chat(

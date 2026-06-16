@@ -7,6 +7,10 @@ from src.application.exceptions import (
     RepositoryNotFoundError,
 )
 from src.application.ports.out.chat_generation_client_protocol import (
+    ChatGenerationConfigurationError,
+    ChatGenerationPermissionDeniedError,
+    ChatGenerationRateLimitError,
+    ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     InvalidChatGenerationResponseError,
 )
@@ -115,6 +119,38 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "chat_generation_unavailable",
             "チャットの回答を生成できませんでした",
+        )
+
+    @app.exception_handler(ChatGenerationRateLimitError)
+    async def generation_rate_limited_handler(
+        _: Request, __: ChatGenerationRateLimitError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "chat_generation_rate_limited",
+            "しばらく待ってから再度お試しください",
+        )
+
+    @app.exception_handler(ChatGenerationPermissionDeniedError)
+    @app.exception_handler(ChatGenerationConfigurationError)
+    async def generation_configuration_error_handler(
+        _: Request,
+        __: ChatGenerationPermissionDeniedError | ChatGenerationConfigurationError,
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "chat_generation_configuration_error",
+            "チャットの回答を生成できませんでした",
+        )
+
+    @app.exception_handler(ChatGenerationSessionUnavailableError)
+    async def generation_session_unavailable_handler(
+        _: Request, __: ChatGenerationSessionUnavailableError
+    ) -> JSONResponse:
+        return _response(
+            status.HTTP_409_CONFLICT,
+            "chat_continuation_expired",
+            "このチャットでは会話を継続できません",
         )
 
     @app.exception_handler(InvalidChatGenerationResponseError)

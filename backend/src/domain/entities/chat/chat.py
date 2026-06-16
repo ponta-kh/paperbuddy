@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from src.domain.exceptions.chat_exception import (
+    ChatContinuationExpiredError,
+    ChatOwnershipMismatchError,
     InvalidChatIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
@@ -38,6 +40,8 @@ class ChatMessage:
 
 @dataclass(slots=True)
 class Chat:
+    _CONTINUATION_LIMIT = timedelta(hours=24)
+
     chat_id: UUID
     session_id: str
     title: str
@@ -104,6 +108,16 @@ class Chat:
         # Repositoryの楽観排他条件に使える状態にする。
         self.last_updated_at = llm_message.sent_at
         self.version += 1
+
+    def ensure_continuable_at(self, requested_at: datetime) -> None:
+        if requested_at.tzinfo is None:
+            raise ValueError("requested_at must be timezone-aware")
+        if requested_at - self.last_updated_at > self._CONTINUATION_LIMIT:
+            raise ChatContinuationExpiredError
+
+    def ensure_owned_by(self, user_id: UUID) -> None:
+        if self.user_id != user_id:
+            raise ChatOwnershipMismatchError
 
     def _validate_turn_pair(
         self,
