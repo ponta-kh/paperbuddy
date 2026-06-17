@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { LibraryHeaderActionsView } from "@/features/chat/components/library/LibraryHeaderActionsView";
+import { LibraryHeaderActions } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryHeaderActions";
 import { getIndexedFiles, type IndexedFile } from "@/lib/library-api";
 
 export function LibraryHeaderActionsContainer() {
@@ -33,7 +33,7 @@ export function LibraryHeaderActionsContainer() {
     }, []);
 
     return (
-        <LibraryHeaderActionsView
+        <LibraryHeaderActions
             files={files}
             isLoading={isLoading}
             loadError={loadError}

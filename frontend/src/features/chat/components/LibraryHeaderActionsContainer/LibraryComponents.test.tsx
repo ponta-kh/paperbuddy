@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
-import { IndexedPaperCount } from "@/features/chat/components/library/IndexedPaperCount";
-import { LibraryButton } from "@/features/chat/components/library/LibraryButton";
-import { LibraryFileList } from "@/features/chat/components/library/LibraryFileList";
+import { IndexedPaperCount } from "@/features/chat/components/LibraryHeaderActionsContainer/IndexedPaperCount";
+import { LibraryButton } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryButton";
+import { LibraryFileList } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryFileList";
 
 describe("IndexedPaperCount", () => {
     test("取り込み済みファイル件数を表示する", () => {

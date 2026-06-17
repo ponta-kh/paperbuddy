@@ -3,9 +3,9 @@ import { useState } from "react";
 import { TooltipProvider } from "@/components/shadcn/tooltip";
 import { ChatComposer } from "@/features/chat/components/ChatComposer";
 import { ChatConversation } from "@/features/chat/components/ChatConversation";
-import { ChatHeader } from "@/features/chat/components/ChatHeader";
-import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
+import { ChatHeaderContainer } from "@/features/chat/containers/ChatHeaderContainer";
 import { ChatMessagesContainer } from "@/features/chat/containers/ChatMessagesContainer";
+import { ChatSidebarContainer } from "@/features/chat/containers/ChatSidebarContainer";
 import { ChatThreadsContainer } from "@/features/chat/containers/ChatThreadsContainer";
 import { LibraryHeaderActionsContainer } from "@/features/chat/containers/library/LibraryHeaderActionsContainer";
 import { type ChatSummary, sendPrompt } from "@/lib/chat-api";
@@ -90,7 +90,7 @@ function ChatPage() {
                                 }
                             >
                                 <div className="h-full w-64">
-                                    <ChatSidebar
+                                    <ChatSidebarContainer
                                         chats={chats}
                                         chatsError={chatsError}
                                         isLoading={isLoading}
@@ -102,24 +102,32 @@ function ChatPage() {
                             </aside>
 
                             <main className="relative flex min-w-0 flex-1 flex-col">
-                                <ChatHeader
-                                    chats={chats}
-                                    chatsError={chatsError}
+                                <ChatHeaderContainer
                                     headerActions={
                                         <LibraryHeaderActionsContainer />
                                     }
-                                    isChatsLoading={isLoading}
+                                    mobileSidebar={
+                                        <ChatSidebarContainer
+                                            chats={chats}
+                                            chatsError={chatsError}
+                                            isLoading={isLoading}
+                                            selectedChatId={selectedChatId}
+                                            onChatSelect={handleChatSelect}
+                                            onNewChat={handleNewChat}
+                                            onSelect={() =>
+                                                setMobileMenuOpen(false)
+                                            }
+                                        />
+                                    }
                                     mobileMenuOpen={mobileMenuOpen}
                                     selectedChatId={selectedChatId}
                                     sidebarOpen={sidebarOpen}
                                     title={title}
-                                    onChatSelect={handleChatSelect}
                                     onDeleteChat={async () => {
                                         await onDeleteChat();
                                         handleNewChat();
                                     }}
                                     onMobileMenuOpenChange={setMobileMenuOpen}
-                                    onNewChat={handleNewChat}
                                     onRenameChat={onRenameChat}
                                     onSidebarOpenChange={setSidebarOpen}
                                 />

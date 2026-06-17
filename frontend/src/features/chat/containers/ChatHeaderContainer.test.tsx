@@ -3,32 +3,30 @@ import type { ComponentProps } from "react";
 import { describe, expect, test, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/shadcn/tooltip";
-import { ChatHeader } from "@/features/chat/components/ChatHeader";
+import { ChatHeaderContainer } from "@/features/chat/containers/ChatHeaderContainer";
 
-const defaultProps: ComponentProps<typeof ChatHeader> = {
-    chats: [],
-    chatsError: false,
-    isChatsLoading: false,
+const defaultProps: ComponentProps<typeof ChatHeaderContainer> = {
+    mobileSidebar: <div>モバイルサイドバー</div>,
     mobileMenuOpen: false,
     sidebarOpen: true,
-    onChatSelect: vi.fn(),
     onDeleteChat: vi.fn(),
     onMobileMenuOpenChange: vi.fn(),
-    onNewChat: vi.fn(),
     onRenameChat: vi.fn(),
     onSidebarOpenChange: vi.fn(),
     headerActions: <div>ライブラリアクション</div>,
 };
 
-function renderHeader(props: Partial<ComponentProps<typeof ChatHeader>> = {}) {
+function renderHeader(
+    props: Partial<ComponentProps<typeof ChatHeaderContainer>> = {},
+) {
     return render(
         <TooltipProvider>
-            <ChatHeader {...defaultProps} {...props} />
+            <ChatHeaderContainer {...defaultProps} {...props} />
         </TooltipProvider>,
     );
 }
 
-describe("ChatHeader", () => {
+describe("ChatHeaderContainer", () => {
     test("新しいチャットではタイトルメニューを表示しない", () => {
         renderHeader();
 

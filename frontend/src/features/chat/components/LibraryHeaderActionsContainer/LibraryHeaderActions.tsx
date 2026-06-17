@@ -5,12 +5,12 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/shadcn/sheet";
-import { IndexedPaperCount } from "@/features/chat/components/library/IndexedPaperCount";
-import { LibraryButton } from "@/features/chat/components/library/LibraryButton";
-import { LibraryFileList } from "@/features/chat/components/library/LibraryFileList";
+import { IndexedPaperCount } from "@/features/chat/components/LibraryHeaderActionsContainer/IndexedPaperCount";
+import { LibraryButton } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryButton";
+import { LibraryFileList } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryFileList";
 import type { IndexedFile } from "@/lib/library-api";
 
-type LibraryHeaderActionsViewProps = {
+type LibraryHeaderActionsProps = {
     files: IndexedFile[];
     isLoading: boolean;
     loadError: boolean;
@@ -18,13 +18,13 @@ type LibraryHeaderActionsViewProps = {
     onLibraryOpenChange: (open: boolean) => void;
 };
 
-export function LibraryHeaderActionsView({
+export function LibraryHeaderActions({
     files,
     isLoading,
     loadError,
     libraryOpen,
     onLibraryOpenChange,
-}: LibraryHeaderActionsViewProps) {
+}: LibraryHeaderActionsProps) {
     return (
         <>
             <div className="flex items-center gap-2">
