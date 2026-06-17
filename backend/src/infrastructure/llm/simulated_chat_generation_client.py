@@ -1,4 +1,5 @@
 import asyncio
+from textwrap import dedent
 from uuid import uuid7
 
 from src.application.ports.out.chat_generation_client_protocol import (
@@ -6,11 +7,13 @@ from src.application.ports.out.chat_generation_client_protocol import (
     StartGeneratedChatResult,
 )
 
-_ANSWER_SEED = """""
+_ANSWER = dedent(
+    """\
     これはローカル動作確認用の疑似回答です。
     実際のLLMやKnowledge Baseには接続せず、画面表示、待機状態、履歴保存、
     チャット継続の一連の挙動を確認するために固定文を返しています。
     """
+).strip()
 
 
 class SimulatedChatGenerationClient:
@@ -35,5 +38,4 @@ class SimulatedChatGenerationClient:
 
     @staticmethod
     def _answer() -> str:
-        repeat_count = 300 // len(_ANSWER_SEED) + 1
-        return (_ANSWER_SEED * repeat_count)[:300]
+        return _ANSWER

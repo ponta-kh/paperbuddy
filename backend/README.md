@@ -43,7 +43,7 @@ mise run dev
 - フロントエンド: `http://localhost:5173`
 - DB: DynamoDB Localコンテナ。データはDocker Volumeへ保存する
 - DynamoDB Localのテーブル作成: Docker Composeの`dynamodb-init`サービス
-- LLM: 既定で2秒待機し、300文字の疑似回答を返す。`CHAT_GENERATION_MODE=aws`の場合はAWS Bedrock Knowledge Baseへ接続する
+- LLM: 既定で2秒待機し、ローカル動作確認用の疑似回答を返す。`CHAT_GENERATION_MODE=aws`の場合はAWS Bedrock Knowledge Baseへ接続する
 - 初期データ: なし
 - 認証: `docker/.env`にAWS上のローカル開発用Cognito User PoolとWeb App Clientを設定する
 
