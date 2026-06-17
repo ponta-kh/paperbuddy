@@ -22,7 +22,6 @@ async def test_start_chat_returns_local_session_title_and_simulated_answer() -> 
 
     assert result.session_id.startswith("local-")
     assert UUID(result.session_id.removeprefix("local-")).version == 7
-    assert result.title == "ローカル検証用の質問..."
     assert "ローカル動作確認用" in result.answer
     assert result.answer.count("ローカル動作確認用") == 1
     assert '""' not in result.answer

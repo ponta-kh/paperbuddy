@@ -45,7 +45,7 @@ def _use_case(
 async def test_start_chat_generates_uuid7_chat_id_by_default() -> None:
     generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
     generation_client.start_chat.return_value = StartGeneratedChatResult(
-        session_id="session-1", answer="answer", title="title"
+        session_id="session-1", answer="answer"
     )
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
     times = iter((USER_SENT_AT, ANSWERED_AT))
@@ -66,7 +66,7 @@ async def test_start_chat_generates_uuid7_chat_id_by_default() -> None:
 async def test_start_chat_saves_chat_and_turn() -> None:
     generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
     generation_client.start_chat.return_value = StartGeneratedChatResult(
-        session_id="session-1", answer="answer", title="title"
+        session_id="session-1", answer="answer"
     )
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
 
@@ -82,10 +82,39 @@ async def test_start_chat_saves_chat_and_turn() -> None:
     assert isinstance(user_message, ChatMessage)
     assert isinstance(llm_message, ChatMessage)
     assert saved_chat.session_id == "session-1"
+    assert saved_chat.title == "question"
     assert saved_chat.created_at == saved_chat.last_updated_at == ANSWERED_AT
     assert user_message.request_id == llm_message.request_id == REQUEST_ID
     assert user_message.sender is MessageSender.USER
     assert llm_message.sender is MessageSender.LLM
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("prompt", "expected_title"),
+    [
+        ("1234567890", "1234567890"),
+        ("1234567890a", "1234567890..."),
+        ("  1234567890a  ", "1234567890..."),
+    ],
+)
+async def test_start_chat_generates_title_from_prompt(
+    prompt: str,
+    expected_title: str,
+) -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.return_value = StartGeneratedChatResult(
+        session_id="session-1", answer="answer"
+    )
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+
+    output = await _use_case(generation_client, repository).execute(
+        StartChatInput(user_id=USER_ID, prompt=prompt, request_id=REQUEST_ID)
+    )
+
+    saved_chat = repository.save_started_chat.await_args.args[0]
+    assert output.title == expected_title
+    assert saved_chat.title == expected_title
 
 
 @pytest.mark.asyncio
@@ -186,7 +215,7 @@ async def test_start_chat_logs_configuration_error(
 async def test_start_chat_propagates_repository_save_error() -> None:
     generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
     generation_client.start_chat.return_value = StartGeneratedChatResult(
-        session_id="session-1", answer="answer", title="title"
+        session_id="session-1", answer="answer"
     )
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
     repository.save_started_chat.side_effect = ChatSaveError

@@ -27,7 +27,6 @@ class SimulatedChatGenerationClient:
         return StartGeneratedChatResult(
             session_id=f"local-{uuid7()}",
             answer=self._answer(),
-            title=f"{prompt[:10]}...",
         )
 
     async def continue_chat(

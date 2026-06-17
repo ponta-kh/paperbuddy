@@ -33,10 +33,8 @@ def create_chat_generation_client(settings: Settings) -> ChatGenerationClientPro
     knowledge_base_client = boto3.client(
         "bedrock-agent-runtime", region_name=settings.aws_region
     )
-    model_client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
     return BedrockKnowledgeBaseChatClient(
         knowledge_base_client,
-        model_client,
         knowledge_base_id=settings.bedrock_knowledge_base_id,
         model_arn=settings.bedrock_model_arn,
     )

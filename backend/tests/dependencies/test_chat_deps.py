@@ -142,8 +142,7 @@ def test_get_chat_generation_client_uses_bedrock_environment(
 ) -> None:
     _set_aws_environment(monkeypatch)
     knowledge_base_client = Mock()
-    model_client = Mock()
-    client_factory = Mock(side_effect=[knowledge_base_client, model_client])
+    client_factory = Mock(return_value=knowledge_base_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     client = chat_deps.get_chat_generation_client()
@@ -151,7 +150,6 @@ def test_get_chat_generation_client_uses_bedrock_environment(
     assert isinstance(client, BedrockKnowledgeBaseChatClient)
     assert client_factory.call_args_list == [
         (("bedrock-agent-runtime",), {"region_name": "ap-northeast-1"}),
-        (("bedrock-runtime",), {"region_name": "ap-northeast-1"}),
     ]
 
 
@@ -160,8 +158,7 @@ def test_get_chat_generation_client_uses_bedrock_with_local_dynamodb(
 ) -> None:
     _set_local_bedrock_environment(monkeypatch)
     knowledge_base_client = Mock()
-    model_client = Mock()
-    client_factory = Mock(side_effect=[knowledge_base_client, model_client])
+    client_factory = Mock(return_value=knowledge_base_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
     client = chat_deps.get_chat_generation_client()
@@ -169,7 +166,6 @@ def test_get_chat_generation_client_uses_bedrock_with_local_dynamodb(
     assert isinstance(client, BedrockKnowledgeBaseChatClient)
     assert client_factory.call_args_list == [
         (("bedrock-agent-runtime",), {"region_name": "ap-northeast-1"}),
-        (("bedrock-runtime",), {"region_name": "ap-northeast-1"}),
     ]
 
 

@@ -25,6 +25,8 @@ from src.domain.value_objects.chat.prompt import Prompt
 
 logger = logging.getLogger(__name__)
 
+_TITLE_MAX_PROMPT_LENGTH = 10
+
 
 class StartChatUseCase:
     def __init__(
@@ -46,6 +48,7 @@ class StartChatUseCase:
         user_sent_at = self._now()
 
         generated = await self._start_chat_generation(command, prompt.value)
+        title = self._title_from_prompt(prompt.value)
         # 正常応答を受け取った時点をLLM回答日時とし、
         # チャット本体の作成・更新日時にも使う。
         answered_at = self._now()
@@ -53,7 +56,7 @@ class StartChatUseCase:
         chat = Chat.create(
             chat_id=self._generate_chat_id(),
             session_id=generated.session_id,
-            title=generated.title,
+            title=title,
             user_id=command.user_id,
             answered_at=answered_at,
         )
@@ -93,7 +96,7 @@ class StartChatUseCase:
         return StartChatOutput(
             chat_id=chat.chat_id,
             answer=generated.answer,
-            title=generated.title,
+            title=title,
             last_updated_at=chat.last_updated_at,
         )
 
@@ -158,3 +161,9 @@ class StartChatUseCase:
             },
             exc_info=True,
         )
+
+    @staticmethod
+    def _title_from_prompt(prompt: str) -> str:
+        if len(prompt) <= _TITLE_MAX_PROMPT_LENGTH:
+            return prompt
+        return f"{prompt[:_TITLE_MAX_PROMPT_LENGTH]}..."

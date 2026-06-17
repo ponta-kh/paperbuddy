@@ -34,7 +34,6 @@ class InvalidChatGenerationResponseError(ChatGenerationError):
 class StartGeneratedChatResult:
     session_id: str
     answer: str
-    title: str
 
 
 @dataclass(frozen=True, slots=True)

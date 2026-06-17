@@ -52,25 +52,19 @@ class BedrockKnowledgeBaseChatClient:
     def __init__(
         self,
         knowledge_base_client: Any,
-        model_client: Any,
         *,
         knowledge_base_id: str,
         model_arn: str,
     ) -> None:
         self._knowledge_base_client = knowledge_base_client
-        self._model_client = model_client
         self._knowledge_base_id = knowledge_base_id
         self._model_arn = model_arn
 
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult:
-        chat_result, title = await asyncio.gather(
-            self._start_knowledge_base_chat(prompt),
-            self._generate_title_or_fallback(prompt),
-        )
+        chat_result = await self._start_knowledge_base_chat(prompt)
         return StartGeneratedChatResult(
             session_id=chat_result.session_id,
             answer=chat_result.answer,
-            title=title,
         )
 
     async def continue_chat(
@@ -176,60 +170,6 @@ class BedrockKnowledgeBaseChatClient:
             raise InvalidChatGenerationResponseError from error
 
         return _KnowledgeBaseChatResult(session_id=returned_session_id, answer=answer)
-
-    async def _generate_title(self, prompt: str) -> str:
-        response = await asyncio.to_thread(
-            self._model_client.converse,
-            modelId=self._model_arn,
-            system=[
-                {
-                    "text": (
-                        "ユーザーの質問に対するチャットタイトルを日本語で生成してください。"
-                        "タイトルだけを簡潔に返してください。"
-                    )
-                }
-            ],
-            messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 40, "temperature": 0},
-        )
-        try:
-            title = response["output"]["message"]["content"][0]["text"].strip()
-            if not title:
-                raise ValueError
-            return title
-        except (KeyError, TypeError, ValueError, IndexError) as error:
-            raise InvalidChatGenerationResponseError from error
-
-    async def _generate_title_or_fallback(self, prompt: str) -> str:
-        try:
-            return await self._generate_title(prompt)
-        except ClientError as error:
-            logger.warning(
-                "Bedrockによるタイトル生成に失敗したためフォールバックします",
-                extra={
-                    "event": "bedrock_title_generation_client_error",
-                    "error_code": self._client_error_code(error),
-                },
-            )
-            return self._fallback_title(prompt)
-        except BotoCoreError:
-            logger.warning(
-                "Bedrockによるタイトル生成に接続できないためフォールバックします",
-                extra={"event": "bedrock_title_generation_unavailable"},
-                exc_info=True,
-            )
-            return self._fallback_title(prompt)
-        except InvalidChatGenerationResponseError:
-            logger.warning(
-                "Bedrockのタイトル生成レスポンスが不正なためフォールバックします",
-                extra={"event": "bedrock_title_generation_invalid_response"},
-                exc_info=True,
-            )
-            return self._fallback_title(prompt)
-
-    @staticmethod
-    def _fallback_title(prompt: str) -> str:
-        return f"{prompt[:10]}..."
 
     @staticmethod
     def _client_error_code(error: ClientError) -> str:
