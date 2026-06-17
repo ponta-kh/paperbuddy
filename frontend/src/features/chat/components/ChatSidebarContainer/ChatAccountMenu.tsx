@@ -1,10 +1,9 @@
-import { LogOut, MoreHorizontal, Settings } from "lucide-react";
+import { LogOut, MoreHorizontal } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 

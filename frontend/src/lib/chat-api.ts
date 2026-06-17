@@ -6,17 +6,33 @@ export type ChatSummary = {
     updatedAt: string;
 };
 
+export type ChatCitationSource = {
+    content: string;
+    locationType: string | null;
+    uri: string | null;
+    metadata: Record<string, unknown>;
+};
+
+export type ChatCitation = {
+    text: string;
+    spanStart: number | null;
+    spanEnd: number | null;
+    sources: ChatCitationSource[];
+};
+
 export type ChatMessage = {
     id: string;
     role: "user" | "assistant";
     content: string;
     createdAt: string;
+    citations?: ChatCitation[];
     status?: "pending" | "revealing" | "completed" | "failed";
 };
 
 export type SendPromptResult = {
     chat: ChatSummary;
     answer: string;
+    citations: ChatCitation[];
 };
 
 type ChatSummaryResponse = {
@@ -33,6 +49,20 @@ type ChatMessageResponse = {
     sent_at: string;
 };
 
+type ChatCitationSourceResponse = {
+    content: string;
+    location_type: string | null;
+    uri: string | null;
+    metadata: Record<string, unknown>;
+};
+
+type ChatCitationResponse = {
+    text: string;
+    span_start: number | null;
+    span_end: number | null;
+    sources: ChatCitationSourceResponse[];
+};
+
 type ListChatsResponse = {
     chats: ChatSummaryResponse[];
 };
@@ -45,6 +75,7 @@ type ListChatMessagesResponse = {
 type SendPromptResponse = {
     chat_id: string;
     answer: string;
+    citations?: ChatCitationResponse[];
     title: string;
     last_updated_at: string;
 };
@@ -118,6 +149,21 @@ export async function sendPrompt(
             updatedAt: response.last_updated_at,
         },
         answer: response.answer,
+        citations: (response.citations ?? []).map(toChatCitation),
+    };
+}
+
+function toChatCitation(citation: ChatCitationResponse): ChatCitation {
+    return {
+        text: citation.text,
+        spanStart: citation.span_start,
+        spanEnd: citation.span_end,
+        sources: citation.sources.map((source) => ({
+            content: source.content,
+            locationType: source.location_type,
+            uri: source.uri,
+            metadata: source.metadata,
+        })),
     };
 }
 

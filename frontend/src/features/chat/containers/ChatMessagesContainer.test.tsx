@@ -124,10 +124,27 @@ describe("ChatMessagesContainer", () => {
                 {({ messages, onAppendAssistantMessage }) => (
                     <div>
                         <span>{messages[0]?.content}</span>
+                        <span>
+                            {messages[0]?.citations?.[0]?.sources[0]?.content}
+                        </span>
                         <button
                             type="button"
                             onClick={() =>
-                                onAppendAssistantMessage("回答テキスト")
+                                onAppendAssistantMessage("回答テキスト", [
+                                    {
+                                        text: "回答",
+                                        spanStart: 0,
+                                        spanEnd: 2,
+                                        sources: [
+                                            {
+                                                content: "引用抜粋",
+                                                locationType: "S3",
+                                                uri: "s3://bucket/paper.pdf",
+                                                metadata: {},
+                                            },
+                                        ],
+                                    },
+                                ])
                             }
                         >
                             回答追加
@@ -139,6 +156,7 @@ describe("ChatMessagesContainer", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "回答追加" }));
         expect(screen.queryByText("回答テキスト")).not.toBeInTheDocument();
+        expect(screen.getByText("引用抜粋")).toBeInTheDocument();
 
         act(() => vi.advanceTimersByTime(20));
         expect(screen.getByText("回答")).toBeInTheDocument();
@@ -194,7 +212,7 @@ describe("ChatMessagesContainer", () => {
                             type="button"
                             onClick={() => {
                                 onBindCurrentChat("chat-new");
-                                onAppendAssistantMessage("新しい回答");
+                                onAppendAssistantMessage("新しい回答", []);
                             }}
                         >
                             回答追加

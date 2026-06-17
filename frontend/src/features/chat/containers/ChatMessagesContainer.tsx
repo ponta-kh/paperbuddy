@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { type ChatMessage, getChatMessages } from "@/lib/chat-api";
+import {
+    type ChatCitation,
+    type ChatMessage,
+    getChatMessages,
+} from "@/lib/chat-api";
 
 const ANSWER_REVEAL_INTERVAL_MS = 20;
 const ANSWER_REVEAL_CHUNK_SIZE = 2;
@@ -13,7 +17,10 @@ type ChatMessagesContainerProps = {
         isLoading: boolean;
         loadError: boolean;
         onAppendUserMessage: (content: string) => string;
-        onAppendAssistantMessage: (content: string) => void;
+        onAppendAssistantMessage: (
+            content: string,
+            citations: ChatCitation[],
+        ) => void;
         onBindCurrentChat: (chatId: string) => void;
         onMarkMessageCompleted: (messageId: string) => void;
         onMarkMessageFailed: (messageId: string) => void;
@@ -96,7 +103,10 @@ export function ChatMessagesContainer({
         return messageId;
     };
 
-    const handleAppendAssistantMessage = (content: string) => {
+    const handleAppendAssistantMessage = (
+        content: string,
+        citations: ChatCitation[],
+    ) => {
         const messageId = crypto.randomUUID();
         const characters = Array.from(content);
         let revealedLength = 0;
@@ -106,6 +116,7 @@ export function ChatMessagesContainer({
                 id: messageId,
                 role: "assistant",
                 content: "",
+                citations,
                 createdAt: new Date().toISOString(),
                 status: "revealing",
             },

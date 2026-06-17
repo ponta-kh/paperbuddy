@@ -1,12 +1,15 @@
 import { LoaderCircle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+
 import { ScrollArea } from "@/components/shadcn/scroll-area";
 import { suggestions } from "@/features/chat/utils/chat-data";
 import type { ChatMessage } from "@/lib/chat-api";
 
+import { AssistantMessageSection } from "./AssistantMessageSection";
+
 const STICK_TO_BOTTOM_THRESHOLD_PX = 80;
 
-type ChatConversationProps = {
+type ChatConversationSectionProps = {
     isLoading: boolean;
     isSending: boolean;
     loadError: boolean;
@@ -14,13 +17,13 @@ type ChatConversationProps = {
     onSuggestionSelect: (suggestion: string) => void;
 };
 
-export function ChatConversation({
+export function ChatConversationSection({
     isLoading,
     isSending,
     loadError,
     messages,
     onSuggestionSelect,
-}: ChatConversationProps) {
+}: ChatConversationSectionProps) {
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const shouldStickToBottomRef = useRef(true);
 
@@ -126,22 +129,10 @@ export function ChatConversation({
                                     </div>
                                 </section>
                             ) : (
-                                <section
+                                <AssistantMessageSection
                                     key={message.id}
-                                    className="flex gap-3 sm:gap-4"
-                                >
-                                    <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#163d32] text-white shadow-sm">
-                                        <Sparkles className="size-3.5" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="mb-3 text-[13px] font-semibold text-[#263f36]">
-                                            PaperBuddy
-                                        </p>
-                                        <p className="whitespace-pre-wrap text-[13px] leading-7 text-[#43584f]">
-                                            {message.content}
-                                        </p>
-                                    </div>
-                                </section>
+                                    message={message}
+                                />
                             ),
                         )}
                         {isSending && (
