@@ -2,6 +2,12 @@
 .ruff_cache
 .pnpm-store
 node_modules
+
+# frontend
+frontend/dist
+frontend/node_modules
+
+# backend
 backend/.coverage
 backend/.pytest_cache
 backend/.ruff_cache
@@ -10,9 +16,10 @@ backend/__pycache__
 backend/src/**/__pycache__
 backend/tests/**/__pycache__
 docker/.env
-frontend/dist
-frontend/node_modules
+
+# infra
 infra/cdk.out
 infra/dist
 infra/node_modules
+
 tmp
