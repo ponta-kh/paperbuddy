@@ -46,6 +46,7 @@ type ChatMessageResponse = {
     request_id: string;
     sender: "user" | "llm";
     content: string;
+    citations?: ChatCitationResponse[];
     sent_at: string;
 };
 
@@ -121,6 +122,7 @@ export async function getChatMessages(
             id: `${message.request_id}:${message.sender}`,
             role: message.sender === "user" ? "user" : "assistant",
             content: message.content,
+            citations: (message.citations ?? []).map(toChatCitation),
             createdAt: message.sent_at,
         }))
         .sort(

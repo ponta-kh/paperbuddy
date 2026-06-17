@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from main import app
 from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto import (
     IndexedFileOutput,
+    ListIndexedFilesInput,
     ListIndexedFilesOutput,
 )
 from src.dependencies.library_deps import get_list_indexed_files_use_case
@@ -17,7 +18,7 @@ REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 
 
 class StubListIndexedFilesUseCase:
-    async def execute(self, query: object) -> ListIndexedFilesOutput:
+    async def execute(self, query: ListIndexedFilesInput) -> ListIndexedFilesOutput:
         assert query.request_id == REQUEST_ID
         return ListIndexedFilesOutput(
             files=(

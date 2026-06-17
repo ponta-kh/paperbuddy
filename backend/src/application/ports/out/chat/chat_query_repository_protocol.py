@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from src.domain.entities.chat.chat import ChatCitation
+
 
 @dataclass(frozen=True, slots=True)
 class ChatSummary:
@@ -18,6 +20,7 @@ class ChatMessageRecord:
     sender: str
     content: str
     sent_at: datetime
+    citations: tuple[ChatCitation, ...] = ()
 
 
 class ChatQueryRepositoryProtocol(Protocol):

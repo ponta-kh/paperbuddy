@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 import { requestJson } from "@/lib/api-client";
-import { sendPrompt } from "@/lib/chat-api";
+import { getChatMessages, sendPrompt } from "@/lib/chat-api";
 
 vi.mock("@/lib/api-client", () => ({
     requestJson: vi.fn(),
@@ -78,4 +78,57 @@ test("継続送信では対象チャットのメッセージAPIを呼び出す",
         method: "POST",
         body: { prompt: "続きの質問" },
     });
+});
+
+test("履歴取得結果の引用情報をメッセージへ変換する", async () => {
+    vi.mocked(requestJson).mockResolvedValue({
+        chat_id: "chat-1",
+        messages: [
+            {
+                request_id: "request-1",
+                sender: "llm",
+                content: "履歴回答",
+                citations: [
+                    {
+                        text: "履歴回答",
+                        span_start: 0,
+                        span_end: 4,
+                        sources: [
+                            {
+                                content: "履歴引用抜粋",
+                                location_type: "S3",
+                                uri: "s3://bucket/history.pdf",
+                                metadata: { title: "History Paper", page: 5 },
+                            },
+                        ],
+                    },
+                ],
+                sent_at: "2026-06-15T00:02:00Z",
+            },
+        ],
+    });
+
+    await expect(getChatMessages("chat-1")).resolves.toEqual([
+        {
+            id: "request-1:llm",
+            role: "assistant",
+            content: "履歴回答",
+            citations: [
+                {
+                    text: "履歴回答",
+                    spanStart: 0,
+                    spanEnd: 4,
+                    sources: [
+                        {
+                            content: "履歴引用抜粋",
+                            locationType: "S3",
+                            uri: "s3://bucket/history.pdf",
+                            metadata: { title: "History Paper", page: 5 },
+                        },
+                    ],
+                },
+            ],
+            createdAt: "2026-06-15T00:02:00Z",
+        },
+    ]);
 });

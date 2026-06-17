@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 
 from src.application.exceptions import RepositoryNotFoundError
-from src.application.ports.out.chat import ChatSummary
+from src.application.ports.out.chat import ChatMessageRecord, ChatSummary
 from src.application.use_cases.chat.list_chats.list_chats import ListChatsUseCase
 from src.application.use_cases.chat.list_chats.list_chats_dto import ListChatsInput
 
@@ -24,6 +24,14 @@ class StubChatQueryRepository:
         if self.chats is None:
             raise RepositoryNotFoundError
         return self.chats
+
+    async def list_messages_by_chat_id(
+        self,
+        *,
+        user_id: UUID,
+        chat_id: UUID,
+    ) -> tuple[ChatMessageRecord, ...]:
+        raise NotImplementedError
 
 
 @pytest.mark.asyncio

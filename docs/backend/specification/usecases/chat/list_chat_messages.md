@@ -13,6 +13,7 @@
 
 - チャットIDに紐づくチャットメッセージ一覧の取得
 - メッセージ発信日時の昇順での並び替え
+- LLM回答に紐づく引用情報の取得
 - 認証済みユーザーが所有するチャットへの取得対象の限定
 
 ### 対象外
@@ -57,6 +58,7 @@
 | `ChatMessageOutput.request_id` | UUID v7 | ユーザー質問とLLM回答を関連付ける識別子 |
 | `ChatMessageOutput.sender` | `str` | メッセージ発信者 |
 | `ChatMessageOutput.content` | `str` | メッセージ内容 |
+| `ChatMessageOutput.citations` | `ChatCitation[]` | LLM回答に紐づく引用情報。引用情報がない場合またはユーザー発信の場合は空配列 |
 | `ChatMessageOutput.sent_at` | タイムゾーンを含む日時 | メッセージ発信日時 |
 
 ## 6. 認可要件
@@ -126,6 +128,7 @@ flowchart TD
 
 - 指定チャットのメッセージが発信日時の昇順で返される
 - ユーザー質問とLLM回答を関連付けるチャットターンIDが返される
+- LLM回答に紐づく引用情報が返される
 - 他ユーザー所有または存在しないチャットでは`RepositoryNotFoundError`が送出される
 - 不正なチャットIDはメッセージ取得前に拒否される
 

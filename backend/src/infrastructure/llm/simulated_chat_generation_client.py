@@ -46,8 +46,8 @@ class SimulatedChatGenerationClient:
     def _answer() -> str:
         return _ANSWER
 
-    @staticmethod
-    def _citations() -> tuple[GeneratedChatCitation, ...]:
+    @classmethod
+    def _citations(cls) -> tuple[GeneratedChatCitation, ...]:
         return (
             GeneratedChatCitation(
                 text="これはローカル動作確認用の疑似回答です。",
@@ -61,12 +61,11 @@ class SimulatedChatGenerationClient:
                         ),
                         location_type="S3",
                         uri="s3://paperbuddy-local-rag-sources/sample-paper.pdf",
-                        metadata={
-                            "title": "PaperBuddy ローカル検証用サンプル論文",
-                            "file_name": "sample-paper.pdf",
-                            "page": 1,
-                            "source": "local-simulation",
-                        },
+                        metadata=cls._source_metadata(
+                            title="PaperBuddy ローカル検証用サンプル論文",
+                            file_name="sample-paper.pdf",
+                            page=1,
+                        ),
                     ),
                 ),
             ),
@@ -82,13 +81,21 @@ class SimulatedChatGenerationClient:
                         ),
                         location_type="S3",
                         uri="s3://paperbuddy-local-rag-sources/chat-flow-guide.pdf",
-                        metadata={
-                            "title": "チャット動作確認ガイド",
-                            "file_name": "chat-flow-guide.pdf",
-                            "page": 4,
-                            "source": "local-simulation",
-                        },
+                        metadata=cls._source_metadata(
+                            title="チャット動作確認ガイド",
+                            file_name="chat-flow-guide.pdf",
+                            page=4,
+                        ),
                     ),
                 ),
             ),
         )
+
+    @staticmethod
+    def _source_metadata(*, title: str, file_name: str, page: int) -> dict[str, object]:
+        return {
+            "title": title,
+            "file_name": file_name,
+            "page": page,
+            "source": "local-simulation",
+        }

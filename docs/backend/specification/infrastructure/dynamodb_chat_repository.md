@@ -51,7 +51,7 @@
 | 項目 | `pk` | `sk` | 用途 |
 | --- | --- | --- | --- |
 | チャット本体 | `CHAT#{chat_id UUID v7}` | `CHAT` | 継続対象チャットの取得、楽観排他更新。`session_id`を属性として保持する |
-| メッセージ | `CHAT#{chat_id}` | `MESSAGE#{sent_at}#{request_id}#{sender_order}` | チャット別メッセージ履歴 |
+| メッセージ | `CHAT#{chat_id}` | `MESSAGE#{sent_at}#{request_id}#{sender_order}` | チャット別メッセージ履歴。LLM回答の場合は`citations`をList/Map属性として保持する |
 
 ユーザー別チャット一覧用に、`gsi1`という名前のGSIを使用する。
 
@@ -66,7 +66,7 @@
 ### save_started_chat
 
 - 内部入力: `Chat`、初回ユーザー`ChatMessage`、初回LLM `ChatMessage`
-- 外部入力への変換: UUIDの`chat_id`を文字列化し、`session_id`を独立属性として持つチャット本体1項目とメッセージ2項目を`TransactWriteItems`へ変換する。チャット本体には主キーが未存在である条件式を付ける
+- 外部入力への変換: UUIDの`chat_id`を文字列化し、`session_id`を独立属性として持つチャット本体1項目とメッセージ2項目を`TransactWriteItems`へ変換する。メッセージ項目には`citations`をList/Map属性として保存する。チャット本体には主キーが未存在である条件式を付ける
 - 外部出力: 書き込み成功または`ClientError`
 - 内部出力への変換: 成功時は戻り値なし
 
@@ -80,7 +80,7 @@
 ### save_exchange
 
 - 内部入力: 更新済み`Chat`、追加ユーザー`ChatMessage`、追加LLM `ChatMessage`
-- 外部入力への変換: チャット本体1項目とメッセージ2項目を`TransactWriteItems`へ変換する。チャット本体には永続化済み`version`が更新前バージョンと一致する条件式を付ける
+- 外部入力への変換: チャット本体1項目とメッセージ2項目を`TransactWriteItems`へ変換する。メッセージ項目には`citations`をList/Map属性として保存する。チャット本体には永続化済み`version`が更新前バージョンと一致する条件式を付ける
 - 外部出力: 書き込み成功または`ClientError`
 - 内部出力への変換: 成功時は戻り値なし
 
@@ -96,7 +96,7 @@
 - 内部入力: `user_id`、`chat_id`
 - 外部入力への変換: チャット本体で所有ユーザーを確認後、`pk = CHAT#{chat_id}`かつ`sk begins_with MESSAGE#`として強い整合性のQueryを昇順実行する
 - 外部出力: メッセージ項目一覧
-- 内部出力への変換: `ChatMessageRecord`のタプルへ変換する
+- 内部出力への変換: メッセージ本文、発信者、発信日時、`citations`を`ChatMessageRecord`のタプルへ変換する。既存データなどで`citations`属性が存在しない場合は空配列として扱う
 
 ### update_title
 
@@ -111,7 +111,7 @@
 - 内部出力への変換: 成功時は戻り値なし
 - 制約: 複数バッチにまたがる削除は原子的ではない
 
-日時はUTCへ変換したISO 8601文字列として保存する。メッセージ履歴は同一発信日時でもユーザー、LLMの順序で取得できることを保証する。
+日時はUTCへ変換したISO 8601文字列として保存する。メッセージ履歴は同一発信日時でもユーザー、LLMの順序で取得できることを保証する。引用情報はDynamoDBのList/Map属性として保存し、JSON文字列化しない。
 
 ## エラー変換
 

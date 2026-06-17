@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
@@ -135,7 +137,7 @@ def test_rejects_unknown_chat_generation_mode() -> None:
     with pytest.raises(ValidationError, match="chat_generation_mode"):
         Settings(
             chat_infrastructure_mode=ChatInfrastructureMode.LOCAL,
-            chat_generation_mode="unknown",
+            chat_generation_mode=cast(ChatGenerationMode, "unknown"),
             aws_region="ap-northeast-1",
             dynamodb_chat_table_name="chat-table",
             dynamodb_library_table_name="library-table",

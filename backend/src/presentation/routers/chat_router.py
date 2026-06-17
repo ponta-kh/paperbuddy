@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Annotated
 from uuid import UUID
 
@@ -31,6 +32,7 @@ from src.dependencies.chat_deps import (
     get_rename_chat_use_case,
     get_start_chat_use_case,
 )
+from src.domain.entities.chat.chat import ChatCitation
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
 from src.presentation.request_id import get_request_id
 from src.presentation.schemas.chat_schema import (
@@ -49,6 +51,28 @@ from src.presentation.schemas.chat_schema import (
 )
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+def _citation_responses(
+    citations: Iterable[ChatCitation],
+) -> list[ChatCitationResponse]:
+    return [
+        ChatCitationResponse(
+            text=citation.text,
+            span_start=citation.span_start,
+            span_end=citation.span_end,
+            sources=[
+                ChatCitationSourceResponse(
+                    content=source.content,
+                    location_type=source.location_type,
+                    uri=source.uri,
+                    metadata=source.metadata,
+                )
+                for source in citation.sources
+            ],
+        )
+        for citation in citations
+    ]
 
 
 @router.patch("/{chat_id}", response_model=RenameChatResponse)
@@ -131,6 +155,7 @@ async def list_chat_messages(
                 request_id=message.request_id,
                 sender=message.sender,
                 content=message.content,
+                citations=_citation_responses(message.citations),
                 sent_at=message.sent_at,
             )
             for message in output.messages
@@ -157,23 +182,7 @@ async def continue_chat(
     return ContinueChatResponse(
         chat_id=output.chat_id,
         answer=output.answer,
-        citations=[
-            ChatCitationResponse(
-                text=citation.text,
-                span_start=citation.span_start,
-                span_end=citation.span_end,
-                sources=[
-                    ChatCitationSourceResponse(
-                        content=source.content,
-                        location_type=source.location_type,
-                        uri=source.uri,
-                        metadata=source.metadata,
-                    )
-                    for source in citation.sources
-                ],
-            )
-            for citation in output.citations
-        ],
+        citations=_citation_responses(output.citations),
         title=output.title,
         last_updated_at=output.last_updated_at,
     )
@@ -196,23 +205,7 @@ async def start_chat(
     return StartChatResponse(
         chat_id=output.chat_id,
         answer=output.answer,
-        citations=[
-            ChatCitationResponse(
-                text=citation.text,
-                span_start=citation.span_start,
-                span_end=citation.span_end,
-                sources=[
-                    ChatCitationSourceResponse(
-                        content=source.content,
-                        location_type=source.location_type,
-                        uri=source.uri,
-                        metadata=source.metadata,
-                    )
-                    for source in citation.sources
-                ],
-            )
-            for citation in output.citations
-        ],
+        citations=_citation_responses(output.citations),
         title=output.title,
         last_updated_at=output.last_updated_at,
     )

@@ -32,6 +32,7 @@ USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
+_CITATION_METADATA: dict[str, object] = {"page": 3}
 CITATIONS = (
     GeneratedChatCitation(
         text="new answer",
@@ -42,7 +43,7 @@ CITATIONS = (
                 content="source excerpt",
                 location_type="S3",
                 uri="s3://bucket/paper.pdf",
-                metadata={"page": 3},
+                metadata=_CITATION_METADATA,
             ),
         ),
     ),
@@ -93,6 +94,8 @@ async def test_continue_chat_saves_exchange_at_24_hours_boundary() -> None:
     assert saved_chat is chat
     assert saved_chat.last_updated_at == answered_at
     assert user_message.request_id == llm_message.request_id == REQUEST_ID
+    assert user_message.citations == ()
+    assert llm_message.citations == CITATIONS
 
 
 @pytest.mark.asyncio

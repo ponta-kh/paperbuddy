@@ -1,6 +1,8 @@
 import asyncio
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, cast
+from decimal import Decimal
+from typing import Any, TypeGuard, cast
 from uuid import UUID
 
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -8,7 +10,12 @@ from botocore.exceptions import ClientError
 
 from src.application.exceptions import RepositoryAccessError, RepositoryNotFoundError
 from src.application.ports.out.chat import ChatMessageRecord, ChatSummary
-from src.domain.entities.chat.chat import Chat, ChatMessage
+from src.domain.entities.chat.chat import (
+    Chat,
+    ChatCitation,
+    ChatCitationSource,
+    ChatMessage,
+)
 from src.domain.repositories.chat_command_repository_protocol import (
     ChatConflictError,
     ChatLoadError,
@@ -250,6 +257,7 @@ class _DynamoDbChatRepositoryOperations:
                 sender=item["sender"],
                 content=item["content"],
                 sent_at=self._parse_datetime(item["sent_at"]),
+                citations=self._to_citations(item.get("citations", [])),
             )
             for item in items
         )
@@ -317,8 +325,87 @@ class _DynamoDbChatRepositoryOperations:
             "request_id": str(message.request_id),
             "sender": message.sender.value,
             "content": content,
+            "citations": cls._citation_items(message.citations),
             "sent_at": sent_at,
         }
+
+    @staticmethod
+    def _citation_items(citations: tuple[ChatCitation, ...]) -> list[dict[str, Any]]:
+        return [
+            {
+                "text": citation.text,
+                "span_start": citation.span_start,
+                "span_end": citation.span_end,
+                "sources": [
+                    {
+                        "content": source.content,
+                        "location_type": source.location_type,
+                        "uri": source.uri,
+                        "metadata": source.metadata,
+                    }
+                    for source in citation.sources
+                ],
+            }
+            for citation in citations
+        ]
+
+    @classmethod
+    def _to_citations(cls, value: object) -> tuple[ChatCitation, ...]:
+        if not isinstance(value, list):
+            return ()
+        return tuple(
+            cls._to_citation(item) for item in value if cls._is_str_mapping(item)
+        )
+
+    @classmethod
+    def _to_citation(cls, item: Mapping[str, object]) -> ChatCitation:
+        sources = item.get("sources", [])
+        if not isinstance(sources, list):
+            sources = []
+        return ChatCitation(
+            text=cls._optional_str(item.get("text")) or "",
+            span_start=cls._optional_int(item.get("span_start")),
+            span_end=cls._optional_int(item.get("span_end")),
+            sources=tuple(
+                cls._to_citation_source(source)
+                for source in sources
+                if cls._is_str_mapping(source)
+            ),
+        )
+
+    @classmethod
+    def _to_citation_source(cls, item: Mapping[str, object]) -> ChatCitationSource:
+        metadata = item.get("metadata", {})
+        if not isinstance(metadata, Mapping):
+            metadata = {}
+        location_type = item.get("location_type")
+        uri = item.get("uri")
+        return ChatCitationSource(
+            content=cls._optional_str(item.get("content")) or "",
+            location_type=location_type if isinstance(location_type, str) else None,
+            uri=uri if isinstance(uri, str) else None,
+            metadata=dict(metadata),
+        )
+
+    @staticmethod
+    def _optional_str(value: object) -> str | None:
+        if isinstance(value, str):
+            return value
+        return None
+
+    @staticmethod
+    def _is_str_mapping(value: object) -> TypeGuard[Mapping[str, object]]:
+        return isinstance(value, Mapping) and all(isinstance(key, str) for key in value)
+
+    @staticmethod
+    def _optional_int(value: object) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, Decimal):
+            return int(value)
+        return None
 
     @staticmethod
     def _to_chat(item: dict[str, Any]) -> Chat:

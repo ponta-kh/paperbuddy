@@ -39,6 +39,7 @@ class ListChatMessagesUseCase:
                     sender=message.sender,
                     content=message.content,
                     sent_at=message.sent_at,
+                    citations=message.citations,
                 )
                 for message in messages
             ),

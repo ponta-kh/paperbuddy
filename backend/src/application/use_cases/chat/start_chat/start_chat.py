@@ -73,6 +73,7 @@ class StartChatUseCase:
             sender=MessageSender.LLM,
             content=generated.answer,
             sent_at=answered_at,
+            citations=generated.citations,
         )
         # 保存前にDomainルールを通し、
         # 永続化層へ不整合な初回ターンを渡さない。

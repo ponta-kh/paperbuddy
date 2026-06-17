@@ -72,6 +72,7 @@ class ChatMessageResponse(BaseModel):
     request_id: UUID
     sender: str
     content: str
+    citations: list[ChatCitationResponse]
     sent_at: datetime
 
 

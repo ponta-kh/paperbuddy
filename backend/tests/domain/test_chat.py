@@ -1,12 +1,19 @@
 from datetime import datetime, timedelta, timezone
+from typing import cast
 from uuid import UUID
 
 import pytest
 
-from src.domain.entities.chat.chat import Chat, ChatMessage
+from src.domain.entities.chat.chat import (
+    Chat,
+    ChatCitation,
+    ChatCitationSource,
+    ChatMessage,
+)
 from src.domain.exceptions.chat_exception import (
     ChatContinuationExpiredError,
     ChatOwnershipMismatchError,
+    InvalidChatCitationError,
     InvalidChatIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
@@ -21,6 +28,22 @@ USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 OTHER_USER_ID = UUID("00000000-0000-0000-0000-000000000002")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 ANSWERED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_CITATION_METADATA: dict[str, object] = {"title": "paper", "page": 3}
+CITATIONS = (
+    ChatCitation(
+        text="answer",
+        span_start=0,
+        span_end=6,
+        sources=(
+            ChatCitationSource(
+                content="source excerpt",
+                location_type="S3",
+                uri="s3://bucket/paper.pdf",
+                metadata=_CITATION_METADATA,
+            ),
+        ),
+    ),
+)
 
 
 def _chat(answered_at: datetime = ANSWERED_AT) -> Chat:
@@ -89,8 +112,8 @@ def test_chat_rejects_owner_mismatch() -> None:
 
 def test_chat_message_rejects_non_uuid_chat_id() -> None:
     with pytest.raises(InvalidChatIdError):
-        ChatMessage(  # type: ignore[arg-type]
-            "chat-1",
+        ChatMessage(
+            cast(UUID, "chat-1"),
             REQUEST_ID,
             MessageSender.USER,
             Prompt("question"),
@@ -100,9 +123,9 @@ def test_chat_message_rejects_non_uuid_chat_id() -> None:
 
 def test_chat_message_rejects_invalid_request_id() -> None:
     with pytest.raises(InvalidChatTurnError):
-        ChatMessage(  # type: ignore[arg-type]
+        ChatMessage(
             CHAT_ID,
-            "request-1",
+            cast(UUID, "request-1"),
             MessageSender.USER,
             Prompt("question"),
             ANSWERED_AT,
@@ -139,6 +162,31 @@ def test_chat_message_rejects_content_for_wrong_sender(
             content,
             ANSWERED_AT,
         )
+
+
+def test_chat_message_rejects_citations_for_user_message() -> None:
+    with pytest.raises(InvalidChatCitationError):
+        ChatMessage(
+            CHAT_ID,
+            REQUEST_ID,
+            MessageSender.USER,
+            Prompt("question"),
+            ANSWERED_AT,
+            citations=CITATIONS,
+        )
+
+
+def test_chat_message_accepts_citations_for_llm_message() -> None:
+    message = ChatMessage(
+        CHAT_ID,
+        REQUEST_ID,
+        MessageSender.LLM,
+        "answer",
+        ANSWERED_AT,
+        citations=CITATIONS,
+    )
+
+    assert message.citations == CITATIONS
 
 
 def _message_pair(

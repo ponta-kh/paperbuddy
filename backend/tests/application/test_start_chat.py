@@ -28,6 +28,7 @@ USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 USER_SENT_AT = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
 ANSWERED_AT = datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc)
+_CITATION_METADATA: dict[str, object] = {"page": 3}
 CITATIONS = (
     GeneratedChatCitation(
         text="answer",
@@ -38,7 +39,7 @@ CITATIONS = (
                 content="source excerpt",
                 location_type="S3",
                 uri="s3://bucket/paper.pdf",
-                metadata={"page": 3},
+                metadata=_CITATION_METADATA,
             ),
         ),
     ),
@@ -105,6 +106,8 @@ async def test_start_chat_saves_chat_and_turn() -> None:
     assert user_message.request_id == llm_message.request_id == REQUEST_ID
     assert user_message.sender is MessageSender.USER
     assert llm_message.sender is MessageSender.LLM
+    assert user_message.citations == ()
+    assert llm_message.citations == CITATIONS
 
 
 @pytest.mark.asyncio

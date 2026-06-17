@@ -21,6 +21,10 @@ class InvalidMessageSenderError(DomainError):
     pass
 
 
+class InvalidChatCitationError(DomainError):
+    pass
+
+
 class InvalidChatTurnError(DomainError):
     pass
 

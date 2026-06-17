@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import cast
 from uuid import UUID
 
 import jwt
@@ -12,6 +13,7 @@ from src.presentation.auth import (
     AuthenticatedUser,
     AuthenticationError,
     CognitoJwtVerifier,
+    SigningKey,
     get_authenticated_user,
 )
 from src.presentation.exception_handlers import register_exception_handlers
@@ -23,8 +25,8 @@ PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
 class StubSigningKeyClient:
-    def get_signing_key_from_jwt(self, _: str) -> SimpleNamespace:
-        return SimpleNamespace(key=PRIVATE_KEY.public_key())
+    def get_signing_key_from_jwt(self, token: str) -> SigningKey:
+        return cast(SigningKey, SimpleNamespace(key=PRIVATE_KEY.public_key()))
 
 
 def create_token(**overrides: object) -> str:

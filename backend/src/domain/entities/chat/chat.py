@@ -5,6 +5,7 @@ from uuid import UUID
 from src.domain.exceptions.chat_exception import (
     ChatContinuationExpiredError,
     ChatOwnershipMismatchError,
+    InvalidChatCitationError,
     InvalidChatIdError,
     InvalidChatTurnError,
     InvalidMessageSenderError,
@@ -16,12 +17,51 @@ from src.domain.value_objects.chat.prompt import Prompt
 
 
 @dataclass(frozen=True, slots=True)
+class ChatCitationSource:
+    content: str
+    location_type: str | None
+    uri: str | None
+    metadata: dict[str, object]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.content, str):
+            raise InvalidChatCitationError
+        if self.location_type is not None and not isinstance(self.location_type, str):
+            raise InvalidChatCitationError
+        if self.uri is not None and not isinstance(self.uri, str):
+            raise InvalidChatCitationError
+        if not isinstance(self.metadata, dict):
+            raise InvalidChatCitationError
+
+
+@dataclass(frozen=True, slots=True)
+class ChatCitation:
+    text: str
+    span_start: int | None
+    span_end: int | None
+    sources: tuple[ChatCitationSource, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str):
+            raise InvalidChatCitationError
+        if self.span_start is not None and not isinstance(self.span_start, int):
+            raise InvalidChatCitationError
+        if self.span_end is not None and not isinstance(self.span_end, int):
+            raise InvalidChatCitationError
+        if not isinstance(self.sources, tuple) or not all(
+            isinstance(source, ChatCitationSource) for source in self.sources
+        ):
+            raise InvalidChatCitationError
+
+
+@dataclass(frozen=True, slots=True)
 class ChatMessage:
     chat_id: UUID
     request_id: UUID
     sender: MessageSender
     content: Prompt | str
     sent_at: datetime
+    citations: tuple[ChatCitation, ...] = ()
 
     def __post_init__(self) -> None:
         # ChatMessageは保存後に更新しない前提のため、
@@ -36,6 +76,12 @@ class ChatMessage:
             raise InvalidMessageSenderError
         if self.sender is MessageSender.LLM and not isinstance(self.content, str):
             raise InvalidMessageSenderError
+        if not isinstance(self.citations, tuple) or not all(
+            isinstance(citation, ChatCitation) for citation in self.citations
+        ):
+            raise InvalidChatCitationError
+        if self.sender is MessageSender.USER and self.citations:
+            raise InvalidChatCitationError
 
 
 @dataclass(slots=True)

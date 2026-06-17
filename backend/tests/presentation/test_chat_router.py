@@ -16,18 +16,28 @@ from src.application.ports.out.chat_generation_client_protocol import (
     GeneratedChatCitationSource,
 )
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
+    ContinueChatInput,
     ContinueChatOutput,
 )
+from src.application.use_cases.chat.delete_chat.delete_chat_dto import DeleteChatInput
 from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto import (
     ChatMessageOutput,
+    ListChatMessagesInput,
     ListChatMessagesOutput,
 )
 from src.application.use_cases.chat.list_chats.list_chats_dto import (
     ChatSummaryOutput,
+    ListChatsInput,
     ListChatsOutput,
 )
-from src.application.use_cases.chat.rename_chat.rename_chat_dto import RenameChatOutput
-from src.application.use_cases.chat.start_chat.start_chat_dto import StartChatOutput
+from src.application.use_cases.chat.rename_chat.rename_chat_dto import (
+    RenameChatInput,
+    RenameChatOutput,
+)
+from src.application.use_cases.chat.start_chat.start_chat_dto import (
+    StartChatInput,
+    StartChatOutput,
+)
 from src.dependencies.chat_deps import (
     get_continue_chat_use_case,
     get_delete_chat_use_case,
@@ -45,6 +55,7 @@ CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 CHAT_ID_TEXT = str(CHAT_ID)
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 LAST_UPDATED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_CITATION_METADATA: dict[str, object] = {"page": 3, "title": "paper"}
 CITATIONS = (
     GeneratedChatCitation(
         text="answer",
@@ -55,7 +66,7 @@ CITATIONS = (
                 content="source excerpt",
                 location_type="S3",
                 uri="s3://bucket/paper.pdf",
-                metadata={"page": 3, "title": "paper"},
+                metadata=_CITATION_METADATA,
             ),
         ),
     ),
@@ -63,7 +74,7 @@ CITATIONS = (
 
 
 class StubStartChatUseCase:
-    async def execute(self, command: object) -> StartChatOutput:
+    async def execute(self, command: StartChatInput) -> StartChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.prompt == "question"
         assert command.request_id == REQUEST_ID
@@ -77,7 +88,7 @@ class StubStartChatUseCase:
 
 
 class StubContinueChatUseCase:
-    async def execute(self, command: object) -> ContinueChatOutput:
+    async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.chat_id == CHAT_ID
         assert command.prompt == "next question"
@@ -92,7 +103,7 @@ class StubContinueChatUseCase:
 
 
 class StubRenameChatUseCase:
-    async def execute(self, command: object) -> RenameChatOutput:
+    async def execute(self, command: RenameChatInput) -> RenameChatOutput:
         assert command.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert command.chat_id == CHAT_ID
         assert command.title == "変更後"
@@ -104,7 +115,7 @@ class StubDeleteChatUseCase:
     def __init__(self) -> None:
         self.called = False
 
-    async def execute(self, command: object) -> None:
+    async def execute(self, command: DeleteChatInput) -> None:
         assert command.chat_id == CHAT_ID
         assert command.user_id == USER_ID
         assert command.request_id == REQUEST_ID
@@ -112,27 +123,27 @@ class StubDeleteChatUseCase:
 
 
 class StubExpiredContinueChatUseCase:
-    async def execute(self, command: object) -> ContinueChatOutput:
+    async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
         raise ChatContinuationExpiredError
 
 
 class StubConflictContinueChatUseCase:
-    async def execute(self, command: object) -> ContinueChatOutput:
+    async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
         raise ChatConflictError
 
 
 class StubRateLimitedStartChatUseCase:
-    async def execute(self, command: object) -> StartChatOutput:
+    async def execute(self, command: StartChatInput) -> StartChatOutput:
         raise ChatGenerationRateLimitError
 
 
 class StubConfigurationErrorStartChatUseCase:
-    async def execute(self, command: object) -> StartChatOutput:
+    async def execute(self, command: StartChatInput) -> StartChatOutput:
         raise ChatGenerationConfigurationError
 
 
 class StubListChatsUseCase:
-    async def execute(self, query: object) -> ListChatsOutput:
+    async def execute(self, query: ListChatsInput) -> ListChatsOutput:
         assert query.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert query.request_id == REQUEST_ID
         created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -149,7 +160,7 @@ class StubListChatsUseCase:
 
 
 class StubListChatMessagesUseCase:
-    async def execute(self, query: object) -> ListChatMessagesOutput:
+    async def execute(self, query: ListChatMessagesInput) -> ListChatMessagesOutput:
         assert query.user_id == UUID("00000000-0000-0000-0000-000000000001")
         assert query.chat_id == CHAT_ID
         assert query.request_id == REQUEST_ID
@@ -158,21 +169,22 @@ class StubListChatMessagesUseCase:
             messages=(
                 ChatMessageOutput(
                     request_id=UUID("00000000-0000-0000-0000-000000000010"),
-                    sender="user",
-                    content="question",
+                    sender="llm",
+                    content="answer",
                     sent_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    citations=CITATIONS,
                 ),
             ),
         )
 
 
 class StubNotFoundListChatMessagesUseCase:
-    async def execute(self, query: object) -> ListChatMessagesOutput:
+    async def execute(self, query: ListChatMessagesInput) -> ListChatMessagesOutput:
         raise RepositoryNotFoundError
 
 
 class StubUnavailableListChatsUseCase:
-    async def execute(self, query: object) -> ListChatsOutput:
+    async def execute(self, query: ListChatsInput) -> ListChatsOutput:
         raise RepositoryAccessError
 
 
@@ -242,8 +254,23 @@ def test_list_chat_messages_endpoint() -> None:
         "messages": [
             {
                 "request_id": "00000000-0000-0000-0000-000000000010",
-                "sender": "user",
-                "content": "question",
+                "sender": "llm",
+                "content": "answer",
+                "citations": [
+                    {
+                        "text": "answer",
+                        "span_start": 0,
+                        "span_end": 6,
+                        "sources": [
+                            {
+                                "content": "source excerpt",
+                                "location_type": "S3",
+                                "uri": "s3://bucket/paper.pdf",
+                                "metadata": {"page": 3, "title": "paper"},
+                            }
+                        ],
+                    }
+                ],
                 "sent_at": "2026-01-01T00:00:00Z",
             }
         ],

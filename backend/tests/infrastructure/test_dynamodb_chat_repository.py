@@ -6,7 +6,12 @@ import pytest
 from botocore.exceptions import ClientError
 
 from src.application.exceptions import RepositoryAccessError, RepositoryNotFoundError
-from src.domain.entities.chat.chat import Chat, ChatMessage
+from src.domain.entities.chat.chat import (
+    Chat,
+    ChatCitation,
+    ChatCitationSource,
+    ChatMessage,
+)
 from src.domain.repositories.chat_command_repository_protocol import (
     ChatConflictError,
     ChatLoadError,
@@ -29,6 +34,25 @@ SECOND_CHAT_ID = UUID("10000000-0000-0000-0000-000000000002")
 REQUEST_ID = UUID("00000000-0000-0000-0000-000000000010")
 
 
+def _citations() -> tuple[ChatCitation, ...]:
+    metadata: dict[str, object] = {"title": "paper", "page": 3}
+    return (
+        ChatCitation(
+            text="answer",
+            span_start=0,
+            span_end=6,
+            sources=(
+                ChatCitationSource(
+                    content="source excerpt",
+                    location_type="S3",
+                    uri="s3://bucket/paper.pdf",
+                    metadata=metadata,
+                ),
+            ),
+        ),
+    )
+
+
 def _chat() -> Chat:
     return Chat.create(
         chat_id=CHAT_ID,
@@ -43,6 +67,7 @@ def _messages(
     *,
     user_sent_at: datetime = ANSWERED_AT,
     llm_sent_at: datetime = ANSWERED_AT,
+    citations: tuple[ChatCitation, ...] = (),
 ) -> tuple[ChatMessage, ChatMessage]:
     return (
         ChatMessage(
@@ -58,6 +83,7 @@ def _messages(
             MessageSender.LLM,
             "answer",
             llm_sent_at,
+            citations=citations,
         ),
     )
 
@@ -100,6 +126,32 @@ async def test_save_started_chat_writes_chat_and_messages_atomically() -> None:
         str(REQUEST_ID),
     ]
     assert stored[1]["sk"] < stored[2]["sk"]
+
+
+@pytest.mark.asyncio
+async def test_save_started_chat_writes_llm_message_citations() -> None:
+    client = Mock()
+    repository = DynamoDbChatRepository(client, table_name="chat-table")
+
+    await repository.save_started_chat(_chat(), *_messages(citations=_citations()))
+
+    transaction = client.transact_write_items.call_args.kwargs["TransactItems"]
+    llm_message = repository._deserialize(transaction[2]["Put"]["Item"])
+    assert llm_message["citations"] == [
+        {
+            "text": "answer",
+            "span_start": 0,
+            "span_end": 6,
+            "sources": [
+                {
+                    "content": "source excerpt",
+                    "location_type": "S3",
+                    "uri": "s3://bucket/paper.pdf",
+                    "metadata": {"title": "paper", "page": 3},
+                }
+            ],
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -427,6 +479,35 @@ async def test_list_messages_checks_owner_and_returns_records() -> None:
     assert [message.content for message in messages] == ["question", "answer"]
     assert [message.request_id for message in messages] == [REQUEST_ID, REQUEST_ID]
     assert client.query.call_args.kwargs["ConsistentRead"] is True
+
+
+@pytest.mark.asyncio
+async def test_list_messages_restores_citations() -> None:
+    client = Mock()
+    repository = DynamoDbChatRepository(client, table_name="chat-table")
+    message_items = [
+        repository._serialize(repository._message_item(message))
+        for message in _messages(citations=_citations())
+    ]
+    client.get_item.return_value = {"Item": _serialized_chat_item(repository)}
+    client.query.return_value = {"Items": message_items}
+
+    messages = await repository.list_messages_by_chat_id(
+        user_id=USER_ID, chat_id=CHAT_ID
+    )
+
+    assert messages[0].citations == ()
+    assert len(messages[1].citations) == 1
+    assert messages[1].citations[0].text == "answer"
+    assert messages[1].citations[0].span_start == 0
+    assert messages[1].citations[0].span_end == 6
+    assert messages[1].citations[0].sources[0].content == "source excerpt"
+    assert messages[1].citations[0].sources[0].location_type == "S3"
+    assert messages[1].citations[0].sources[0].uri == "s3://bucket/paper.pdf"
+    assert messages[1].citations[0].sources[0].metadata == {
+        "title": "paper",
+        "page": 3,
+    }
 
 
 @pytest.mark.asyncio

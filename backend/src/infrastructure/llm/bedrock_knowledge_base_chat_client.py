@@ -96,16 +96,19 @@ class BedrockKnowledgeBaseChatClient:
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
-            response = await asyncio.to_thread(
-                self._knowledge_base_client.retrieve_and_generate,
-                input={"text": prompt},
-                retrieveAndGenerateConfiguration={
-                    "type": "KNOWLEDGE_BASE",
-                    "knowledgeBaseConfiguration": {
-                        "knowledgeBaseId": self._knowledge_base_id,
-                        "modelArn": self._model_arn,
+            response = cast(
+                dict[str, Any],
+                await asyncio.to_thread(
+                    self._knowledge_base_client.retrieve_and_generate,
+                    input={"text": prompt},
+                    retrieveAndGenerateConfiguration={
+                        "type": "KNOWLEDGE_BASE",
+                        "knowledgeBaseConfiguration": {
+                            "knowledgeBaseId": self._knowledge_base_id,
+                            "modelArn": self._model_arn,
+                        },
                     },
-                },
+                ),
             )
         except ClientError as error:
             self._raise_client_error(
@@ -113,6 +116,7 @@ class BedrockKnowledgeBaseChatClient:
                 operation="start_chat",
                 validation_error=ChatGenerationConfigurationError,
             )
+            raise AssertionError("到達不能な例外分岐です")
         except BotoCoreError as error:
             logger.exception(
                 "Bedrock Knowledge Baseへの接続に失敗しました",
@@ -149,17 +153,20 @@ class BedrockKnowledgeBaseChatClient:
         self, session_id: str, prompt: str
     ) -> _KnowledgeBaseChatResult:
         try:
-            response = await asyncio.to_thread(
-                self._knowledge_base_client.retrieve_and_generate,
-                input={"text": prompt},
-                retrieveAndGenerateConfiguration={
-                    "type": "KNOWLEDGE_BASE",
-                    "knowledgeBaseConfiguration": {
-                        "knowledgeBaseId": self._knowledge_base_id,
-                        "modelArn": self._model_arn,
+            response = cast(
+                dict[str, Any],
+                await asyncio.to_thread(
+                    self._knowledge_base_client.retrieve_and_generate,
+                    input={"text": prompt},
+                    retrieveAndGenerateConfiguration={
+                        "type": "KNOWLEDGE_BASE",
+                        "knowledgeBaseConfiguration": {
+                            "knowledgeBaseId": self._knowledge_base_id,
+                            "modelArn": self._model_arn,
+                        },
                     },
-                },
-                sessionId=session_id,
+                    sessionId=session_id,
+                ),
             )
         except ClientError as error:
             self._raise_client_error(
@@ -167,6 +174,7 @@ class BedrockKnowledgeBaseChatClient:
                 operation="continue_chat",
                 validation_error=ChatGenerationSessionUnavailableError,
             )
+            raise AssertionError("到達不能な例外分岐です")
         except BotoCoreError as error:
             logger.exception(
                 "Bedrock Knowledge Baseへの接続に失敗しました",

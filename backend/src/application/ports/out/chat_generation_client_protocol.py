@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, TypeAlias
+
+from src.domain.entities.chat.chat import ChatCitation, ChatCitationSource
 
 
 class ChatGenerationError(Exception):
@@ -30,20 +32,8 @@ class InvalidChatGenerationResponseError(ChatGenerationError):
     pass
 
 
-@dataclass(frozen=True, slots=True)
-class GeneratedChatCitationSource:
-    content: str
-    location_type: str | None
-    uri: str | None
-    metadata: dict[str, object]
-
-
-@dataclass(frozen=True, slots=True)
-class GeneratedChatCitation:
-    text: str
-    span_start: int | None
-    span_end: int | None
-    sources: tuple[GeneratedChatCitationSource, ...]
+GeneratedChatCitationSource: TypeAlias = ChatCitationSource
+GeneratedChatCitation: TypeAlias = ChatCitation
 
 
 @dataclass(frozen=True, slots=True)

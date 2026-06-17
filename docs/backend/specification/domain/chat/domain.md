@@ -11,6 +11,7 @@
 - アプリケーションが採番するチャットID、外部会話を継続するためのセッションID、タイトル、所有ユーザーID、作成日時、最終更新日時を持つチャット
 - チャット内のユーザーとLLMによるやり取り
 - やり取りの発信者、内容、発信日時
+- LLM回答に紐づく引用情報
 - プロンプトの不正入力チェック、文字数チェック、整形
 
 ### 対象外
@@ -31,6 +32,7 @@
 | チャットメッセージ | チャット内でユーザーまたはLLMが発信した1件の内容 |
 | チャットターン | ユーザーの質問と、それに対するLLM回答を1対1で関連付けた会話の1往復 |
 | 発信者 | チャットメッセージを発信した主体。ユーザーまたはLLMのいずれか |
+| 引用情報 | LLM回答に紐づく回答本文中の該当箇所と参照元抜粋 |
 | プロンプト | ユーザーがLLMへ渡すために入力した内容。検証および整形の対象となる |
 | 正常回答日時 | LLMから正常な回答を受領した時点で記録する日時 |
 | 作成日時 | チャット開始時にLLMから正常な回答が返された日時 |
@@ -92,12 +94,43 @@
 | `sender` | `MessageSender` | 必須 | ユーザーまたはLLM |
 | `content` | `Prompt \| str` | 必須 | ユーザー発信の場合は`Prompt`。LLM発信の場合は文字数上限を設けない`str` |
 | `sent_at` | タイムゾーンを含む日時 | 必須 | メッセージが発信された日時 |
+| `citations` | `tuple[ChatCitation, ...]` | 必須 | LLM回答に紐づく引用情報。ユーザー発信の場合は空でなければならない |
 
 #### 操作
 
 | 操作 | 入力 | 結果 | 関連するDomainルール | 送出するDomainエラー |
 | --- | --- | --- | --- | --- |
-| 生成 | `chat_id`, `request_id`, `sender`, `content`, `sent_at` | `ChatMessage`を生成する | DR-01, DR-02 | `InvalidChatIdError`, `InvalidPromptError`, `PromptTooLongError`, `InvalidMessageSenderError`, `InvalidChatTurnError` |
+| 生成 | `chat_id`, `request_id`, `sender`, `content`, `sent_at`, `citations` | `ChatMessage`を生成する | DR-01, DR-02, DR-12 | `InvalidChatIdError`, `InvalidPromptError`, `PromptTooLongError`, `InvalidMessageSenderError`, `InvalidChatCitationError`, `InvalidChatTurnError` |
+
+### ChatCitation
+
+- 種別: Value Object
+- 識別子: なし
+- 責務: LLM回答に紐づく回答本文中の該当箇所と参照元を表現する
+
+#### 属性
+
+| 属性名 | 型 | 必須 | 説明・制約 |
+| --- | --- | --- | --- |
+| `text` | `str` | 必須 | 回答本文中の引用対象テキスト |
+| `span_start` | `int \| None` | 必須 | 回答本文中の開始位置。取得できない場合は`None` |
+| `span_end` | `int \| None` | 必須 | 回答本文中の終了位置。取得できない場合は`None` |
+| `sources` | `tuple[ChatCitationSource, ...]` | 必須 | 引用対象に紐づく参照元 |
+
+### ChatCitationSource
+
+- 種別: Value Object
+- 識別子: なし
+- 責務: 引用情報の参照元抜粋、場所、メタデータを表現する
+
+#### 属性
+
+| 属性名 | 型 | 必須 | 説明・制約 |
+| --- | --- | --- | --- |
+| `content` | `str` | 必須 | 参照元の抜粋 |
+| `location_type` | `str \| None` | 必須 | 参照元の種別。例: `S3` |
+| `uri` | `str \| None` | 必須 | 参照元URI。取得できない場合は`None` |
+| `metadata` | `dict[str, object]` | 必須 | 参照元メタデータ |
 
 ## 6. Value Object
 
@@ -189,6 +222,12 @@
 - 内容: チャットは`user_id`で表される所有ユーザーのみが継続できる
 - 違反時のDomainエラー: `ChatOwnershipMismatchError`
 
+### DR-12: 引用情報の発信者制約
+
+- 対象: `ChatMessage`
+- 内容: 引用情報はLLM回答にのみ紐づけられる。ユーザー発信メッセージは引用情報を持ってはならない
+- 違反時のDomainエラー: `InvalidChatCitationError`
+
 ## 8. Domainエラー
 
 | エラー | 発生条件 | 呼び出し側が区別する理由 |
@@ -198,6 +237,7 @@
 | `InvalidPromptError` | 整形後のプロンプトが空文字 | 入力内容の修正を要求するため |
 | `PromptTooLongError` | 整形後のプロンプトが1,000文字を超える | 許容文字数内への修正を要求するため |
 | `InvalidMessageSenderError` | 発信者がユーザーまたはLLM以外 | 不正な発信者を持つメッセージの生成を拒否するため |
+| `InvalidChatCitationError` | 引用情報の構造が不正、またはユーザー発信メッセージが引用情報を持つ | 不正な引用情報を持つメッセージの保存を拒否するため |
 | `InvalidChatTurnError` | 同一ターンにユーザー質問とLLM回答が1件ずつ存在しない、または`chat_id`・`request_id`が一致しない | 不完全または不整合な会話の保存を拒否するため |
 | `MessageSentAtOutOfOrderError` | ユーザーメッセージが現在の最終更新日時より過去、またはLLMメッセージがユーザーメッセージより過去 | 発信日時の順序が不正な会話記録を拒否するため |
 | `ChatContinuationExpiredError` | `last_updated_at`から継続要求日時までが24時間を超過した | 継続できないチャットへの新しい会話記録を拒否するため |

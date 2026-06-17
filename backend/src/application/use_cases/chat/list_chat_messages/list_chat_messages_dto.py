@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from src.domain.entities.chat.chat import ChatCitation
+
 
 class ListChatMessagesInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -19,6 +21,7 @@ class ChatMessageOutput:
     sender: str
     content: str
     sent_at: datetime
+    citations: tuple[ChatCitation, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

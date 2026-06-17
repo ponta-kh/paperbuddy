@@ -84,6 +84,7 @@ class ContinueChatUseCase:
             sender=MessageSender.LLM,
             content=generated.answer,
             sent_at=answered_at,
+            citations=generated.citations,
         )
         # Domain側で発信順序と更新バージョンを確定してから、
         # Repository側の楽観排他保存へ渡す。
