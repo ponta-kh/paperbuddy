@@ -42,11 +42,6 @@ export function ChatAccountMenu({ account, onSignOut }: ChatAccountMenuProps) {
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                    <DropdownMenuItem>
-                        <Settings />
-                        設定
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut />
                         ログアウト
