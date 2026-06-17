@@ -19,12 +19,16 @@ _ANSWER = dedent(
 
 
 class SimulatedChatGenerationClient:
+    """ローカル動作確認用の疑似LLM回答生成Client。"""
+
     def __init__(self, *, delay_seconds: float = 2.0) -> None:
         if delay_seconds < 0:
             raise ValueError("delay_seconds must be non-negative")
         self._delay_seconds = delay_seconds
 
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult:
+        """固定回答、疑似セッションID、疑似引用情報を返す。"""
+
         await asyncio.sleep(self._delay_seconds)
         return StartGeneratedChatResult(
             session_id=f"local-{uuid7()}",
@@ -35,6 +39,8 @@ class SimulatedChatGenerationClient:
     async def continue_chat(
         self, session_id: str, prompt: str
     ) -> ContinueGeneratedChatResult:
+        """指定された疑似セッションIDを維持して固定回答と疑似引用情報を返す。"""
+
         await asyncio.sleep(self._delay_seconds)
         return ContinueGeneratedChatResult(
             session_id=session_id,

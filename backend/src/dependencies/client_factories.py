@@ -15,6 +15,8 @@ from src.infrastructure.llm.simulated_chat_generation_client import (
 
 
 def create_dynamodb_client(settings: Settings) -> Any:
+    """設定に応じたDynamoDBクライアントを生成する。"""
+
     client_options: dict[str, str] = {"region_name": settings.aws_region}
     if settings.is_local_mode:
         assert settings.dynamodb_endpoint_url is not None
@@ -23,6 +25,8 @@ def create_dynamodb_client(settings: Settings) -> Any:
 
 
 def create_chat_generation_client(settings: Settings) -> ChatGenerationClientProtocol:
+    """設定に応じたLLM回答生成Clientを生成する。"""
+
     if settings.uses_local_chat_generation:
         return SimulatedChatGenerationClient(
             delay_seconds=settings.simulated_llm_delay_seconds

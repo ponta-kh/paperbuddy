@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 class ContinueChatUseCase:
+    """既存チャットへユーザー質問を追加し、LLM回答を生成するユースケース。"""
+
     def __init__(
         self,
         chat_generation_client: ChatGenerationClientProtocol,
@@ -46,6 +48,18 @@ class ContinueChatUseCase:
         self._now = now or (lambda: datetime.now(timezone.utc))
 
     async def execute(self, command: ContinueChatInput) -> ContinueChatOutput:
+        """チャット所有者と継続期限を確認し、継続ターンを保存する。
+
+        Raises:
+            ChatContinuationExpiredError: チャット継続期限を超過している場合。
+            ChatNotFoundError: 指定されたチャットが存在しない、または所有者が一致しない場合。
+            ChatGenerationRateLimitError: LLM回答生成がレート制限された場合。
+            ChatGenerationPermissionDeniedError: LLM回答生成の権限が不足している場合。
+            ChatGenerationConfigurationError: LLM回答生成の設定が不正な場合。
+            ChatGenerationUnavailableError: LLM回答生成が一時的に利用できない場合。
+            InvalidChatGenerationResponseError: LLM回答生成レスポンスが期待形式ではない場合。
+        """
+
         prompt = Prompt(command.prompt)
         # チャットを取得してから所有者を確認し、
         # 権限外リクエストで副作用を起こさない。

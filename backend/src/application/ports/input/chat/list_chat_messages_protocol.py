@@ -7,4 +7,8 @@ from src.application.use_cases.chat.list_chat_messages.list_chat_messages_dto im
 
 
 class ListChatMessagesProtocol(Protocol):
-    async def execute(self, query: ListChatMessagesInput) -> ListChatMessagesOutput: ...
+    """チャットメッセージ履歴取得ユースケースの入力ポート。"""
+
+    async def execute(self, query: ListChatMessagesInput) -> ListChatMessagesOutput:
+        """指定チャットのメッセージ履歴を返す。"""
+        ...

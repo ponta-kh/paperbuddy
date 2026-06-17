@@ -14,23 +14,35 @@ from src.dependencies.settings import Settings, get_settings
 
 
 class AuthenticationError(Exception):
+    """HTTP認証に失敗した場合の例外。"""
+
     pass
 
 
 @dataclass(frozen=True, slots=True)
 class AuthenticatedUser:
+    """認証済みユーザーを表すPresentation層の値。"""
+
     user_id: UUID
 
 
 class SigningKey(Protocol):
+    """JWT検証に使用する署名鍵のProtocol。"""
+
     key: Any
 
 
 class SigningKeyClient(Protocol):
-    def get_signing_key_from_jwt(self, token: str) -> SigningKey: ...
+    """JWTから署名鍵を取得するClient契約。"""
+
+    def get_signing_key_from_jwt(self, token: str) -> SigningKey:
+        """JWT検証に使用する署名鍵を取得する。"""
+        ...
 
 
 class CognitoJwtVerifier:
+    """Amazon CognitoのAccess Tokenを検証するVerifier。"""
+
     def __init__(
         self,
         *,
@@ -51,6 +63,12 @@ class CognitoJwtVerifier:
         )
 
     def verify(self, token: str) -> AuthenticatedUser:
+        """Cognito Access Tokenを検証して認証済みユーザーを返す。
+
+        Raises:
+            AuthenticationError: トークンの署名、Issuer、Client ID、用途、ユーザーIDが不正な場合。
+        """
+
         try:
             signing_key = self._signing_key_client.get_signing_key_from_jwt(token)
             claims = jwt.decode(
@@ -91,6 +109,8 @@ def _create_cognito_jwt_verifier(
 def get_cognito_jwt_verifier(
     settings: Settings = Depends(get_settings),
 ) -> CognitoJwtVerifier:
+    """Cognito JWT Verifierを返すFastAPI依存性注入関数。"""
+
     if not settings.cognito_user_pool_id or not settings.cognito_user_pool_client_id:
         raise AuthenticationError
     return _create_cognito_jwt_verifier(
@@ -104,6 +124,8 @@ async def get_authenticated_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> AuthenticatedUser:
+    """Bearer Tokenを検証して認証済みユーザーを返すFastAPI依存性注入関数。"""
+
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AuthenticationError
     verifier = get_cognito_jwt_verifier(get_settings())

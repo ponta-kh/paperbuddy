@@ -65,6 +65,8 @@ class _KnowledgeBaseChatResult:
 
 
 class BedrockKnowledgeBaseChatClient:
+    """AWS Bedrock Knowledge BaseでRAG回答を生成するClient実装。"""
+
     def __init__(
         self,
         knowledge_base_client: Any,
@@ -77,6 +79,19 @@ class BedrockKnowledgeBaseChatClient:
         self._model_arn = model_arn
 
     async def start_chat(self, prompt: str) -> StartGeneratedChatResult:
+        """Bedrock Knowledge Baseで新規チャットの回答を生成する。
+
+        Bedrockの`retrieve_and_generate`を呼び出し、回答本文、セッションID、引用情報を
+        Application層の出力ポート形式へ変換する。
+
+        Raises:
+            ChatGenerationRateLimitError: Bedrockがスロットリング系エラーを返した場合。
+            ChatGenerationPermissionDeniedError: BedrockまたはKnowledge Baseへの権限が不足している場合。
+            ChatGenerationConfigurationError: Knowledge Base IDやModel ARNなどの設定が不正な場合。
+            ChatGenerationUnavailableError: Bedrockまたは依存サービスが一時的に利用できない場合。
+            InvalidChatGenerationResponseError: Bedrockのレスポンス形式が期待と異なる場合。
+        """
+
         chat_result = await self._start_knowledge_base_chat(prompt)
         return StartGeneratedChatResult(
             session_id=chat_result.session_id,
@@ -87,6 +102,21 @@ class BedrockKnowledgeBaseChatClient:
     async def continue_chat(
         self, session_id: str, prompt: str
     ) -> ContinueGeneratedChatResult:
+        """Bedrock Knowledge Baseの既存セッションで回答を生成する。
+
+        Args:
+            session_id: Bedrock Knowledge Baseが返した継続用セッションID。
+            prompt: ユーザーが入力した質問文。
+
+        Raises:
+            ChatGenerationSessionUnavailableError: Bedrockが指定セッションを継続できない場合。
+            ChatGenerationRateLimitError: Bedrockがスロットリング系エラーを返した場合。
+            ChatGenerationPermissionDeniedError: BedrockまたはKnowledge Baseへの権限が不足している場合。
+            ChatGenerationConfigurationError: Knowledge Base IDやModel ARNなどの設定が不正な場合。
+            ChatGenerationUnavailableError: Bedrockまたは依存サービスが一時的に利用できない場合。
+            InvalidChatGenerationResponseError: Bedrockのレスポンス形式が期待と異なる場合。
+        """
+
         result = await self._continue_knowledge_base_chat(session_id, prompt)
         return ContinueGeneratedChatResult(
             session_id=result.session_id,

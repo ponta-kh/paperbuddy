@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def register_access_log_middleware(app: FastAPI) -> None:
+    """HTTPアクセスログを出力するmiddlewareをFastAPIアプリへ登録する。"""
+
     @app.middleware("http")
     async def access_log_middleware(request: Request, call_next):
         request_id = get_request_id(request)

@@ -37,6 +37,8 @@ def _response(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    """Domain例外とApplication例外をHTTPエラーレスポンスへ変換するHandlerを登録する。"""
+
     @app.exception_handler(ChatNotFoundError)
     async def chat_not_found_handler(_: Request, __: ChatNotFoundError) -> JSONResponse:
         return _response(

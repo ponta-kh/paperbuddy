@@ -25,7 +25,11 @@ _RESERVED_LOG_RECORD_ATTRIBUTES = frozenset(
 
 
 class JsonLogFormatter(logging.Formatter):
+    """ログレコードをJSON形式へ変換するFormatter。"""
+
     def format(self, record: logging.LogRecord) -> str:
+        """ログレコードへリクエスト文脈とextra項目を加えてJSON文字列に変換する。"""
+
         payload: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created, UTC)
             .isoformat(timespec="milliseconds")
@@ -48,6 +52,8 @@ def configure_logging(
     level: str = "INFO",
     stream: TextIO | None = None,
 ) -> None:
+    """アプリケーションの標準ログ設定をJSON出力へ構成する。"""
+
     handler = logging.StreamHandler(stream or sys.stdout)
     handler.setFormatter(JsonLogFormatter())
 
@@ -68,6 +74,8 @@ def set_log_context(
     request_id: object | None = None,
     user_id: object | None = None,
 ) -> None:
+    """現在の実行コンテキストへログ出力用の識別子を設定する。"""
+
     if request_id is not None:
         _request_id_context.set(str(request_id))
     if user_id is not None:
@@ -75,6 +83,8 @@ def set_log_context(
 
 
 def clear_log_context() -> None:
+    """現在の実行コンテキストに設定されたログ識別子をクリアする。"""
+
     _request_id_context.set(None)
     _user_id_context.set(None)
 

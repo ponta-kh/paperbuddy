@@ -18,6 +18,8 @@ from src.infrastructure.library.dynamodb_indexed_file_catalog import (
 
 @lru_cache
 def get_indexed_file_catalog() -> IndexedFileCatalogProtocol:
+    """インデックス済みファイルCatalog実装を返すDIファクトリ。"""
+
     settings = get_settings()
     client = create_dynamodb_client(settings)
     return DynamoDbIndexedFileCatalog(
@@ -28,4 +30,6 @@ def get_indexed_file_catalog() -> IndexedFileCatalogProtocol:
 
 @lru_cache
 def get_list_indexed_files_use_case() -> ListIndexedFilesProtocol:
+    """インデックス済みファイル一覧取得ユースケースを返すDIファクトリ。"""
+
     return ListIndexedFilesUseCase(get_indexed_file_catalog())

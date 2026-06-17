@@ -6,16 +6,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ChatInfrastructureMode(StrEnum):
+    """チャット永続化基盤の実行モード。"""
+
     AWS = "aws"
     LOCAL = "local"
 
 
 class ChatGenerationMode(StrEnum):
+    """チャット回答生成の実行モード。"""
+
     AWS = "aws"
     LOCAL = "local"
 
 
 class Settings(BaseSettings):
+    """環境変数から読み込むアプリケーション設定。"""
+
     model_config = SettingsConfigDict(
         case_sensitive=False,
         extra="ignore",
@@ -36,14 +42,20 @@ class Settings(BaseSettings):
 
     @property
     def is_local_mode(self) -> bool:
+        """チャット永続化基盤がローカル実行か判定する。"""
+
         return self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
 
     @property
     def uses_local_chat_generation(self) -> bool:
+        """チャット回答生成がローカル疑似生成か判定する。"""
+
         return self.chat_generation_mode is ChatGenerationMode.LOCAL
 
     @model_validator(mode="after")
     def validate_mode_specific_settings(self) -> "Settings":
+        """実行モードごとに必須設定が揃っていることを検証する。"""
+
         if self.chat_generation_mode is None:
             self.chat_generation_mode = (
                 ChatGenerationMode.LOCAL
@@ -73,4 +85,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """アプリケーション設定を返すDIファクトリ。"""
+
     return Settings()

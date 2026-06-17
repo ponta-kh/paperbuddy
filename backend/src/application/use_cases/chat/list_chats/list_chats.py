@@ -12,10 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class ListChatsUseCase:
+    """ユーザーに紐づくチャット一覧を取得するユースケース。"""
+
     def __init__(self, chat_repository: ChatQueryRepositoryProtocol) -> None:
         self._chat_repository = chat_repository
 
     async def execute(self, query: ListChatsInput) -> ListChatsOutput:
+        """チャット一覧を取得し、存在しない場合は空一覧として返す。
+
+        Raises:
+            RepositoryAccessError: チャット一覧の取得に失敗した場合。
+        """
+
         try:
             chats = await self._chat_repository.list_chats_by_user_id(query.user_id)
         except RepositoryNotFoundError:

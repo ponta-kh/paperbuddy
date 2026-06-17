@@ -29,6 +29,8 @@ _TITLE_MAX_PROMPT_LENGTH = 10
 
 
 class StartChatUseCase:
+    """新しいチャットを開始し、初回のLLM回答を生成するユースケース。"""
+
     def __init__(
         self,
         chat_generation_client: ChatGenerationClientProtocol,
@@ -42,6 +44,16 @@ class StartChatUseCase:
         self._generate_chat_id = generate_chat_id or uuid7
 
     async def execute(self, command: StartChatInput) -> StartChatOutput:
+        """ユーザー質問を保存し、LLM回答と引用情報をチャット履歴へ追加する。
+
+        Raises:
+            ChatGenerationRateLimitError: LLM回答生成がレート制限された場合。
+            ChatGenerationPermissionDeniedError: LLM回答生成の権限が不足している場合。
+            ChatGenerationConfigurationError: LLM回答生成の設定が不正な場合。
+            ChatGenerationUnavailableError: LLM回答生成が一時的に利用できない場合。
+            InvalidChatGenerationResponseError: LLM回答生成レスポンスが期待形式ではない場合。
+        """
+
         prompt = Prompt(command.prompt)
         # 外部生成前の時刻をユーザー発信日時として固定し、
         # 生成待ち時間で発信順序が崩れないようにする。

@@ -6,6 +6,8 @@ from src.dependencies.logging_config import set_log_context
 
 
 def get_request_id(request: Request) -> UUID:
+    """HTTPリクエスト単位のUUID v7リクエストIDを返す。"""
+
     current = getattr(request.state, "request_id", None)
     if isinstance(current, UUID):
         set_log_context(request_id=current)

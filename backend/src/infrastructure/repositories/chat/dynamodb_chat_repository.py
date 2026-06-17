@@ -477,15 +477,30 @@ class _DynamoDbChatRepository:
 
 
 class DynamoDbChatCommandRepository(_DynamoDbChatRepository):
+    """DynamoDBへチャット集約とメッセージを保存するCommand Repository実装。"""
+
     async def save_started_chat(
         self,
         chat: Chat,
         user_message: ChatMessage,
         llm_message: ChatMessage,
     ) -> None:
+        """チャット本体と初回ターンの2メッセージをトランザクション保存する。
+
+        Raises:
+            ChatSaveError: DynamoDBへの保存に失敗した場合。
+        """
+
         await self._operations.save_started_chat(chat, user_message, llm_message)
 
     async def get_chat(self, *, chat_id: UUID) -> Chat:
+        """チャット本体をDynamoDBから取得してDomain Entityへ復元する。
+
+        Raises:
+            ChatNotFoundError: 指定チャットが存在しない場合。
+            ChatLoadError: DynamoDBからの読み込みに失敗した場合。
+        """
+
         return await self._operations.get_chat(chat_id=chat_id)
 
     async def save_exchange(
@@ -494,11 +509,27 @@ class DynamoDbChatCommandRepository(_DynamoDbChatRepository):
         user_message: ChatMessage,
         llm_message: ChatMessage,
     ) -> None:
+        """更新後チャット本体と継続ターンの2メッセージをトランザクション保存する。
+
+        Raises:
+            ChatConflictError: 保存済みチャットのバージョンと競合した場合。
+            ChatSaveError: DynamoDBへの保存に失敗した場合。
+        """
+
         await self._operations.save_exchange(chat, user_message, llm_message)
 
 
 class DynamoDbChatQueryRepository(_DynamoDbChatRepository):
+    """DynamoDBからチャット読み取りモデルを取得するQuery Repository実装。"""
+
     async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
+        """GSIを使って指定ユーザーのチャット一覧を取得する。
+
+        Raises:
+            RepositoryNotFoundError: 指定ユーザーのチャットが存在しない場合。
+            RepositoryAccessError: DynamoDBからの読み込みまたは項目変換に失敗した場合。
+        """
+
         return await self._operations.list_chats_by_user_id(user_id)
 
     async def list_messages_by_chat_id(
@@ -507,6 +538,15 @@ class DynamoDbChatQueryRepository(_DynamoDbChatRepository):
         user_id: UUID,
         chat_id: UUID,
     ) -> tuple[ChatMessageRecord, ...]:
+        """指定チャットのメッセージ履歴を送信日時順で取得する。
+
+        DynamoDB上の引用情報はMap/ListからDomainの引用情報へ復元する。
+
+        Raises:
+            RepositoryNotFoundError: 指定チャットまたはメッセージが存在しない場合。
+            RepositoryAccessError: DynamoDBからの読み込みまたは項目変換に失敗した場合。
+        """
+
         return await self._operations.list_messages_by_chat_id(
             user_id=user_id,
             chat_id=chat_id,
@@ -514,6 +554,8 @@ class DynamoDbChatQueryRepository(_DynamoDbChatRepository):
 
 
 class DynamoDbChatTitleRepository(_DynamoDbChatRepository):
+    """DynamoDB上のチャットタイトルを更新するRepository実装。"""
+
     async def update_title(
         self,
         *,
@@ -521,6 +563,12 @@ class DynamoDbChatTitleRepository(_DynamoDbChatRepository):
         user_id: UUID,
         title: str,
     ) -> None:
+        """所有者条件つきでチャットタイトルを更新する。
+
+        Raises:
+            ChatTitleUpdateError: DynamoDBでタイトル更新に失敗した場合。
+        """
+
         await self._operations.update_title(
             chat_id=chat_id,
             user_id=user_id,
@@ -529,5 +577,13 @@ class DynamoDbChatTitleRepository(_DynamoDbChatRepository):
 
 
 class DynamoDbChatDeletionRepository(_DynamoDbChatRepository):
+    """DynamoDB上のチャット本体とメッセージを削除するRepository実装。"""
+
     async def delete_chat(self, *, chat_id: UUID, user_id: UUID) -> None:
+        """所有者条件つきでチャット本体とメッセージ履歴を削除する。
+
+        Raises:
+            ChatDeleteError: DynamoDBでチャット削除に失敗した場合。
+        """
+
         await self._operations.delete_chat(chat_id=chat_id, user_id=user_id)

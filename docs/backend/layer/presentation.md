@@ -82,6 +82,17 @@ Routerは具象ユースケースをimportせず、Application層の入力ポー
 
 Application層の出力からレスポンススキーマへの変換は、Router内で直接行う。変換処理が複雑になった場合は、その時点でMapperなどへの分離を検討する。
 
+## Docstring
+Presentation層では、FastAPI endpointの説明はOpenAPIへ集約し、リクエスト・レスポンスの構造はPydantic Modelで表現する。
+
+- FastAPI endpoint関数には原則としてdocstringを書かない
+- endpointの説明はデコレータの`summary`と`description`に書く
+- リクエスト・レスポンスの詳細はPydantic Modelのフィールド名、型、必要に応じたField説明で表現する
+- endpoint以外の公開関数、認証処理、例外ハンドラ、変換処理には、必要に応じてdocstringを書く
+- Presentation層の通常関数まで一律でdocstring不要とはしない
+
+docstringはGoogle Style Docstringを使用する。HTTP公開仕様として利用者に見せる情報はOpenAPIへ寄せ、内部の変換処理や認証処理の契約だけをdocstringで補足する。
+
 ## リクエストID
 Presentation層は、FastAPIの依存性注入を使ってリクエストIDをUUID v7で採番する。
 

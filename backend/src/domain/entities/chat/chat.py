@@ -18,6 +18,11 @@ from src.domain.value_objects.chat.prompt import Prompt
 
 @dataclass(frozen=True, slots=True)
 class ChatCitationSource:
+    """LLM回答の引用元を表すValue Object。
+
+    引用元の抜粋本文、場所種別、URI、メタデータを保持する。
+    """
+
     content: str
     location_type: str | None
     uri: str | None
@@ -36,6 +41,11 @@ class ChatCitationSource:
 
 @dataclass(frozen=True, slots=True)
 class ChatCitation:
+    """LLM回答本文の引用箇所と参照元を表すValue Object。
+
+    回答本文中の該当テキスト、文字位置、引用元一覧を保持する。
+    """
+
     text: str
     span_start: int | None
     span_end: int | None
@@ -56,6 +66,12 @@ class ChatCitation:
 
 @dataclass(frozen=True, slots=True)
 class ChatMessage:
+    """チャット内の1メッセージを表すEntity。
+
+    ユーザー発信メッセージはPromptを保持し、LLM発信メッセージは回答文字列を保持する。
+    ユーザー発信メッセージは引用情報を持たない。
+    """
+
     chat_id: UUID
     request_id: UUID
     sender: MessageSender
@@ -86,6 +102,11 @@ class ChatMessage:
 
 @dataclass(slots=True)
 class Chat:
+    """ユーザーに紐づくチャットを表すAggregate Root。
+
+    チャットの所有者、Bedrockセッション、最終更新時刻、楽観排他用バージョンを管理する。
+    """
+
     _CONTINUATION_LIMIT = timedelta(hours=24)
 
     chat_id: UUID
@@ -106,6 +127,23 @@ class Chat:
         user_id: UUID,
         answered_at: datetime,
     ) -> "Chat":
+        """初回LLM回答を基準に新しいチャットを生成する。
+
+        Args:
+            chat_id: 生成するチャットの識別子。
+            session_id: LLM側の会話継続用セッションID。
+            title: チャット一覧に表示するタイトル。
+            user_id: チャットを所有するユーザーID。
+            answered_at: 初回LLM回答が生成された日時。
+
+        Returns:
+            初期状態のチャットAggregate。
+
+        Raises:
+            InvalidChatIdError: チャットIDがUUIDではない場合。
+            InvalidSessionIdError: セッションIDが空の場合。
+        """
+
         if not isinstance(chat_id, UUID):
             raise InvalidChatIdError
         if not session_id.strip():
@@ -130,6 +168,17 @@ class Chat:
         user_message: ChatMessage,
         llm_message: ChatMessage,
     ) -> None:
+        """チャット開始時のユーザー質問とLLM回答の整合性を検証する。
+
+        Args:
+            user_message: 初回ターンのユーザー発信メッセージ。
+            llm_message: 初回ターンのLLM発信メッセージ。
+
+        Raises:
+            InvalidChatTurnError: メッセージのチャットID、リクエストID、発信者の対応が不正な場合。
+            MessageSentAtOutOfOrderError: 初回ターンの送信時刻がチャット作成時刻と整合しない場合。
+        """
+
         self._validate_turn_pair(user_message=user_message, llm_message=llm_message)
         if user_message.sent_at > llm_message.sent_at:
             raise MessageSentAtOutOfOrderError
@@ -145,6 +194,17 @@ class Chat:
         user_message: ChatMessage,
         llm_message: ChatMessage,
     ) -> None:
+        """継続ターンのユーザー質問とLLM回答をチャット状態へ反映する。
+
+        Args:
+            user_message: 継続ターンのユーザー発信メッセージ。
+            llm_message: 継続ターンのLLM発信メッセージ。
+
+        Raises:
+            InvalidChatTurnError: メッセージのチャットID、リクエストID、発信者の対応が不正な場合。
+            MessageSentAtOutOfOrderError: 継続ターンの送信時刻が既存チャット時刻と整合しない場合。
+        """
+
         self._validate_turn_pair(user_message=user_message, llm_message=llm_message)
         if user_message.sent_at < self.last_updated_at:
             raise MessageSentAtOutOfOrderError
@@ -156,12 +216,30 @@ class Chat:
         self.version += 1
 
     def ensure_continuable_at(self, requested_at: datetime) -> None:
+        """指定日時にチャットを継続できることを確認する。
+
+        Args:
+            requested_at: 継続要求を受け付けた日時。
+
+        Raises:
+            ChatContinuationExpiredError: 最終更新から継続可能期間を超過している場合。
+        """
+
         if requested_at.tzinfo is None:
             raise ValueError("requested_at must be timezone-aware")
         if requested_at - self.last_updated_at > self._CONTINUATION_LIMIT:
             raise ChatContinuationExpiredError
 
     def ensure_owned_by(self, user_id: UUID) -> None:
+        """指定ユーザーがチャット所有者であることを確認する。
+
+        Args:
+            user_id: 操作を要求したユーザーID。
+
+        Raises:
+            ChatOwnershipMismatchError: 指定ユーザーがチャット所有者ではない場合。
+        """
+
         if self.user_id != user_id:
             raise ChatOwnershipMismatchError
 

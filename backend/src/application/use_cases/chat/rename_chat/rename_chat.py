@@ -12,10 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class RenameChatUseCase:
+    """ユーザーに紐づくチャットのタイトルを変更するユースケース。"""
+
     def __init__(self, chat_repository: ChatTitleRepositoryProtocol) -> None:
         self._chat_repository = chat_repository
 
     async def execute(self, command: RenameChatInput) -> RenameChatOutput:
+        """指定ユーザーが所有するチャットのタイトルを変更する。
+
+        Raises:
+            ChatTitleUpdateError: チャットタイトル更新に失敗した場合。
+        """
+
         try:
             await self._chat_repository.update_title(
                 chat_id=command.chat_id,

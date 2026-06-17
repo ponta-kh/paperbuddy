@@ -13,11 +13,20 @@ _deserializer = TypeDeserializer()
 
 
 class DynamoDbIndexedFileCatalog:
+    """DynamoDBからインデックス済みファイル一覧を取得するCatalog実装。"""
+
     def __init__(self, client: Any, *, table_name: str) -> None:
         self._client = client
         self._table_name = table_name
 
     async def list_indexed_files(self) -> tuple[IndexedFile, ...]:
+        """DynamoDBテーブルをscanし、登録済みファイル一覧へ変換する。
+
+        Raises:
+            RepositoryNotFoundError: 登録済みファイルが存在しない場合。
+            RepositoryAccessError: DynamoDBアクセスまたは項目変換に失敗した場合。
+        """
+
         try:
             items = await self._scan_all()
         except ClientError as error:

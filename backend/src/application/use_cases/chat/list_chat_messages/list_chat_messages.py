@@ -11,10 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class ListChatMessagesUseCase:
+    """チャット内のメッセージ履歴を取得するユースケース。"""
+
     def __init__(self, chat_repository: ChatQueryRepositoryProtocol) -> None:
         self._chat_repository = chat_repository
 
     async def execute(self, query: ListChatMessagesInput) -> ListChatMessagesOutput:
+        """指定チャットのメッセージ履歴と引用情報を取得する。
+
+        Raises:
+            RepositoryNotFoundError: 指定されたチャットが存在しない場合。
+            RepositoryAccessError: メッセージ履歴の取得に失敗した場合。
+        """
+
         try:
             messages = await self._chat_repository.list_messages_by_chat_id(
                 user_id=query.user_id,

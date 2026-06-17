@@ -9,10 +9,18 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteChatUseCase:
+    """ユーザーに紐づくチャットを削除するユースケース。"""
+
     def __init__(self, chat_repository: ChatDeletionRepositoryProtocol) -> None:
         self._chat_repository = chat_repository
 
     async def execute(self, command: DeleteChatInput) -> None:
+        """指定ユーザーが所有するチャットを削除する。
+
+        Raises:
+            ChatDeleteError: チャット削除に失敗した場合。
+        """
+
         try:
             await self._chat_repository.delete_chat(
                 chat_id=command.chat_id,
