@@ -10,7 +10,6 @@ import {
 
 export type ChatAccount = {
     displayName: string;
-    workspaceLabel: string;
     initials: string;
 };
 
@@ -37,9 +36,6 @@ export function ChatAccountMenu({ account, onSignOut }: ChatAccountMenuProps) {
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-[13px] font-medium text-[#263b34]">
                                 {account.displayName}
-                            </p>
-                            <p className="truncate text-[11px] text-[#7b8984]">
-                                {account.workspaceLabel}
                             </p>
                         </div>
                         <MoreHorizontal className="size-4 text-[#7b8984]" />

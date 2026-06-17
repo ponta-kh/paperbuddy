@@ -87,8 +87,7 @@ export function ChatSidebarContainer({
             <ChatAccountMenu
                 account={{
                     displayName,
-                    initials: createInitials(displayName),
-                    workspaceLabel: "個人ワークスペース",
+                    initials: createInitials(displayName)
                 }}
                 onSignOut={handleSignOut}
             />
