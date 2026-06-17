@@ -36,8 +36,8 @@ def test_json_log_formatter_outputs_structured_log() -> None:
         args=(),
         exc_info=None,
     )
-    record.request_id = "019ecde4-0000-7000-8000-000000000001"
-    record.user_id = "00000000-0000-0000-0000-000000000001"
+    setattr(record, "request_id", "019ecde4-0000-7000-8000-000000000001")
+    setattr(record, "user_id", "00000000-0000-0000-0000-000000000001")
 
     payload = json.loads(formatter.format(record))
 

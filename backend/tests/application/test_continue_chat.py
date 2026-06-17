@@ -137,10 +137,10 @@ async def test_continue_chat_logs_expired_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "continue_chat_expired"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
-    assert record.chat_id == str(CHAT_ID)
+    assert getattr(record, "event") == "continue_chat_expired"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
     assert "秘密の質問" not in caplog.text
 
 
@@ -243,10 +243,10 @@ async def test_continue_chat_treats_unavailable_session_as_expired(
         )
 
     record = caplog.records[0]
-    assert record.event == "continue_chat_generation_session_unavailable"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
-    assert record.chat_id == str(CHAT_ID)
+    assert getattr(record, "event") == "continue_chat_generation_session_unavailable"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
     assert "秘密の質問" not in caplog.text
     repository.save_exchange.assert_not_awaited()
     assert chat.last_updated_at == datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -284,10 +284,10 @@ async def test_continue_chat_logs_rate_limit_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "continue_chat_generation_rate_limited"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
-    assert record.chat_id == str(CHAT_ID)
+    assert getattr(record, "event") == "continue_chat_generation_rate_limited"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
     assert "秘密の質問" not in caplog.text
     repository.save_exchange.assert_not_awaited()
 

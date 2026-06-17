@@ -93,5 +93,5 @@ async def test_list_indexed_files_logs_not_found(
 
     assert output.files == ()
     record = caplog.records[0]
-    assert record.event == "list_indexed_files_not_found"
-    assert record.request_id == str(REQUEST_ID)
+    assert getattr(record, "event") == "list_indexed_files_not_found"
+    assert getattr(record, "request_id") == str(REQUEST_ID)

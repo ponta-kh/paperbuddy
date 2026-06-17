@@ -75,6 +75,6 @@ async def test_list_chats_logs_not_found(
         )
 
     record = caplog.records[0]
-    assert record.event == "list_chats_not_found"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
+    assert getattr(record, "event") == "list_chats_not_found"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)

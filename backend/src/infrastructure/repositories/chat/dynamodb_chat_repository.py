@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -115,7 +115,7 @@ class _DynamoDbChatRepositoryOperations:
                 ],
             )
         except ClientError as error:
-            cancellation_reasons = error.response.get("CancellationReasons", [])
+            cancellation_reasons = self._cancellation_reasons(error)
             if any(
                 reason.get("Code") == "ConditionalCheckFailed"
                 for reason in cancellation_reasons
@@ -147,10 +147,7 @@ class _DynamoDbChatRepositoryOperations:
                 ),
             )
         except ClientError as error:
-            if (
-                error.response.get("Error", {}).get("Code")
-                == "ConditionalCheckFailedException"
-            ):
+            if self._client_error_code(error) == "ConditionalCheckFailedException":
                 raise ChatNotFoundError from error
             raise ChatTitleUpdateError from error
 
@@ -366,6 +363,22 @@ class _DynamoDbChatRepositoryOperations:
     @staticmethod
     def _deserialize(item: dict[str, Any]) -> dict[str, Any]:
         return {key: _deserializer.deserialize(value) for key, value in item.items()}
+
+    @staticmethod
+    def _client_error_code(error: ClientError) -> str:
+        response = cast(dict[str, Any], error.response)
+        error_detail = response.get("Error", {})
+        if not isinstance(error_detail, dict):
+            return ""
+        return str(error_detail.get("Code", ""))
+
+    @staticmethod
+    def _cancellation_reasons(error: ClientError) -> list[dict[str, Any]]:
+        response = cast(dict[str, Any], error.response)
+        reasons = response.get("CancellationReasons", [])
+        if not isinstance(reasons, list):
+            return []
+        return [reason for reason in reasons if isinstance(reason, dict)]
 
 
 class _DynamoDbChatRepository:

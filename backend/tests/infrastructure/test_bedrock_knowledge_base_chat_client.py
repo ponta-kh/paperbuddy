@@ -77,8 +77,8 @@ async def test_start_chat_raises_permission_denied_for_access_denied(
         await _client(knowledge_base).start_chat("秘密の質問")
 
     record = caplog.records[0]
-    assert record.event == "bedrock_knowledge_base_permission_denied"
-    assert record.error_code == "AccessDeniedException"
+    assert getattr(record, "event") == "bedrock_knowledge_base_permission_denied"
+    assert getattr(record, "error_code") == "AccessDeniedException"
     assert "秘密の質問" not in caplog.text
 
 
@@ -96,6 +96,73 @@ async def test_start_chat_raises_configuration_error_for_invalid_request() -> No
 
     with pytest.raises(ChatGenerationConfigurationError):
         await _client(knowledge_base).start_chat("question")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "expected_event", "expected_text"),
+    [
+        (
+            "Invocation of model ID model with on-demand throughput isn’t supported.",
+            "bedrock_knowledge_base_model_requires_inference_profile",
+            "Inference Profile",
+        ),
+        (
+            "This Model is marked by provider as Legacy.",
+            "bedrock_knowledge_base_model_legacy",
+            "Legacy",
+        ),
+        (
+            "Custom prompt templates must be provided for both Orchestration and Generation.",
+            "bedrock_knowledge_base_model_requires_custom_prompt",
+            "カスタムプロンプト",
+        ),
+        (
+            "Value 'arn:aws:aoss:collection/example' at modelArn failed to satisfy constraint.",
+            "bedrock_knowledge_base_invalid_model_identifier",
+            "Bedrockモデル",
+        ),
+    ],
+)
+async def test_start_chat_logs_actionable_configuration_error(
+    caplog: pytest.LogCaptureFixture,
+    message: str,
+    expected_event: str,
+    expected_text: str,
+) -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        error=_client_error("ValidationException", message)
+    )
+
+    with pytest.raises(ChatGenerationConfigurationError) as error_info:
+        await _client(knowledge_base).start_chat("question")
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == expected_event
+    assert getattr(record, "diagnosis")
+    assert getattr(record, "remediation")
+    assert expected_text in str(error_info.value)
+
+
+@pytest.mark.asyncio
+async def test_start_chat_logs_authentication_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        error=_client_error(
+            "ExpiredTokenException",
+            "The security token included in the request is expired",
+        )
+    )
+
+    with pytest.raises(ChatGenerationUnavailableError) as error_info:
+        await _client(knowledge_base).start_chat("question")
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == "bedrock_knowledge_base_authentication_error"
+    assert getattr(record, "diagnosis")
+    assert getattr(record, "remediation")
+    assert "AWS認証情報が無効" in str(error_info.value)
 
 
 @pytest.mark.asyncio

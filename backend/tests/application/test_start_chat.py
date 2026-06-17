@@ -151,9 +151,9 @@ async def test_start_chat_logs_generation_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "start_chat_generation_unavailable"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
+    assert getattr(record, "event") == "start_chat_generation_unavailable"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
     assert "秘密の質問" not in caplog.text
 
 
@@ -177,9 +177,9 @@ async def test_start_chat_logs_rate_limit_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "start_chat_generation_rate_limited"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
+    assert getattr(record, "event") == "start_chat_generation_rate_limited"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
     assert "秘密の質問" not in caplog.text
     repository.save_started_chat.assert_not_awaited()
 
@@ -204,9 +204,9 @@ async def test_start_chat_logs_configuration_error(
         )
 
     record = caplog.records[0]
-    assert record.event == "start_chat_generation_configuration_error"
-    assert record.request_id == str(REQUEST_ID)
-    assert record.user_id == str(USER_ID)
+    assert getattr(record, "event") == "start_chat_generation_configuration_error"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
     assert "秘密の質問" not in caplog.text
     repository.save_started_chat.assert_not_awaited()
 
