@@ -10,6 +10,11 @@ class ChatInfrastructureMode(StrEnum):
     LOCAL = "local"
 
 
+class ChatGenerationMode(StrEnum):
+    AWS = "aws"
+    LOCAL = "local"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         case_sensitive=False,
@@ -18,6 +23,7 @@ class Settings(BaseSettings):
     )
 
     chat_infrastructure_mode: ChatInfrastructureMode = ChatInfrastructureMode.AWS
+    chat_generation_mode: ChatGenerationMode | None = None
     aws_region: str = Field(default="", min_length=1)
     dynamodb_chat_table_name: str = Field(default="", min_length=1)
     dynamodb_library_table_name: str = Field(default="", min_length=1)
@@ -32,11 +38,24 @@ class Settings(BaseSettings):
     def is_local_mode(self) -> bool:
         return self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
 
+    @property
+    def uses_local_chat_generation(self) -> bool:
+        return self.chat_generation_mode is ChatGenerationMode.LOCAL
+
     @model_validator(mode="after")
     def validate_mode_specific_settings(self) -> "Settings":
+        if self.chat_generation_mode is None:
+            self.chat_generation_mode = (
+                ChatGenerationMode.LOCAL
+                if self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
+                else ChatGenerationMode.AWS
+            )
+
         if self.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL:
             if not self.dynamodb_endpoint_url:
                 raise ValueError("DYNAMODB_ENDPOINT_URL is required in local mode")
+
+        if self.chat_generation_mode is ChatGenerationMode.LOCAL:
             return self
 
         missing = [

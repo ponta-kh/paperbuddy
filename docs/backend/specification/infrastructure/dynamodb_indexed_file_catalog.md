@@ -10,7 +10,7 @@
 - `AWS_REGION`: 接続先リージョン
 - `DYNAMODB_LIBRARY_TABLE_NAME`: データソース一覧テーブル名
 - `DYNAMODB_ENDPOINT_URL`: ローカルモード時のみ利用
-- `CHAT_INFRASTRUCTURE_MODE`: `local` の場合は `DYNAMODB_ENDPOINT_URL` を使う
+- `CHAT_INFRASTRUCTURE_MODE`: `local` の場合は `DYNAMODB_ENDPOINT_URL` を使う。チャット生成先の切り替えには使用しない
 
 ## 3. テーブル前提
 

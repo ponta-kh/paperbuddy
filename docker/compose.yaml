@@ -15,7 +15,7 @@ services:
     entrypoint: ["/bin/sh", "/docker/dynamodb/init.sh"]
     volumes:
       - ./dynamodb/init.sh:/docker/dynamodb/init.sh:ro
-    environment: &local-environment
+    environment: &dynamodb-local-environment
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
       AWS_REGION: ap-northeast-1
@@ -23,7 +23,6 @@ services:
       DYNAMODB_LIBRARY_TABLE_NAME: paperbuddy-local-library
       DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
       CHAT_INFRASTRUCTURE_MODE: local
-      SIMULATED_LLM_DELAY_SECONDS: "2"
     depends_on:
       - dynamodb-local
     restart: "no"
@@ -34,7 +33,16 @@ services:
       dockerfile: docker/backend/Dockerfile
     env_file:
       - .env
-    environment: *local-environment
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ap-northeast-1
+      DYNAMODB_CHAT_TABLE_NAME: paperbuddy-local-chat
+      DYNAMODB_LIBRARY_TABLE_NAME: paperbuddy-local-library
+      DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
+      CHAT_INFRASTRUCTURE_MODE: local
+      SIMULATED_LLM_DELAY_SECONDS: "2"
     depends_on:
       dynamodb-init:
         condition: service_completed_successfully

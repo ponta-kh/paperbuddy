@@ -23,7 +23,7 @@ def create_dynamodb_client(settings: Settings) -> Any:
 
 
 def create_chat_generation_client(settings: Settings) -> ChatGenerationClientProtocol:
-    if settings.is_local_mode:
+    if settings.uses_local_chat_generation:
         return SimulatedChatGenerationClient(
             delay_seconds=settings.simulated_llm_delay_seconds
         )

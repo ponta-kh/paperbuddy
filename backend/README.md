@@ -13,9 +13,9 @@ AWSアクセスキーは`.env`へ保存しない。
 
 - 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`、`DYNAMODB_LIBRARY_TABLE_NAME`
 - 認証必須: `COGNITO_USER_POOL_ID`、`COGNITO_USER_POOL_CLIENT_ID`
-- AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
+- チャット生成AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
 - ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
-- 任意: `CHAT_INFRASTRUCTURE_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
+- 任意: `CHAT_INFRASTRUCTURE_MODE`、`CHAT_GENERATION_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
 
 ## Local Configuration
 
@@ -43,15 +43,28 @@ mise run dev
 - フロントエンド: `http://localhost:5173`
 - DB: DynamoDB Localコンテナ。データはDocker Volumeへ保存する
 - DynamoDB Localのテーブル作成: Docker Composeの`dynamodb-init`サービス
-- LLM: 既定で2秒待機し、300文字の疑似回答を返す
+- LLM: 既定で2秒待機し、300文字の疑似回答を返す。`CHAT_GENERATION_MODE=aws`の場合はAWS Bedrock Knowledge Baseへ接続する
 - 初期データ: なし
 - 認証: `docker/.env`にAWS上のローカル開発用Cognito User PoolとWeb App Clientを設定する
 
 フロントエンド改修を即時反映したい場合は、`mise run dev:backend`でバックエンドだけをDocker起動し、
 別ターミナルで`mise run dev:frontend`を実行する。
 
-`CHAT_INFRASTRUCTURE_MODE=local`の場合だけローカル用LLMを注入する。
-DynamoDB RepositoryはAWSデプロイ時と同じ実装を使用し、接続先だけDynamoDB Localへ切り替える。
+`CHAT_INFRASTRUCTURE_MODE=local`の場合はDynamoDB Repositoryの接続先をDynamoDB Localへ切り替える。
+チャット生成は`CHAT_GENERATION_MODE`で個別に切り替える。未指定の場合は`CHAT_INFRASTRUCTURE_MODE=local`で疑似LLM、
+`CHAT_INFRASTRUCTURE_MODE=aws`でAWS Bedrock Knowledge Baseを使用する。
+
+DynamoDB Localを使いながらAWS Bedrock Knowledge Baseへ接続する場合は、`docker/.env`へ以下を追加し、
+AWS認証情報は`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、必要に応じて`AWS_SESSION_TOKEN`を
+シェル環境変数でコンテナへ渡す。
+
+```sh
+CHAT_GENERATION_MODE=aws
+BEDROCK_KNOWLEDGE_BASE_ID=replace-with-knowledge-base-id
+BEDROCK_MODEL_ARN=replace-with-model-arn
+```
+
+AWSアクセスキーは`.env`へ保存しない。
 
 バックエンドとDynamoDB Localを停止する場合は以下を実行する。
 

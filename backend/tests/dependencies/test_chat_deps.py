@@ -61,6 +61,13 @@ def _set_local_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
 
 
+def _set_local_bedrock_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_local_environment(monkeypatch)
+    monkeypatch.setenv("CHAT_GENERATION_MODE", "aws")
+    monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
+    monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
+
+
 def test_get_chat_repositories_use_dynamodb(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -148,6 +155,24 @@ def test_get_chat_generation_client_uses_bedrock_environment(
     ]
 
 
+def test_get_chat_generation_client_uses_bedrock_with_local_dynamodb(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_local_bedrock_environment(monkeypatch)
+    knowledge_base_client = Mock()
+    model_client = Mock()
+    client_factory = Mock(side_effect=[knowledge_base_client, model_client])
+    monkeypatch.setattr(client_factories.boto3, "client", client_factory)
+
+    client = chat_deps.get_chat_generation_client()
+
+    assert isinstance(client, BedrockKnowledgeBaseChatClient)
+    assert client_factory.call_args_list == [
+        (("bedrock-agent-runtime",), {"region_name": "ap-northeast-1"}),
+        (("bedrock-runtime",), {"region_name": "ap-northeast-1"}),
+    ]
+
+
 def test_get_chat_generation_client_uses_simulated_client_locally(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -167,6 +192,16 @@ def test_rejects_unknown_infrastructure_mode(
 
     with pytest.raises(ValidationError, match="chat_infrastructure_mode"):
         chat_deps.get_chat_command_repository()
+
+
+def test_rejects_unknown_chat_generation_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_local_environment(monkeypatch)
+    monkeypatch.setenv("CHAT_GENERATION_MODE", "unknown")
+
+    with pytest.raises(ValidationError, match="chat_generation_mode"):
+        chat_deps.get_chat_generation_client()
 
 
 @pytest.mark.parametrize(

@@ -3,7 +3,11 @@ from unittest.mock import Mock
 import pytest
 
 from src.dependencies import client_factories
-from src.dependencies.settings import ChatInfrastructureMode, Settings
+from src.dependencies.settings import (
+    ChatGenerationMode,
+    ChatInfrastructureMode,
+    Settings,
+)
 from src.infrastructure.llm.bedrock_knowledge_base_chat_client import (
     BedrockKnowledgeBaseChatClient,
 )
@@ -71,6 +75,23 @@ def test_create_chat_generation_client_uses_bedrock_clients(
     ]
 
 
+def test_create_chat_generation_client_uses_bedrock_with_local_dynamodb_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    knowledge_base_client = Mock()
+    model_client = Mock()
+    boto3_client = Mock(side_effect=[knowledge_base_client, model_client])
+    monkeypatch.setattr(client_factories.boto3, "client", boto3_client)
+
+    result = client_factories.create_chat_generation_client(_local_bedrock_settings())
+
+    assert isinstance(result, BedrockKnowledgeBaseChatClient)
+    assert boto3_client.call_args_list == [
+        (("bedrock-agent-runtime",), {"region_name": "ap-northeast-1"}),
+        (("bedrock-runtime",), {"region_name": "ap-northeast-1"}),
+    ]
+
+
 def _aws_settings() -> Settings:
     return Settings(
         aws_region="ap-northeast-1",
@@ -89,4 +110,17 @@ def _local_settings() -> Settings:
         dynamodb_library_table_name="library-table",
         dynamodb_endpoint_url="http://dynamodb-local:8000",
         simulated_llm_delay_seconds=0,
+    )
+
+
+def _local_bedrock_settings() -> Settings:
+    return Settings(
+        chat_infrastructure_mode=ChatInfrastructureMode.LOCAL,
+        chat_generation_mode=ChatGenerationMode.AWS,
+        aws_region="ap-northeast-1",
+        dynamodb_chat_table_name="chat-table",
+        dynamodb_library_table_name="library-table",
+        dynamodb_endpoint_url="http://dynamodb-local:8000",
+        bedrock_knowledge_base_id="knowledge-base-id",
+        bedrock_model_arn="model-arn",
     )
