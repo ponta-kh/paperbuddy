@@ -1,11 +1,8 @@
 FROM node:26-bookworm-slim
 
-ENV PNPM_HOME=/pnpm \
-    PATH=/pnpm:$PATH
+RUN npm install -g pnpm
 
 WORKDIR /app
-
-RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY frontend/package.json frontend/package.json
