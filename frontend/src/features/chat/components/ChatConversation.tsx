@@ -1,7 +1,10 @@
 import { LoaderCircle, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { ScrollArea } from "@/components/shadcn/scroll-area";
 import { suggestions } from "@/features/chat/utils/chat-data";
 import type { ChatMessage } from "@/lib/chat-api";
+
+const STICK_TO_BOTTOM_THRESHOLD_PX = 80;
 
 type ChatConversationProps = {
     isLoading: boolean;
@@ -18,8 +21,57 @@ export function ChatConversation({
     messages,
     onSuggestionSelect,
 }: ChatConversationProps) {
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const shouldStickToBottomRef = useRef(true);
+
+    const getViewport = useCallback(
+        () =>
+            scrollAreaRef.current?.querySelector<HTMLElement>(
+                "[data-slot='scroll-area-viewport']",
+            ),
+        [],
+    );
+
+    useEffect(() => {
+        const viewport = getViewport();
+        if (!viewport) return;
+
+        const updateStickToBottom = () => {
+            const distanceFromBottom =
+                viewport.scrollHeight -
+                viewport.scrollTop -
+                viewport.clientHeight;
+            shouldStickToBottomRef.current =
+                distanceFromBottom < STICK_TO_BOTTOM_THRESHOLD_PX;
+        };
+
+        updateStickToBottom();
+        viewport.addEventListener("scroll", updateStickToBottom, {
+            passive: true,
+        });
+        return () =>
+            viewport.removeEventListener("scroll", updateStickToBottom);
+    }, [getViewport]);
+
+    useLayoutEffect(() => {
+        if (!shouldStickToBottomRef.current) return;
+
+        const viewport = getViewport();
+        if (!viewport) return;
+
+        if (typeof viewport.scrollTo === "function") {
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior: "smooth",
+            });
+            return;
+        }
+
+        viewport.scrollTop = viewport.scrollHeight;
+    });
+
     return (
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
             <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-8 sm:px-8 sm:pb-10 sm:pt-12">
                 {isLoading ? (
                     <div className="flex items-center justify-center gap-2 pt-24 text-sm text-[#74837d]">
