@@ -10,9 +10,24 @@ class StartChatRequest(BaseModel):
     prompt: str = Field(description="チャットを開始する最初のプロンプト")
 
 
+class ChatCitationSourceResponse(BaseModel):
+    content: str
+    location_type: str | None
+    uri: str | None
+    metadata: dict[str, object]
+
+
+class ChatCitationResponse(BaseModel):
+    text: str
+    span_start: int | None
+    span_end: int | None
+    sources: list[ChatCitationSourceResponse]
+
+
 class StartChatResponse(BaseModel):
     chat_id: UUID
     answer: str
+    citations: list[ChatCitationResponse]
     title: str
     last_updated_at: datetime
 
@@ -26,6 +41,7 @@ class ContinueChatRequest(BaseModel):
 class ContinueChatResponse(BaseModel):
     chat_id: UUID
     answer: str
+    citations: list[ChatCitationResponse]
     title: str
     last_updated_at: datetime
 

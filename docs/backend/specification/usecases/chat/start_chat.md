@@ -18,7 +18,7 @@
 - チャットタイトルは整形済みプロンプトの先頭10文字から決定する
 - アプリケーション内のチャットIDをUUID v7で採番する
 - チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する
-- 採番したチャットID、最終更新日時、AI回答、タイトルを返す
+- 採番したチャットID、最終更新日時、AI回答、引用情報、タイトルを返す
 
 ### 対象外
 
@@ -26,7 +26,7 @@
 - 2回目以降のチャット会話
 - チャット履歴の取得
 - セッションID、AI回答の生成方法の制御
-- AI回答の根拠、引用箇所、参照論文の返却
+- AI回答の引用情報の永続化
 
 ## 3. 前提条件・事後条件
 
@@ -43,7 +43,7 @@
 - チャットの作成日時と最終更新日時が、初回の正常なLLM回答日時と一致している
 - 初回ユーザーメッセージの発信日時が、初回LLMメッセージの発信日時より後ではない
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
-- 採番したチャットID、最終更新日時、AI回答、タイトルが呼び出し元へ返されている
+- 採番したチャットID、最終更新日時、AI回答、引用情報、タイトルが呼び出し元へ返されている
 
 ### 異常終了時の事後条件
 
@@ -69,6 +69,7 @@
 | --- | --- | --- |
 | `chat_id` | UUID v7 | 初回登録時にアプリケーションが採番したチャット識別子 |
 | `answer` | `str` | 検証済みのAI回答 |
+| `citations` | `GeneratedChatCitation[]` | AI回答に紐づく引用箇所と参照元。チャット生成サービスから引用情報が返らない場合は空配列 |
 | `title` | `str` | 検証済みのチャットタイトル |
 | `last_updated_at` | タイムゾーンを含む日時 | 初回の正常なLLM回答日時 |
 
@@ -89,7 +90,7 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
-| `ChatGenerationClientProtocol` | `start_chat` | 整形済みプロンプトからチャットを開始し、検証済みのセッションID、AI回答を取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `InvalidChatGenerationResponseError` |
+| `ChatGenerationClientProtocol` | `start_chat` | 整形済みプロンプトからチャットを開始し、検証済みのセッションID、AI回答、引用情報を取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `InvalidChatGenerationResponseError` |
 | `ChatCommandRepositoryProtocol` | `save_started_chat` | チャット本体と初回のユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError` |
 
 ## 9. 基本フロー
@@ -97,7 +98,7 @@
 1. 入力されたプロンプトから`Prompt` Value Objectを生成し、一般的な前後空白の除去と文字数制約を適用する。
 2. 初回ユーザーメッセージの発信日時を記録する。
 3. 整形済みのプロンプトのみを渡し、チャット生成を開始する。
-4. 検証済みのセッションID、AI回答を取得する。
+4. 検証済みのセッションID、AI回答、引用情報を取得する。
 5. 整形済みプロンプトが10文字以内の場合はその全文、11文字以上の場合は先頭10文字に`...`を付けてタイトルを決定する。
 6. アプリケーション内のチャットIDをUUID v7で採番する。
 7. 検証済み応答を受領した時点の日時を、初回の正常回答日時として記録する。
@@ -105,7 +106,7 @@
 9. 同じ`chat_id`と`request_id`を持つ初回ユーザー・LLMメッセージを生成する。ユーザーメッセージには手順2の日時、LLMメッセージには初回の正常回答日時を設定する。
 10. 初回2メッセージがチャットターンと初回発信順序のルールを満たすことを保証する。
 11. チャット本体と初回2メッセージを同一トランザクションで永続化する。
-12. 採番したチャットID、AI回答、タイトル、最終更新日時を返す。
+12. 採番したチャットID、AI回答、引用情報、タイトル、最終更新日時を返す。
 
 ### フロー図
 
@@ -126,7 +127,7 @@ flowchart TD
     E -->|発信順序違反| ERR6["MessageSentAtOutOfOrderError"]
     E -->|有効| G["同一トランザクションで保存"]
     G -->|保存失敗| ERR7["ChatSaveError"]
-    G -->|保存成功| H["chat_id・answer・title・last_updated_atを返す"]
+    G -->|保存成功| H["chat_id・answer・citations・title・last_updated_atを返す"]
     H --> I([完了])
 
     style ERR1 fill:#fdd,stroke:#c66
@@ -162,6 +163,7 @@ flowchart TD
 
 - タイトルは整形済みプロンプトから決定する。10文字以内の場合は整形済みプロンプト全文、11文字以上の場合は先頭10文字に`...`を付ける。
 - プロンプト、チャット、メッセージ、チャットターン、日時の制約はドメイン仕様書で定義し、外部応答の妥当性はチャット生成結果の契約で保証する。
+- 引用情報はAI回答の付帯情報として呼び出し元へ返す。チャットメッセージとしては永続化しない。
 
 ## 13. 副作用
 
@@ -172,7 +174,7 @@ flowchart TD
 ## 14. 受け入れ条件
 
 - プロンプトの一般的な前後空白が除去され、整形済みプロンプトのみがチャット生成サービスへ送信される
-- 正常終了時に採番した`chat_id`、初回の正常なLLM回答日時である`last_updated_at`、`answer`、整形済みプロンプトから決定した`title`が返される
+- 正常終了時に採番した`chat_id`、初回の正常なLLM回答日時である`last_updated_at`、`answer`、`citations`、整形済みプロンプトから決定した`title`が返される
 - 正常終了時にチャット本体と初回のユーザー・LLMメッセージが永続化される
 - 初回のユーザー質問とLLM回答が同じチャットターンIDで関連付けられている
 - チャット本体の`created_at`と`last_updated_at`が、初回の正常なLLM回答日時と一致する

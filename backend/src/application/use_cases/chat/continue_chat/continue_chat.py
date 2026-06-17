@@ -106,6 +106,7 @@ class ContinueChatUseCase:
         return ContinueChatOutput(
             chat_id=chat.chat_id,
             answer=generated.answer,
+            citations=generated.citations,
             title=chat.title,
             last_updated_at=chat.last_updated_at,
         )

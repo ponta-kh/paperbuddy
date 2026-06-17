@@ -34,6 +34,8 @@ from src.dependencies.chat_deps import (
 from src.presentation.auth import AuthenticatedUser, get_authenticated_user
 from src.presentation.request_id import get_request_id
 from src.presentation.schemas.chat_schema import (
+    ChatCitationResponse,
+    ChatCitationSourceResponse,
     ChatMessageResponse,
     ChatSummaryResponse,
     ContinueChatRequest,
@@ -155,6 +157,23 @@ async def continue_chat(
     return ContinueChatResponse(
         chat_id=output.chat_id,
         answer=output.answer,
+        citations=[
+            ChatCitationResponse(
+                text=citation.text,
+                span_start=citation.span_start,
+                span_end=citation.span_end,
+                sources=[
+                    ChatCitationSourceResponse(
+                        content=source.content,
+                        location_type=source.location_type,
+                        uri=source.uri,
+                        metadata=source.metadata,
+                    )
+                    for source in citation.sources
+                ],
+            )
+            for citation in output.citations
+        ],
         title=output.title,
         last_updated_at=output.last_updated_at,
     )
@@ -177,6 +196,23 @@ async def start_chat(
     return StartChatResponse(
         chat_id=output.chat_id,
         answer=output.answer,
+        citations=[
+            ChatCitationResponse(
+                text=citation.text,
+                span_start=citation.span_start,
+                span_end=citation.span_end,
+                sources=[
+                    ChatCitationSourceResponse(
+                        content=source.content,
+                        location_type=source.location_type,
+                        uri=source.uri,
+                        metadata=source.metadata,
+                    )
+                    for source in citation.sources
+                ],
+            )
+            for citation in output.citations
+        ],
         title=output.title,
         last_updated_at=output.last_updated_at,
     )

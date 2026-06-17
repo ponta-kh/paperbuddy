@@ -12,6 +12,8 @@ from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     ContinueGeneratedChatResult,
+    GeneratedChatCitation,
+    GeneratedChatCitationSource,
     InvalidChatGenerationResponseError,
     StartGeneratedChatResult,
 )
@@ -59,6 +61,7 @@ class _BedrockErrorHint:
 class _KnowledgeBaseChatResult:
     session_id: str
     answer: str
+    citations: tuple[GeneratedChatCitation, ...]
 
 
 class BedrockKnowledgeBaseChatClient:
@@ -78,6 +81,7 @@ class BedrockKnowledgeBaseChatClient:
         return StartGeneratedChatResult(
             session_id=chat_result.session_id,
             answer=chat_result.answer,
+            citations=chat_result.citations,
         )
 
     async def continue_chat(
@@ -85,7 +89,9 @@ class BedrockKnowledgeBaseChatClient:
     ) -> ContinueGeneratedChatResult:
         result = await self._continue_knowledge_base_chat(session_id, prompt)
         return ContinueGeneratedChatResult(
-            session_id=result.session_id, answer=result.answer
+            session_id=result.session_id,
+            answer=result.answer,
+            citations=result.citations,
         )
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
@@ -125,6 +131,7 @@ class BedrockKnowledgeBaseChatClient:
                 for value in (session_id, answer)
             ):
                 raise ValueError
+            citations = self._parse_citations(response)
         except (KeyError, TypeError, ValueError) as error:
             logger.warning(
                 "Bedrock Knowledge Baseの回答生成レスポンスが不正です",
@@ -132,7 +139,11 @@ class BedrockKnowledgeBaseChatClient:
             )
             raise InvalidChatGenerationResponseError from error
 
-        return _KnowledgeBaseChatResult(session_id=session_id, answer=answer)
+        return _KnowledgeBaseChatResult(
+            session_id=session_id,
+            answer=answer,
+            citations=citations,
+        )
 
     async def _continue_knowledge_base_chat(
         self, session_id: str, prompt: str
@@ -175,6 +186,7 @@ class BedrockKnowledgeBaseChatClient:
                 or not answer.strip()
             ):
                 raise ValueError
+            citations = self._parse_citations(response)
         except (KeyError, TypeError, ValueError) as error:
             logger.warning(
                 "Bedrock Knowledge Baseの継続回答生成レスポンスが不正です",
@@ -182,7 +194,116 @@ class BedrockKnowledgeBaseChatClient:
             )
             raise InvalidChatGenerationResponseError from error
 
-        return _KnowledgeBaseChatResult(session_id=returned_session_id, answer=answer)
+        return _KnowledgeBaseChatResult(
+            session_id=returned_session_id,
+            answer=answer,
+            citations=citations,
+        )
+
+    @classmethod
+    def _parse_citations(
+        cls, response: dict[str, Any]
+    ) -> tuple[GeneratedChatCitation, ...]:
+        citations = response.get("citations", [])
+        if not isinstance(citations, list):
+            raise ValueError
+
+        return tuple(cls._parse_citation(citation) for citation in citations)
+
+    @classmethod
+    def _parse_citation(cls, citation: object) -> GeneratedChatCitation:
+        if not isinstance(citation, dict):
+            raise ValueError
+
+        generated_response_part = citation.get("generatedResponsePart", {})
+        if generated_response_part is None:
+            generated_response_part = {}
+        if not isinstance(generated_response_part, dict):
+            raise ValueError
+
+        text_response_part = generated_response_part.get("textResponsePart", {})
+        if text_response_part is None:
+            text_response_part = {}
+        if not isinstance(text_response_part, dict):
+            raise ValueError
+
+        text = text_response_part.get("text", "")
+        if not isinstance(text, str):
+            raise ValueError
+
+        span = text_response_part.get("span", {})
+        if span is None:
+            span = {}
+        if not isinstance(span, dict):
+            raise ValueError
+        span_start = cls._optional_int(span.get("start"))
+        span_end = cls._optional_int(span.get("end"))
+
+        references = citation.get("retrievedReferences", [])
+        if not isinstance(references, list):
+            raise ValueError
+
+        return GeneratedChatCitation(
+            text=text,
+            span_start=span_start,
+            span_end=span_end,
+            sources=tuple(cls._parse_reference(reference) for reference in references),
+        )
+
+    @classmethod
+    def _parse_reference(cls, reference: object) -> GeneratedChatCitationSource:
+        if not isinstance(reference, dict):
+            raise ValueError
+
+        content = reference.get("content", {})
+        if not isinstance(content, dict):
+            raise ValueError
+        text = content.get("text", "")
+        if not isinstance(text, str):
+            raise ValueError
+
+        location = reference.get("location", {})
+        if location is None:
+            location = {}
+        if not isinstance(location, dict):
+            raise ValueError
+        location_type = location.get("type")
+        if location_type is not None and not isinstance(location_type, str):
+            raise ValueError
+
+        metadata = reference.get("metadata", {})
+        if metadata is None:
+            metadata = {}
+        if not isinstance(metadata, dict):
+            raise ValueError
+
+        return GeneratedChatCitationSource(
+            content=text,
+            location_type=location_type,
+            uri=cls._reference_uri(location),
+            metadata=dict(metadata),
+        )
+
+    @staticmethod
+    def _optional_int(value: object) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        raise ValueError
+
+    @staticmethod
+    def _reference_uri(location: dict[str, object]) -> str | None:
+        for location_value in location.values():
+            if not isinstance(location_value, dict):
+                continue
+            uri = location_value.get("uri")
+            if isinstance(uri, str):
+                return uri
+            url = location_value.get("url")
+            if isinstance(url, str):
+                return url
+        return None
 
     @staticmethod
     def _client_error_code(error: ClientError) -> str:
@@ -260,7 +381,10 @@ class BedrockKnowledgeBaseChatClient:
                     "model ID、Inference Profile ID/ARNのいずれかを設定してください。"
                 ),
             )
-        if "knowledgebase" in normalized_message or "knowledge base" in normalized_message:
+        if (
+            "knowledgebase" in normalized_message
+            or "knowledge base" in normalized_message
+        ):
             return _BedrockErrorHint(
                 event="bedrock_knowledge_base_invalid_knowledge_base",
                 message="Bedrock Knowledge Base IDが不正です",

@@ -10,6 +10,8 @@ from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationConfigurationError,
     ChatGenerationRateLimitError,
     ChatGenerationUnavailableError,
+    GeneratedChatCitation,
+    GeneratedChatCitationSource,
     StartGeneratedChatResult,
 )
 from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
@@ -26,6 +28,21 @@ USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 USER_SENT_AT = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
 ANSWERED_AT = datetime(2026, 1, 1, 0, 1, tzinfo=timezone.utc)
+CITATIONS = (
+    GeneratedChatCitation(
+        text="answer",
+        span_start=0,
+        span_end=6,
+        sources=(
+            GeneratedChatCitationSource(
+                content="source excerpt",
+                location_type="S3",
+                uri="s3://bucket/paper.pdf",
+                metadata={"page": 3},
+            ),
+        ),
+    ),
+)
 
 
 def _use_case(
@@ -66,7 +83,7 @@ async def test_start_chat_generates_uuid7_chat_id_by_default() -> None:
 async def test_start_chat_saves_chat_and_turn() -> None:
     generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
     generation_client.start_chat.return_value = StartGeneratedChatResult(
-        session_id="session-1", answer="answer"
+        session_id="session-1", answer="answer", citations=CITATIONS
     )
     repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
 
@@ -76,6 +93,7 @@ async def test_start_chat_saves_chat_and_turn() -> None:
 
     generation_client.start_chat.assert_awaited_once_with("question")
     assert output.chat_id == CHAT_ID
+    assert output.citations == CITATIONS
     assert output.last_updated_at == ANSWERED_AT
     saved_chat, user_message, llm_message = repository.save_started_chat.await_args.args
     assert isinstance(saved_chat, Chat)

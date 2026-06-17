@@ -12,6 +12,8 @@ from src.application.exceptions import (
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationConfigurationError,
     ChatGenerationRateLimitError,
+    GeneratedChatCitation,
+    GeneratedChatCitationSource,
 )
 from src.application.use_cases.chat.continue_chat.continue_chat_dto import (
     ContinueChatOutput,
@@ -43,6 +45,21 @@ CHAT_ID = UUID("10000000-0000-0000-0000-000000000001")
 CHAT_ID_TEXT = str(CHAT_ID)
 REQUEST_ID = UUID("019ecde4-0000-7000-8000-000000000001")
 LAST_UPDATED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
+CITATIONS = (
+    GeneratedChatCitation(
+        text="answer",
+        span_start=0,
+        span_end=6,
+        sources=(
+            GeneratedChatCitationSource(
+                content="source excerpt",
+                location_type="S3",
+                uri="s3://bucket/paper.pdf",
+                metadata={"page": 3, "title": "paper"},
+            ),
+        ),
+    ),
+)
 
 
 class StubStartChatUseCase:
@@ -53,6 +70,7 @@ class StubStartChatUseCase:
         return StartChatOutput(
             chat_id=CHAT_ID,
             answer="answer",
+            citations=CITATIONS,
             title="title",
             last_updated_at=LAST_UPDATED_AT,
         )
@@ -67,6 +85,7 @@ class StubContinueChatUseCase:
         return ContinueChatOutput(
             chat_id=CHAT_ID,
             answer="next answer",
+            citations=CITATIONS,
             title="title",
             last_updated_at=LAST_UPDATED_AT,
         )
@@ -270,6 +289,21 @@ def test_continue_chat_endpoint() -> None:
     assert response.json() == {
         "chat_id": CHAT_ID_TEXT,
         "answer": "next answer",
+        "citations": [
+            {
+                "text": "answer",
+                "span_start": 0,
+                "span_end": 6,
+                "sources": [
+                    {
+                        "content": "source excerpt",
+                        "location_type": "S3",
+                        "uri": "s3://bucket/paper.pdf",
+                        "metadata": {"page": 3, "title": "paper"},
+                    }
+                ],
+            }
+        ],
         "title": "title",
         "last_updated_at": "2026-01-01T00:00:00Z",
     }
@@ -368,6 +402,21 @@ def test_start_chat_endpoint() -> None:
     assert response.json() == {
         "chat_id": CHAT_ID_TEXT,
         "answer": "answer",
+        "citations": [
+            {
+                "text": "answer",
+                "span_start": 0,
+                "span_end": 6,
+                "sources": [
+                    {
+                        "content": "source excerpt",
+                        "location_type": "S3",
+                        "uri": "s3://bucket/paper.pdf",
+                        "metadata": {"page": 3, "title": "paper"},
+                    }
+                ],
+            }
+        ],
         "title": "title",
         "last_updated_at": "2026-01-01T00:00:00Z",
     }
@@ -392,7 +441,9 @@ def test_start_chat_endpoint_rejects_missing_authentication() -> None:
     assert called
 
 
-def test_start_chat_endpoint_returns_too_many_requests_when_generation_rate_limited() -> None:
+def test_start_chat_endpoint_returns_too_many_requests_when_generation_rate_limited() -> (
+    None
+):
     app.dependency_overrides[get_start_chat_use_case] = lambda: (
         StubRateLimitedStartChatUseCase()
     )
@@ -408,7 +459,9 @@ def test_start_chat_endpoint_returns_too_many_requests_when_generation_rate_limi
     assert response.json()["code"] == "chat_generation_rate_limited"
 
 
-def test_start_chat_endpoint_returns_unavailable_when_generation_config_is_invalid() -> None:
+def test_start_chat_endpoint_returns_unavailable_when_generation_config_is_invalid() -> (
+    None
+):
     app.dependency_overrides[get_start_chat_use_case] = lambda: (
         StubConfigurationErrorStartChatUseCase()
     )

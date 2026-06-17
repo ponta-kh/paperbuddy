@@ -4,6 +4,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from src.application.ports.out.chat_generation_client_protocol import (
+    GeneratedChatCitation,
+)
+
 
 class ContinueChatInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -18,5 +22,6 @@ class ContinueChatInput(BaseModel):
 class ContinueChatOutput:
     chat_id: UUID
     answer: str
+    citations: tuple[GeneratedChatCitation, ...]
     title: str
     last_updated_at: datetime

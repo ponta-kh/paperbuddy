@@ -27,13 +27,18 @@ class SimulatedChatGenerationClient:
         return StartGeneratedChatResult(
             session_id=f"local-{uuid7()}",
             answer=self._answer(),
+            citations=(),
         )
 
     async def continue_chat(
         self, session_id: str, prompt: str
     ) -> ContinueGeneratedChatResult:
         await asyncio.sleep(self._delay_seconds)
-        return ContinueGeneratedChatResult(session_id=session_id, answer=self._answer())
+        return ContinueGeneratedChatResult(
+            session_id=session_id,
+            answer=self._answer(),
+            citations=(),
+        )
 
     @staticmethod
     def _answer() -> str:

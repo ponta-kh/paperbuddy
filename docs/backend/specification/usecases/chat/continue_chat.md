@@ -16,6 +16,7 @@
 - 最終更新日時から24時間未満であることの確認
 - チャット生成サービスによる既存チャットの会話継続
 - 新しいユーザー・LLMメッセージと更新後のチャット本体の永続化
+- チャット生成サービスが返した引用情報の返却
 
 ### 対象外
 
@@ -23,6 +24,7 @@
 - チャットタイトルの再生成または更新
 - チャット履歴の取得
 - 回答生成方法および会話継続可能期間の技術的な実現方法
+- 引用情報の永続化
 
 ## 3. 前提条件・事後条件
 
@@ -35,7 +37,7 @@
 
 - 新しいユーザー質問とLLM回答が同じチャットターンIDで永続化されている
 - チャットの最終更新日時が正常なLLM回答日時へ更新されている
-- チャットID、AI回答、既存タイトル、更新後の最終更新日時が返されている
+- チャットID、AI回答、引用情報、既存タイトル、更新後の最終更新日時が返されている
 
 ### 異常終了時の事後条件
 
@@ -62,6 +64,7 @@
 | --- | --- | --- |
 | `chat_id` | UUID v7 | 継続したチャットの識別子 |
 | `answer` | `str` | チャット生成サービスが返した検証済みのAI回答 |
+| `citations` | `GeneratedChatCitation[]` | AI回答に紐づく引用箇所と参照元。チャット生成サービスから引用情報が返らない場合は空配列 |
 | `title` | `str` | 継続対象チャットの既存タイトル |
 | `last_updated_at` | タイムゾーンを含む日時 | 正常なLLM回答日時へ更新された最終更新日時 |
 
@@ -82,7 +85,7 @@
 | Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
 | `ChatCommandRepositoryProtocol` | `get_chat` | `chat_id`に対応するチャット本体を取得する | `ChatNotFoundError`, `ChatLoadError` |
-| `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答を取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `ChatGenerationSessionUnavailableError`, `InvalidChatGenerationResponseError` |
+| `ChatGenerationClientProtocol` | `continue_chat` | 整形済みプロンプトを使用して既存チャットを継続し、検証済みの回答と引用情報を取得する | `ChatGenerationUnavailableError`, `ChatGenerationRateLimitError`, `ChatGenerationPermissionDeniedError`, `ChatGenerationConfigurationError`, `ChatGenerationSessionUnavailableError`, `InvalidChatGenerationResponseError` |
 | `ChatCommandRepositoryProtocol` | `save_exchange` | 更新済みチャット本体と新しいユーザー・LLMメッセージを同一トランザクションで永続化する | `ChatSaveError`, `ChatConflictError` |
 
 ## 9. 基本フロー
@@ -93,11 +96,11 @@
 4. `Chat`のDomainルールとして、現在日時と`Chat.last_updated_at`の差が24時間以内であることを確認する。[DR-10@chat]
 5. ユーザーメッセージの発信日時を記録する。
 6. 永続化済みのセッションIDと整形済みプロンプトを渡し、既存チャットを継続する。
-7. 検証済み回答を受領した日時を正常回答日時として記録する。
+7. 検証済み回答と引用情報を受領し、その日時を正常回答日時として記録する。
 8. 同じチャットIDとリクエストIDを持つユーザー・LLMメッセージを生成する。
 9. 発信順序を検証し、最終更新日時を正常回答日時へ更新して更新バージョンを1増加する。[DR-05@chat] [DR-07@chat] [DR-09@chat]
 10. 取得時の更新バージョンから変更されていないことを楽観排他で確認し、更新済みチャット本体と新しい2メッセージを同一トランザクションで保存する。
-11. チャットID、AI回答、既存タイトル、更新後の最終更新日時を返す。
+11. チャットID、AI回答、引用情報、既存タイトル、更新後の最終更新日時を返す。
 
 ### フロー図
 
@@ -119,7 +122,7 @@ flowchart TD
     F -->|有効| G["楽観排他・同一トランザクション保存"]
     G -->|競合| ERR8["ChatConflictError"]
     G -->|保存失敗| ERR7["ChatSaveError"]
-    G -->|保存成功| H["chat_id・answer・title・last_updated_atを返す"]
+    G -->|保存成功| H["chat_id・answer・citations・title・last_updated_atを返す"]
     H --> I([完了])
 
     style ERR1 fill:#fdd,stroke:#c66
@@ -174,10 +177,12 @@ flowchart TD
 - 永続化: 正常回答後、更新済みチャット本体と新しいユーザー・LLMメッセージを保存する
 - 外部サービス: チャット生成サービスへセッションIDと整形済みプロンプトを渡して会話を継続する
 - イベント・通知: 該当なし
+- 引用情報: チャット生成サービスから受け取った引用情報を呼び出し元へ返すが、チャットメッセージとしては永続化しない
 
 ## 14. 受け入れ条件
 
 - 最終更新日時から24時間以内の所有チャットを継続できる
+- 正常終了時に`answer`とともに`citations`が返される
 - 正常回答後に最終更新日時と新しい2メッセージが保存される
 - 既存タイトルは変更されず、出力に含まれる
 - 24時間を超過したチャットでは外部サービスが呼び出されず、状態も変更されない
