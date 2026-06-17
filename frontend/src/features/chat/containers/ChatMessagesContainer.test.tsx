@@ -176,4 +176,46 @@ describe("ChatMessagesContainer", () => {
             expect(getChatMessages).not.toHaveBeenCalled();
         });
     });
+
+    test("新規チャット採番後も追加済み回答の段階表示を継続する", () => {
+        vi.useFakeTimers();
+        vi.mocked(getChatMessages).mockResolvedValue([]);
+
+        const { rerender } = render(
+            <ChatMessagesContainer>
+                {({
+                    messages,
+                    onAppendAssistantMessage,
+                    onBindCurrentChat,
+                }) => (
+                    <div>
+                        <span>{messages[0]?.content}</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onBindCurrentChat("chat-new");
+                                onAppendAssistantMessage("新しい回答");
+                            }}
+                        >
+                            回答追加
+                        </button>
+                    </div>
+                )}
+            </ChatMessagesContainer>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "回答追加" }));
+        rerender(
+            <ChatMessagesContainer selectedChatId="chat-new">
+                {({ messages }) => <div>{messages[0]?.content}</div>}
+            </ChatMessagesContainer>,
+        );
+
+        act(() => vi.runAllTimers());
+
+        expect(screen.getByText("新しい回答")).toBeInTheDocument();
+        expect(getChatMessages).not.toHaveBeenCalled();
+
+        vi.useRealTimers();
+    });
 });

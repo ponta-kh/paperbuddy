@@ -40,6 +40,10 @@ export function ChatMessagesContainer({
     );
 
     useEffect(() => {
+        if (selectedChatId && selectedChatId === loadedChatIdRef.current) {
+            return;
+        }
+
         for (const timer of revealTimersRef.current) {
             window.clearInterval(timer);
         }
@@ -50,10 +54,6 @@ export function ChatMessagesContainer({
             setLoadError(false);
             setIsLoading(false);
             loadedChatIdRef.current = undefined;
-            return;
-        }
-
-        if (selectedChatId === loadedChatIdRef.current) {
             return;
         }
 
