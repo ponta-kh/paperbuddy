@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="infra/pdf配下のPDFアップロード後、開発環境のKnowledge Base同期を実行する"
+
+set -euo pipefail
+
+mise run rag:upload:dev
+mise run rag:generate:dev

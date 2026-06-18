@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のBedrock Knowledge Base同期を開始し、完了まで待機する"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly POLL_INTERVAL_SECONDS=20
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jqが見つかりません。Knowledge Base同期状態の判定にjqが必要です。" >&2
+  exit 1
+fi
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+stack_output() {
+  local stack_name="$1"
+  local region="$2"
+  local output_key="$3"
+
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query "Stacks[0].Outputs[?OutputKey=='${output_key}'].OutputValue | [0]" \
+    --output text
+}
+
+stack_name="$(read_env_value STACK_NAME)"
+region="$(read_env_value AWS_REGION)"
+knowledge_base_id="$(stack_output "$stack_name" "$region" BedrockKnowledgeBaseId)"
+data_source_id="$(stack_output "$stack_name" "$region" BedrockDataSourceId)"
+
+if [[ -z "$knowledge_base_id" || "$knowledge_base_id" == "None" ]]; then
+  echo "CloudFormation OutputからBedrockKnowledgeBaseIdを取得できませんでした" >&2
+  exit 1
+fi
+
+if [[ -z "$data_source_id" || "$data_source_id" == "None" ]]; then
+  echo "CloudFormation OutputからBedrockDataSourceIdを取得できませんでした" >&2
+  exit 1
+fi
+
+echo "Knowledge Base同期を開始します: ${knowledge_base_id} / ${data_source_id}"
+
+ingestion_job_id="$(
+  aws bedrock-agent start-ingestion-job \
+    --region "$region" \
+    --knowledge-base-id "$knowledge_base_id" \
+    --data-source-id "$data_source_id" \
+    --query 'ingestionJob.ingestionJobId' \
+    --output text
+)"
+
+echo "Ingestion Job ID: ${ingestion_job_id}"
+
+while true; do
+  job_json="$(
+    aws bedrock-agent get-ingestion-job \
+      --region "$region" \
+      --knowledge-base-id "$knowledge_base_id" \
+      --data-source-id "$data_source_id" \
+      --ingestion-job-id "$ingestion_job_id" \
+      --query 'ingestionJob.{Status:status,Statistics:statistics,FailureReasons:failureReasons}' \
+      --output json
+  )"
+
+  status="$(
+    printf '%s' "$job_json" |
+      jq -r '.Status'
+  )"
+
+  echo "$job_json"
+
+  case "$status" in
+    COMPLETE)
+      echo "Knowledge Base同期が完了しました"
+      exit 0
+      ;;
+    FAILED | STOPPED)
+      echo "Knowledge Base同期が失敗または停止しました: ${status}" >&2
+      exit 1
+      ;;
+    *)
+      sleep "$POLL_INTERVAL_SECONDS"
+      ;;
+  esac
+done

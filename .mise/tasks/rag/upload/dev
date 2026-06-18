@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#MISE description="infra/pdf配下のPDFを開発環境のRAG材料S3へアップロードする"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly PDF_DIR="infra/pdf"
+readonly S3_PREFIX="documents/"
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+stack_output() {
+  local stack_name="$1"
+  local region="$2"
+  local output_key="$3"
+
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query "Stacks[0].Outputs[?OutputKey=='${output_key}'].OutputValue | [0]" \
+    --output text
+}
+
+if [[ ! -d "$PDF_DIR" ]]; then
+  echo "RAG材料PDFディレクトリが見つかりません: ${PDF_DIR}" >&2
+  exit 1
+fi
+
+if ! find "$PDF_DIR" -type f -name '*.pdf' -print -quit | grep -q .; then
+  echo "アップロード対象のPDFがありません: ${PDF_DIR}" >&2
+  exit 1
+fi
+
+stack_name="$(read_env_value STACK_NAME)"
+region="$(read_env_value AWS_REGION)"
+bucket_name="$(stack_output "$stack_name" "$region" RagSourceBucketName)"
+
+if [[ -z "$bucket_name" || "$bucket_name" == "None" ]]; then
+  echo "CloudFormation OutputからRagSourceBucketNameを取得できませんでした" >&2
+  exit 1
+fi
+
+echo "RAG材料PDFをアップロードします: ${PDF_DIR} -> s3://${bucket_name}/${S3_PREFIX}"
+
+aws s3 sync "$PDF_DIR" "s3://${bucket_name}/${S3_PREFIX}" \
+  --region "$region" \
+  --exclude '*' \
+  --include '*.pdf'
+
+echo
+echo "アップロード済みPDF:"
+aws s3 ls "s3://${bucket_name}/${S3_PREFIX}" \
+  --region "$region" \
+  --recursive

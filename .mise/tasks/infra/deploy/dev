@@ -3,4 +3,21 @@
 #MISE depends=["frontend:build"]
 #MISE dir="infra"
 
-pnpm cdk deploy PaperBuddyDev
+stack_name="$(
+  awk -F= '
+    $0 !~ /^[[:space:]]*#/ && $1 == "STACK_NAME" {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^["'\''"]|["'\''"]$/, "")
+      print
+      exit
+    }
+  ' .env
+)"
+
+if [[ -z "$stack_name" ]]; then
+  echo "infra設定のSTACK_NAMEが未設定です" >&2
+  exit 1
+fi
+
+pnpm cdk deploy "$stack_name"

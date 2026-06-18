@@ -98,7 +98,30 @@ mise run infra:bedrock:check:dev
 
 埋め込みモデルにはCDKで`amazon.titan-embed-text-v2:0`を固定設定している。
 
-## デプロイ前検証
+## 推奨デプロイ手順
+
+開発環境の通常デプロイは、リポジトリルートで次の統合タスクを実行する。
+
+```sh
+mise run deploy:dev
+```
+
+このタスクは次を順に実行する。
+
+1. `infra/.env`の必須値を確認する
+2. miseタスク定義、AWS認証先、Docker、Bedrockモデル利用可否を確認する
+3. CDK bootstrap済みか確認し、未実行の場合は`infra:bootstrap:dev`を実行する
+4. Lint、各テスト、CDK synth、`git diff --check`を実行する
+5. `infra:deploy:dev`でAWSへデプロイする
+6. スタック状態、CloudFormation Output、CloudFront経由の`/api/health`を確認する
+
+PDFのS3配置とKnowledge Base同期は、この統合タスクでは実行しない。
+
+## 個別検証手順
+
+問題切り分けや部分実行が必要な場合は、以下の個別コマンドを使用する。
+
+### デプロイ前検証
 
 リポジトリルートでLintとテストを実行する。
 
@@ -129,9 +152,9 @@ aws sts get-caller-identity
 docker info --format '{{.ServerVersion}}'
 ```
 
-## 初回デプロイ
+## 個別デプロイ
 
-デプロイを実行する。
+事前検証やbootstrapを個別に済ませている場合は、デプロイだけを実行できる。
 
 ```sh
 mise run infra:deploy:dev
@@ -199,9 +222,39 @@ https://<DistributionDomainName>
 
 ### RAG材料PDFの配置
 
-PDFはリポジトリへ置くだけでは取り込まれない。デプロイ完了後、RAG材料用S3バケットの`documents/`配下へアップロードする。
+RAG材料PDFは`infra/pdf/`配下に配置する。デプロイ完了後、次のタスクでRAG材料用S3バケットの`documents/`配下へアップロードし、Knowledge Base同期を開始する。
 
-CloudFormation Outputからバケット名を取得する。
+```sh
+mise run rag:sync:dev
+```
+
+このタスクは次を順に実行する。
+
+1. `infra/pdf/`配下の`*.pdf`をRAG材料用S3バケットの`documents/`配下へ同期する
+2. 同期後のS3オブジェクト一覧を表示する
+3. Bedrock Knowledge Baseのingestion jobを開始する
+4. ingestion jobの状態を確認し、`COMPLETE`まで待機する
+
+S3へのアップロードだけを実行する場合:
+
+```sh
+mise run rag:upload:dev
+```
+
+Knowledge Base同期だけを実行する場合:
+
+```sh
+mise run rag:generate:dev
+```
+
+PDFを追加、更新した場合は、同じタスクを再実行する。
+ローカルから削除したPDFは安全のためS3から自動削除しない。S3上の不要なPDFを削除する場合は、対象と影響範囲を確認してから個別に削除する。
+
+Knowledge Base同期は、ライブラリ一覧用DynamoDBテーブルへPDFメタデータを登録しない。現在の実装では、RAG検索対象への取り込みとライブラリ一覧表示のデータ管理は独立している。
+
+### RAG材料PDFの個別操作
+
+問題切り分けや手動操作が必要な場合は、CloudFormation Outputからバケット名を取得する。
 
 ```sh
 rag_source_bucket_name="$(
@@ -236,7 +289,7 @@ aws s3 sync \
 aws s3 ls "s3://${rag_source_bucket_name}/documents/" --recursive
 ```
 
-### Knowledge Base同期
+### Knowledge Base同期の個別操作
 
 CloudFormation OutputからKnowledge Base IDとData Source IDを取得する。
 
@@ -279,10 +332,6 @@ aws bedrock-agent get-ingestion-job \
 ```
 
 `Status`が`COMPLETE`になることを確認する。`FAILED`の場合は`FailureReasons`を確認する。
-
-PDFを追加、更新、削除した場合は、S3同期後にKnowledge Base同期を再実行する。
-
-Knowledge Base同期は、ライブラリ一覧用DynamoDBテーブルへPDFメタデータを登録しない。現在の実装では、RAG検索対象への取り込みとライブラリ一覧表示のデータ管理は独立している。
 
 ### アプリケーション動作確認
 

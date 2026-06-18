@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+#MISE description="開発環境の事前検証、bootstrap、デプロイ、ヘルスチェックを一括実行する"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly BOOTSTRAP_STACK_NAME="CDKToolkit"
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+run_step() {
+  local message="$1"
+  shift
+
+  echo
+  echo "==> ${message}"
+  "$@"
+}
+
+ensure_bootstrap() {
+  local region="$1"
+
+  if aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --query 'Stacks[0].StackStatus' \
+    --output text >/dev/null 2>&1; then
+    echo "CDK bootstrapは実行済みです"
+    return
+  fi
+
+  run_step "CDK bootstrapを実行します" mise run infra:bootstrap:dev
+}
+
+stack_output() {
+  local stack_name="$1"
+  local region="$2"
+  local output_key="$3"
+
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query "Stacks[0].Outputs[?OutputKey=='${output_key}'].OutputValue | [0]" \
+    --output text
+}
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "infra設定ファイルが見つかりません: ${ENV_FILE}" >&2
+  echo "infra/.env.example を infra/.env にコピーして値を設定してください。" >&2
+  exit 1
+fi
+
+stack_name="$(read_env_value STACK_NAME)"
+region="$(read_env_value AWS_REGION)"
+read_env_value BEDROCK_MODEL_ARN >/dev/null
+
+echo "デプロイ対象: ${stack_name} (${region})"
+
+run_step "miseタスク定義を検証します" mise tasks validate
+run_step "AWS認証先を確認します" aws sts get-caller-identity
+run_step "Dockerの起動状態を確認します" docker info --format '{{.ServerVersion}}'
+run_step "Bedrock生成モデルの利用可否を確認します" mise run infra:bedrock:check:dev
+ensure_bootstrap "$region"
+run_step "Lintを実行します" mise run lint
+run_step "フロントエンドテストを実行します" mise run frontend:test
+run_step "バックエンドテストを実行します" mise run backend:test
+run_step "インフラテストを実行します" mise run infra:test
+run_step "CloudFormationテンプレートを生成します" mise run infra:synth
+run_step "差分の空白エラーを確認します" git diff --check
+run_step "AWSへデプロイします" mise run infra:deploy:dev
+
+run_step "スタック状態を確認します" \
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query 'Stacks[0].StackStatus' \
+    --output text
+
+run_step "CloudFormation Outputを表示します" \
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query 'Stacks[0].Outputs' \
+    --output table
+
+distribution_domain_name="$(stack_output "$stack_name" "$region" DistributionDomainName)"
+
+run_step "CloudFront経由でヘルスチェックを実行します" \
+  curl --fail-with-body "https://${distribution_domain_name}/api/health"
+
+echo
+echo "デプロイが完了しました: https://${distribution_domain_name}"
