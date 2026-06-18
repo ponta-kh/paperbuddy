@@ -105,6 +105,12 @@ export function grantBackendBedrockAccess(
     );
     taskRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
+            actions: ["bedrock:Retrieve"],
+            resources: [llm.knowledgeBase.attrKnowledgeBaseArn],
+        }),
+    );
+    taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
             actions: ["bedrock:InvokeModel"],
             resources: [llm.modelArn],
         }),

@@ -312,6 +312,10 @@ describe("InfraStack", () => {
                         Resource: "*",
                     }),
                     Match.objectLike({
+                        Action: "bedrock:Retrieve",
+                        Effect: "Allow",
+                    }),
+                    Match.objectLike({
                         Action: "bedrock:InvokeModel",
                         Effect: "Allow",
                     }),
