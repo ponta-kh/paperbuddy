@@ -6,7 +6,7 @@ import * as cdk from "aws-cdk-lib/core";
 import type { Construct } from "constructs";
 
 const DATA_SOURCE_PREFIX = "documents/";
-const EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0";
+const EMBEDDING_MODEL_ID = "ap.anthropic.claude-3-5-sonnet-20241022-v2:0";
 const EMBEDDING_VECTOR_DIMENSION = 1024;
 const VECTOR_INDEX_NAME = "bedrock-knowledge-base";
 const VECTOR_FIELD_NAME = "bedrock-knowledge-base-default-vector";
