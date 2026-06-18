@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from unittest.mock import Mock
 from uuid import UUID
 
@@ -34,8 +35,13 @@ SECOND_CHAT_ID = UUID("10000000-0000-0000-0000-000000000002")
 REQUEST_ID = UUID("00000000-0000-0000-0000-000000000010")
 
 
-def _citations() -> tuple[ChatCitation, ...]:
-    metadata: dict[str, object] = {"title": "paper", "page": 3}
+def _citations(
+    *,
+    metadata: dict[str, object] | None = None,
+) -> tuple[ChatCitation, ...]:
+    source_metadata: dict[str, object] = (
+        metadata if metadata is not None else {"title": "paper", "page": 3}
+    )
     return (
         ChatCitation(
             text="answer",
@@ -46,7 +52,7 @@ def _citations() -> tuple[ChatCitation, ...]:
                     content="source excerpt",
                     location_type="S3",
                     uri="s3://bucket/paper.pdf",
-                    metadata=metadata,
+                    metadata=source_metadata,
                 ),
             ),
         ),
@@ -152,6 +158,30 @@ async def test_save_started_chat_writes_llm_message_citations() -> None:
             ],
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_save_started_chat_accepts_float_values_in_citation_metadata() -> None:
+    client = Mock()
+    repository = DynamoDbChatRepository(client, table_name="chat-table")
+    citations = _citations(
+        metadata={
+            "title": "paper",
+            "score": 0.95,
+            "nested": {"weights": [0.1, 1]},
+        }
+    )
+
+    await repository.save_started_chat(_chat(), *_messages(citations=citations))
+
+    transaction = client.transact_write_items.call_args.kwargs["TransactItems"]
+    llm_message = repository._deserialize(transaction[2]["Put"]["Item"])
+    metadata = llm_message["citations"][0]["sources"][0]["metadata"]
+    assert metadata == {
+        "title": "paper",
+        "score": Decimal("0.95"),
+        "nested": {"weights": [Decimal("0.1"), Decimal("1")]},
+    }
 
 
 @pytest.mark.asyncio
