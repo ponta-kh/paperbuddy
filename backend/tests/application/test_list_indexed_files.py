@@ -31,6 +31,11 @@ class StubNotFoundIndexedFileCatalog:
         raise RepositoryNotFoundError
 
 
+class FailingIndexedFileCatalog:
+    async def list_indexed_files(self) -> tuple[IndexedFile, ...]:
+        raise RuntimeError("DynamoDB failure")
+
+
 @pytest.mark.asyncio
 async def test_list_indexed_files_returns_catalog_results() -> None:
     catalog = StubIndexedFileCatalog(
@@ -94,4 +99,27 @@ async def test_list_indexed_files_logs_not_found(
     assert output.files == ()
     record = caplog.records[0]
     assert getattr(record, "event") == "list_indexed_files_not_found"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+
+
+@pytest.mark.asyncio
+async def test_list_indexed_files_logs_repository_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger=(
+                "src.application.use_cases.library.list_indexed_files."
+                "list_indexed_files"
+            ),
+        ),
+        pytest.raises(RuntimeError, match="DynamoDB failure"),
+    ):
+        await ListIndexedFilesUseCase(FailingIndexedFileCatalog()).execute(
+            ListIndexedFilesInput(request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == "list_indexed_files_failed"
     assert getattr(record, "request_id") == str(REQUEST_ID)
