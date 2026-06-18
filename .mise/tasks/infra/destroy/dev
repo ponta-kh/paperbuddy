@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のPaperBuddy本体AWSリソースを削除する"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly STACK_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-stack.XXXXXX.json)"
+readonly STACK_RESOURCES_FILE="$(mktemp /tmp/paperbuddy-stack-resources.XXXXXX.json)"
+
+cleanup() {
+  rm -f "$STACK_SNAPSHOT_FILE" "$STACK_RESOURCES_FILE"
+}
+trap cleanup EXIT
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+output_value() {
+  local key="$1"
+
+  jq -r --arg key "$key" \
+    '.Stacks[0].Outputs[] | select(.OutputKey == $key) | .OutputValue' \
+    "$STACK_SNAPSHOT_FILE"
+}
+
+stack_resource_ids_by_type() {
+  local resource_type="$1"
+
+  jq -r --arg resource_type "$resource_type" '
+    .StackResourceSummaries[]
+    | select(.ResourceType == $resource_type)
+    | .PhysicalResourceId
+  ' "$STACK_RESOURCES_FILE"
+}
+
+require_command() {
+  local command_name="$1"
+
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "必要なコマンドが見つかりません: ${command_name}" >&2
+    exit 1
+  fi
+}
+
+empty_s3_bucket_completely() {
+  local bucket_name="$1"
+  local delete_payload
+  local object_count
+
+  echo "S3バケットを空にします: ${bucket_name}"
+  aws s3 rm "s3://${bucket_name}" --recursive --region "$AWS_REGION"
+
+  while true; do
+    delete_payload="$(
+      aws s3api list-object-versions \
+        --bucket "$bucket_name" \
+        --region "$AWS_REGION" \
+        --max-items 1000 \
+        --output json \
+      | jq -c '{
+          Objects: (
+            [.Versions[]?, .DeleteMarkers[]?]
+            | map({Key: .Key, VersionId: .VersionId})
+          ),
+          Quiet: true
+        }'
+    )"
+
+    object_count="$(jq '.Objects | length' <<< "$delete_payload")"
+    [[ "$object_count" -eq 0 ]] && break
+
+    aws s3api delete-objects \
+      --bucket "$bucket_name" \
+      --region "$AWS_REGION" \
+      --delete "$delete_payload" \
+      > /dev/null
+  done
+}
+
+delete_dynamodb_table() {
+  local table_name="$1"
+
+  [[ -z "$table_name" || "$table_name" == "null" ]] && return
+
+  echo "DynamoDBテーブルを削除します: ${table_name}"
+  aws dynamodb update-table \
+    --table-name "$table_name" \
+    --region "$AWS_REGION" \
+    --no-deletion-protection-enabled \
+    > /dev/null
+
+  until [[ "$(
+    aws dynamodb describe-table \
+      --table-name "$table_name" \
+      --region "$AWS_REGION" \
+      --query 'Table.TableStatus' \
+      --output text
+  )" == "ACTIVE" ]]; do
+    sleep 5
+  done
+
+  aws dynamodb delete-table \
+    --table-name "$table_name" \
+    --region "$AWS_REGION" \
+    > /dev/null
+
+  aws dynamodb wait table-not-exists \
+    --table-name "$table_name" \
+    --region "$AWS_REGION"
+}
+
+delete_s3_bucket() {
+  local bucket_name="$1"
+
+  [[ -z "$bucket_name" || "$bucket_name" == "null" ]] && return
+
+  empty_s3_bucket_completely "$bucket_name"
+  echo "S3バケットを削除します: ${bucket_name}"
+  aws s3api delete-bucket \
+    --bucket "$bucket_name" \
+    --region "$AWS_REGION"
+}
+
+delete_log_group() {
+  local log_group_name="$1"
+
+  [[ -z "$log_group_name" || "$log_group_name" == "null" ]] && return
+
+  echo "CloudWatch Logsロググループを削除します: ${log_group_name}"
+  aws logs delete-log-group \
+    --log-group-name "$log_group_name" \
+    --region "$AWS_REGION" \
+    || true
+}
+
+audit_deleted_resources() {
+  echo
+  echo "削除結果を監査します"
+
+  if aws cloudformation describe-stacks \
+    --stack-name "$STACK_NAME" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "スタックがまだ存在します: ${STACK_NAME}" >&2
+    exit 1
+  fi
+
+  for table_name in "$CHAT_TABLE_NAME" "$LIBRARY_TABLE_NAME"; do
+    if aws dynamodb describe-table \
+      --table-name "$table_name" \
+      --region "$AWS_REGION" \
+      >/dev/null 2>&1; then
+      echo "DynamoDBテーブルがまだ存在します: ${table_name}" >&2
+      exit 1
+    fi
+  done
+
+  for bucket_name in "$FRONTEND_BUCKET_NAME" "$RAG_SOURCE_BUCKET_NAME"; do
+    if aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
+      echo "S3バケットがまだ存在します: ${bucket_name}" >&2
+      exit 1
+    fi
+  done
+
+  if aws cognito-idp describe-user-pool \
+    --user-pool-id "$USER_POOL_ID" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "Cognito User Poolがまだ存在します: ${USER_POOL_ID}" >&2
+    exit 1
+  fi
+
+  remaining_tagged_resources="$(
+    aws resourcegroupstaggingapi get-resources \
+      --region "$AWS_REGION" \
+      --tag-filters Key=aws:cloudformation:stack-name,Values="$STACK_NAME" \
+      --query 'ResourceTagMappingList[].ResourceARN' \
+      --output text
+  )"
+
+  if [[ -n "$remaining_tagged_resources" ]]; then
+    echo "PaperBuddyスタックタグが残るリソースがあります:" >&2
+    printf '%s\n' "$remaining_tagged_resources" >&2
+    exit 1
+  fi
+
+  echo "PaperBuddy本体リソースの削除を確認しました"
+}
+
+require_command aws
+require_command jq
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "infra設定ファイルが見つかりません: ${ENV_FILE}" >&2
+  echo "infra/.env.example を infra/.env にコピーして値を設定してください。" >&2
+  exit 1
+fi
+
+STACK_NAME="$(read_env_value STACK_NAME)"
+AWS_REGION="$(read_env_value AWS_REGION)"
+
+aws cloudformation describe-stacks \
+  --stack-name "$STACK_NAME" \
+  --region "$AWS_REGION" \
+  --output json \
+  > "$STACK_SNAPSHOT_FILE"
+
+aws cloudformation list-stack-resources \
+  --stack-name "$STACK_NAME" \
+  --region "$AWS_REGION" \
+  --output json \
+  > "$STACK_RESOURCES_FILE"
+
+CHAT_TABLE_NAME="$(output_value ChatTableName)"
+LIBRARY_TABLE_NAME="$(output_value LibraryTableName)"
+FRONTEND_BUCKET_NAME="$(output_value FrontendBucketName)"
+RAG_SOURCE_BUCKET_NAME="$(output_value RagSourceBucketName)"
+USER_POOL_ID="$(output_value UserPoolId)"
+LOG_GROUP_NAMES=()
+while IFS= read -r log_group_name; do
+  [[ -z "$log_group_name" ]] && continue
+  LOG_GROUP_NAMES+=("$log_group_name")
+done < <(stack_resource_ids_by_type "AWS::Logs::LogGroup")
+
+echo "以下のPaperBuddy本体AWSリソースを削除します。削除後は復元できません。"
+echo "AWSアカウント:"
+aws sts get-caller-identity
+echo
+printf 'AWS_REGION=%s\n' "$AWS_REGION"
+printf 'STACK_NAME=%s\n' "$STACK_NAME"
+printf 'CHAT_TABLE_NAME=%s\n' "$CHAT_TABLE_NAME"
+printf 'LIBRARY_TABLE_NAME=%s\n' "$LIBRARY_TABLE_NAME"
+printf 'FRONTEND_BUCKET_NAME=%s\n' "$FRONTEND_BUCKET_NAME"
+printf 'RAG_SOURCE_BUCKET_NAME=%s\n' "$RAG_SOURCE_BUCKET_NAME"
+printf 'USER_POOL_ID=%s\n' "$USER_POOL_ID"
+printf 'LOG_GROUP_NAMES=%s\n' "${LOG_GROUP_NAMES[*]:-}"
+echo
+read -r -p "削除を続行するにはスタック名 ${STACK_NAME} を入力してください: " confirmation
+
+if [[ "$confirmation" != "$STACK_NAME" ]]; then
+  echo "入力が一致しないため削除を中止しました" >&2
+  exit 1
+fi
+
+echo "CloudFormationスタックを削除します: ${STACK_NAME}"
+aws cloudformation delete-stack \
+  --stack-name "$STACK_NAME" \
+  --region "$AWS_REGION"
+
+aws cloudformation wait stack-delete-complete \
+  --stack-name "$STACK_NAME" \
+  --region "$AWS_REGION"
+
+delete_dynamodb_table "$CHAT_TABLE_NAME"
+delete_dynamodb_table "$LIBRARY_TABLE_NAME"
+delete_s3_bucket "$FRONTEND_BUCKET_NAME"
+delete_s3_bucket "$RAG_SOURCE_BUCKET_NAME"
+
+echo "Cognito User Poolを削除します: ${USER_POOL_ID}"
+aws cognito-idp delete-user-pool \
+  --user-pool-id "$USER_POOL_ID" \
+  --region "$AWS_REGION"
+
+for log_group_name in "${LOG_GROUP_NAMES[@]}"; do
+  delete_log_group "$log_group_name"
+done
+
+audit_deleted_resources
+
+echo
+echo "CDK bootstrap資産は削除していません。必要に応じて docs/infra/deletion-guide.md のCDK bootstrapアセット削除手順を実行してください。"
