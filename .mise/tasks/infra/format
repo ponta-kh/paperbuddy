@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="AWSインフラストラクチャをフォーマットする"
+#MISE dir="infra"
+
+pnpm format

@@ -1,0 +1,25 @@
+.git
+.ruff_cache
+.pnpm-store
+node_modules
+
+# frontend
+frontend/dist
+frontend/node_modules
+
+# backend
+backend/.coverage
+backend/.pytest_cache
+backend/.ruff_cache
+backend/.venv
+backend/__pycache__
+backend/src/**/__pycache__
+backend/tests/**/__pycache__
+docker/.env
+
+# infra
+infra/cdk.out
+infra/dist
+infra/node_modules
+
+tmp

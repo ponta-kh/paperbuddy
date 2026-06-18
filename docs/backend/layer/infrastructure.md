@@ -52,6 +52,18 @@ DB接続、HTTPクライアント、SDKクライアントなどは、Infrastruct
 
 クライアントの共有範囲、生成タイミング、破棄タイミングなどのライフサイクルは、Dependencies層で管理する。
 
+## Docstring
+Infrastructure層では、外部サービス、SDK、DB、ネットワーク、永続化形式などの接続詳細をdocstringで伝える。
+
+- 外部サービスAdapter、Repository実装、Client実装には概要docstringを書く
+- メソッドdocstringには、外部サービスに対して何を行うかを書く
+- 外部APIのエラーコード、リトライ対象、変換する例外、保存形式など、実装を読む前に知るべき接続仕様を書く
+- ArgsおよびReturnsは、外部サービスの入力・出力との対応が分かりにくい場合に書く
+- Raisesは、外部サービスやSDKの例外をApplication層またはDomain層の契約例外へ変換している場合に書く
+- SDKの内部例外をすべて列挙せず、呼び出し側に公開する例外だけを書く
+
+docstringはGoogle Style Docstringを使用する。実装固有の手順はコードで表現し、外部接続仕様として読み手が事前に知るべき内容を優先する。
+
 ## 設定・機密情報
 - APIキー、DB接続情報、AWS認証情報などをコードへ直接記述しない
 - 機密情報は環境変数またはSecrets Managerから取得する

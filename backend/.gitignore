@@ -8,7 +8,6 @@ __pycache__/
 venv/
 .env
 .env.*
-!.env.example
 
 # Test, lint, and type-check caches
 .pytest_cache/

@@ -9,8 +9,8 @@ HTTP API全体で共通して適用する外部公開形式を定義する。
 - URLの単語区切りにはハイフンを使用する
 
 ```text
-GET /chats/{chat_id}
-POST /chats
+GET /api/chats/{chat_id}
+POST /api/chats
 ```
 
 ## HTTPメソッド
@@ -42,6 +42,7 @@ POST /chats
 - JSONのフィールド名は`snake_case`とする
 - 日時はタイムゾーンを含むISO 8601形式で表現する
 - UUIDはハイフンを含む標準文字列表現とする
+- アプリケーションが採番するUUIDはUUID v7とする
 - 列挙値は文字列で表現する
 - 金額など浮動小数点数で誤差が問題になる値は、浮動小数点数で表現しない
 

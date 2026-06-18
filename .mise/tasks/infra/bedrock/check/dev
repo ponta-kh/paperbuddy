@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="開発環境で使用するBedrock生成モデルの利用可否を確認する"
+#MISE dir="infra"
+
+pnpm exec ts-node --prefer-ts-exts scripts/check-bedrock-dev.ts

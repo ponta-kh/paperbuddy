@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Domain層をテストし、分岐カバレッジ100%を検証する"
+#MISE dir="backend"
+
+uv run pytest tests/domain --cov=src/domain --cov-branch --cov-report=term-missing --cov-fail-under=100

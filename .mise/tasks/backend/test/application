@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Application層をモック付きでテストし、分岐カバレッジ100%を検証する"
+#MISE dir="backend"
+
+uv run pytest tests/application --cov=src/application/use_cases --cov-branch --cov-report=term-missing --cov-fail-under=100

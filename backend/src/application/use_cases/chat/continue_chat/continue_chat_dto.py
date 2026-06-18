@@ -1,26 +1,27 @@
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
+
+from src.application.ports.out.chat_generation_client_protocol import (
+    GeneratedChatCitation,
+)
 
 
 class ContinueChatInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     user_id: UUID
-    chat_id: str
+    chat_id: UUID
     prompt: str
-
-    @field_validator("chat_id")
-    @classmethod
-    def validate_chat_id(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("chat_id must not be blank")
-        return value
+    request_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
 class ContinueChatOutput:
-    chat_id: str
+    chat_id: UUID
     answer: str
+    citations: tuple[GeneratedChatCitation, ...]
     title: str
+    last_updated_at: datetime

@@ -3,63 +3,85 @@
 ## Prerequisites
 
 - Python 3.14 and uv
-- An AWS profile with access to the target Bedrock Knowledge Base and model
-- Model access enabled in the AWS region used by the Knowledge Base
+- Docker
+- Cognito User PoolとWeb App Clientを作成済みであること
 
-The application uses boto3's standard AWS credential provider chain. Do not put
-AWS access keys in `.env`.
+AWSアクセスキーは`.env`へ保存しない。
+
+アプリケーション固有の環境変数は
+`src/dependencies/settings.py`のPydantic Settingsへ集約している。
+
+- 共通必須: `AWS_REGION`、`DYNAMODB_CHAT_TABLE_NAME`、`DYNAMODB_LIBRARY_TABLE_NAME`
+- 認証必須: `COGNITO_USER_POOL_ID`、`COGNITO_USER_POOL_CLIENT_ID`
+- チャット生成AWSモード必須: `BEDROCK_KNOWLEDGE_BASE_ID`、`BEDROCK_MODEL_ARN`
+- ローカルモード必須: `DYNAMODB_ENDPOINT_URL`
+- 任意: `CHAT_INFRASTRUCTURE_MODE`、`CHAT_GENERATION_MODE`、`SIMULATED_LLM_DELAY_SECONDS`
 
 ## Local Configuration
 
-Create the local environment file and replace the Bedrock identifiers:
+Docker Composeで起動する場合は、`docker/.env`へCognitoの識別子を設定する。
+
+ローカル環境とデプロイ環境は、どちらも永続化用のDynamoDB Repository実装を使用する。
+ローカルのDocker Composeでは、同じRepository実装の接続先をDynamoDB Localへ切り替える。
+
+DynamoDBのデプロイ、認証、IAM要件は`docs/infra/dynamodb.md`を参照する。
+デプロイ環境のチャットテーブルと`gsi1`のキー構造は
+`docs/backend/specification/infrastructure/dynamodb_chat_repository.md`に記載している。
+ライブラリ一覧テーブルは
+`docs/backend/specification/infrastructure/dynamodb_indexed_file_catalog.md`に記載している。
+
+## ローカル全体動作確認
+
+実AWSへ接続せずに画面から一連のチャット操作を確認する場合は、リポジトリルートで
+以下を実行する。
 
 ```sh
-cp .env.example .env
+mise run dev
 ```
 
-For an AWS SSO profile, authenticate before starting the backend:
+- バックエンド: `http://localhost:8000`
+- フロントエンド: `http://localhost:5173`
+- DB: DynamoDB Localコンテナ。データはDocker Volumeへ保存する
+- DynamoDB Localのテーブル作成: Docker Composeの`dynamodb-init`サービス
+- LLM: 既定で2秒待機し、ローカル動作確認用の疑似回答を返す。`CHAT_GENERATION_MODE=aws`の場合はAWS Bedrock Knowledge Baseへ接続する
+- 初期データ: なし
+- 認証: `docker/.env`にAWS上のローカル開発用Cognito User PoolとWeb App Clientを設定する
+
+フロントエンド改修を即時反映したい場合は、`mise run dev:backend`でバックエンドだけをDocker起動し、
+別ターミナルで`mise run dev:frontend`を実行する。
+
+`CHAT_INFRASTRUCTURE_MODE=local`の場合はDynamoDB Repositoryの接続先をDynamoDB Localへ切り替える。
+チャット生成は`CHAT_GENERATION_MODE`で個別に切り替える。未指定の場合は`CHAT_INFRASTRUCTURE_MODE=local`で疑似LLM、
+`CHAT_INFRASTRUCTURE_MODE=aws`でAWS Bedrock Knowledge Baseを使用する。
+
+DynamoDB Localを使いながらAWS Bedrock Knowledge Baseへ接続する場合は、`docker/.env`へ以下を追加し、
+AWS認証情報は`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、必要に応じて`AWS_SESSION_TOKEN`を
+シェル環境変数でコンテナへ渡す。
 
 ```sh
-aws sso login --profile your-profile
-AWS_PROFILE=your-profile aws sts get-caller-identity
+CHAT_GENERATION_MODE=aws
+BEDROCK_KNOWLEDGE_BASE_ID=replace-with-knowledge-base-id
+BEDROCK_MODEL_ARN=replace-with-model-arn
 ```
 
-Set the same profile name in `.env`.
+AWSアクセスキーは`.env`へ保存しない。
 
-## Run on the Host
+バックエンドとDynamoDB Localを停止する場合は以下を実行する。
 
 ```sh
-uv sync
-uv run uvicorn main:app --reload --env-file .env
+docker compose -f docker/compose.yaml down
 ```
 
-## Run with Docker Compose
+DynamoDB Localの保存データも初期化する場合は、`--volumes`を追加する。
 
-The Compose service mounts the host's `~/.aws` directory read-only so boto3 can
-use the configured profile and AWS SSO cache. It overrides the container user
-to root locally so AWS files with `0600` permissions remain readable. The
-production Docker image still runs as a non-root user.
+## 自動テスト
+
+ドメイン層とユースケース層のカバレッジ条件を含めて、バックエンドテストを実行する。
 
 ```sh
-docker compose up --build
+mise run backend:test
 ```
 
-## Test the Bedrock Connection
-
-Start the backend, then create a chat. This calls both Knowledge Base
-`RetrieveAndGenerate` and Bedrock Runtime `Converse`.
-
-```sh
-curl --fail-with-body \
-  -X POST http://localhost:8000/chats \
-  -H 'Content-Type: application/json' \
-  -H 'X-User-ID: 00000000-0000-0000-0000-000000000001' \
-  -d '{"prompt":"このナレッジベースの内容を簡潔に説明してください"}'
-```
-
-Required permissions for the AWS identity include:
-
-- `bedrock:RetrieveAndGenerate`
-- `bedrock:InvokeModel`
-
-The Bedrock Knowledge Base and model must be available in `AWS_REGION`.
+- `backend:test:domain`は、実行可能なDomainコードに対してstatementとbranchの100%カバレッジを要求する。
+- `backend:test:application`は、出力ポートをモック化してユースケースをテストし、statementとbranchの100%カバレッジを要求する。
+- Repository Protocol宣言は実行可能なドメイン振る舞いを持たないため、実行時カバレッジの対象外とする。

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="すべてのソースコードをフォーマットする"
+#MISE depends=["frontend:format", "backend:format", "infra:format"]

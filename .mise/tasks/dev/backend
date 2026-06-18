@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Docker ComposeでバックエンドとDynamoDB Localを起動する"
+#MISE dir="docker"
+
+docker compose up --build backend

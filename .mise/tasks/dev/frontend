@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#MISE description="即時反映用にpnpm devでフロントエンドを起動する"
+#MISE dir="frontend"
+
+set -euo pipefail
+
+set -a
+source ../docker/.env
+set +a
+
+pnpm dev
