@@ -122,6 +122,7 @@ export function createBackend(
             actions: [
                 "dynamodb:GetItem",
                 "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
                 "dynamodb:Query",
                 "dynamodb:TransactWriteItems",
                 "dynamodb:UpdateItem",

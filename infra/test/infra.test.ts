@@ -300,6 +300,7 @@ describe("InfraStack", () => {
                         Action: Match.arrayWith([
                             "dynamodb:GetItem",
                             "dynamodb:BatchWriteItem",
+                            "dynamodb:PutItem",
                             "dynamodb:Query",
                             "dynamodb:TransactWriteItems",
                             "dynamodb:UpdateItem",
