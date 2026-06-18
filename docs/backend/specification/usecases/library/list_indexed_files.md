@@ -76,7 +76,7 @@
 
 | Protocol | 操作 | 用途 | 送出する可能性のあるエラー |
 | --- | --- | --- | --- |
-| `IndexedFileCatalogProtocol` | `list_indexed_files` | データソース一覧を取得する | `RepositoryNotFoundError`, `RepositoryAccessError` |
+| `IndexedFileQueryRepositoryProtocol` | `list_indexed_files` | データソース一覧を取得する | `RepositoryNotFoundError`, `RepositoryAccessError` |
 
 ## 9. 基本フロー
 

@@ -1,4 +1,4 @@
-# DynamoDbIndexedFileCatalog 外部接続仕様書
+# DynamoDbIndexedFileQueryRepository 外部接続仕様書
 
 ## 1. 概要
 

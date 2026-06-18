@@ -1,8 +1,8 @@
 import logging
 
 from src.application.exceptions import RepositoryNotFoundError
-from src.application.ports.out.indexed_file_catalog_protocol import (
-    IndexedFileCatalogProtocol,
+from src.application.ports.out.library.indexed_file_query_repository_protocol import (
+    IndexedFileQueryRepositoryProtocol,
 )
 from src.application.use_cases.library.list_indexed_files.list_indexed_files_dto import (
     IndexedFileOutput,
@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 class ListIndexedFilesUseCase:
     """RAG検索対象として登録済みのファイル一覧を取得するユースケース。"""
 
-    def __init__(self, indexed_file_catalog: IndexedFileCatalogProtocol) -> None:
-        self._indexed_file_catalog = indexed_file_catalog
+    def __init__(
+        self, indexed_file_query_repository: IndexedFileQueryRepositoryProtocol
+    ) -> None:
+        self._indexed_file_query_repository = indexed_file_query_repository
 
     async def execute(self, query: ListIndexedFilesInput) -> ListIndexedFilesOutput:
         """インデックス済みファイル一覧をカテゴリ名とファイル名の昇順で返す。
@@ -27,7 +29,9 @@ class ListIndexedFilesUseCase:
         """
 
         try:
-            indexed_files = await self._indexed_file_catalog.list_indexed_files()
+            indexed_files = (
+                await self._indexed_file_query_repository.list_indexed_files()
+            )
         except RepositoryNotFoundError:
             logger.warning(
                 "インデックス済みファイル一覧が見つからなかったため空一覧を返します",

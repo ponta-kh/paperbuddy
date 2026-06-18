@@ -8,18 +8,18 @@ from src.application.use_cases.library.list_indexed_files.list_indexed_files imp
 )
 from src.dependencies import client_factories, library_deps
 from src.dependencies.settings import get_settings
-from src.infrastructure.library.dynamodb_indexed_file_catalog import (
-    DynamoDbIndexedFileCatalog,
+from src.infrastructure.repositories.library.dynamodb_indexed_file_query_repository import (
+    DynamoDbIndexedFileQueryRepository,
 )
 
 
 @pytest.fixture(autouse=True)
 def clear_cached_dependencies() -> Iterator[None]:
-    library_deps.get_indexed_file_catalog.cache_clear()
+    library_deps.get_indexed_file_query_repository.cache_clear()
     library_deps.get_list_indexed_files_use_case.cache_clear()
     get_settings.cache_clear()
     yield
-    library_deps.get_indexed_file_catalog.cache_clear()
+    library_deps.get_indexed_file_query_repository.cache_clear()
     library_deps.get_list_indexed_files_use_case.cache_clear()
     get_settings.cache_clear()
 
@@ -48,10 +48,10 @@ def test_get_library_dependencies_use_dynamodb_repository(
     client_factory = Mock(return_value=dynamodb_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
-    catalog = library_deps.get_indexed_file_catalog()
+    repository = library_deps.get_indexed_file_query_repository()
     use_case = library_deps.get_list_indexed_files_use_case()
 
-    assert isinstance(catalog, DynamoDbIndexedFileCatalog)
+    assert isinstance(repository, DynamoDbIndexedFileQueryRepository)
     assert isinstance(use_case, ListIndexedFilesUseCase)
     assert client_factory.call_args == (
         ("dynamodb",),
@@ -67,9 +67,9 @@ def test_get_library_dependencies_use_dynamodb_local_endpoint(
     client_factory = Mock(return_value=dynamodb_client)
     monkeypatch.setattr(client_factories.boto3, "client", client_factory)
 
-    catalog = library_deps.get_indexed_file_catalog()
+    repository = library_deps.get_indexed_file_query_repository()
 
-    assert isinstance(catalog, DynamoDbIndexedFileCatalog)
+    assert isinstance(repository, DynamoDbIndexedFileQueryRepository)
     assert client_factory.call_args == (
         ("dynamodb",),
         {

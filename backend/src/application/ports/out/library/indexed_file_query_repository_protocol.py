@@ -17,7 +17,7 @@ class IndexedFile:
     rag_indexed_at: datetime | None
 
 
-class IndexedFileCatalogProtocol(Protocol):
+class IndexedFileQueryRepositoryProtocol(Protocol):
     """インデックス済みファイル一覧を取得する出力ポート。"""
 
     async def list_indexed_files(self) -> tuple[IndexedFile, ...]:
