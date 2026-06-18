@@ -115,13 +115,20 @@ aws cloudformation describe-stacks \
 
 RAG材料PDF用S3バケットはCDKデプロイ時に作成されるが、PDFファイルは自動配置されない。
 
-通常運用では、RAG材料PDFを`infra/pdf/`配下へ配置し、次のタスクを実行する。
+通常運用では、RAG材料PDFを`infra/pdf/[分類]/`配下へ配置し、次のタスクを実行する。
+
+```text
+infra/pdf/
+  IT/
+    RAG Survey.pdf
+    RAG Original.pdf
+```
 
 ```sh
 mise run rag:sync:dev
 ```
 
-このタスクは`infra/pdf/`配下の`*.pdf`をRAG材料用S3バケットの`documents/`配下へアップロードし、Bedrock Knowledge Baseのingestion jobを開始して`COMPLETE`まで待機する。
+このタスクは`infra/pdf/`配下の`*.pdf`を再帰的に走査し、相対パスを保ったままRAG材料用S3バケットの`documents/`配下へ同期する。例えば`infra/pdf/IT/RAG Survey.pdf`は`documents/IT/RAG Survey.pdf`として配置される。同期後、Bedrock Knowledge Baseのingestion jobを開始して`COMPLETE`まで待機する。
 
 S3へのアップロードだけを実行する場合:
 
@@ -135,7 +142,7 @@ Knowledge Base同期だけを実行する場合:
 mise run rag:generate:dev
 ```
 
-ローカルから削除したPDFは安全のためS3から自動削除しない。S3上の不要なPDFを削除する場合は、対象と影響範囲を確認してから個別に削除する。
+ローカルから削除したPDFや分類フォルダ変更で移動したPDFは、`mise run rag:upload:dev`または`mise run rag:sync:dev`実行時にS3の`documents/`配下からも削除される。RAG対象は`infra/pdf/`配下のPDFを正とする。
 
 個別操作が必要な場合は、最初にCloudFormation Outputからバケット名を取得する。
 
@@ -158,8 +165,10 @@ aws s3 cp ./path/to/document.pdf "s3://${rag_source_bucket_name}/documents/docum
 
 ```sh
 aws s3 sync ./path/to/pdfs "s3://${rag_source_bucket_name}/documents/" \
+  --delete \
   --exclude '*' \
-  --include '*.pdf'
+  --include '*.pdf' \
+  --include '*.PDF'
 ```
 
 PDF配置後、個別に同期する場合はCloudFormation OutputからKnowledge Base IDとData Source IDを取得して同期処理を開始する。
@@ -201,7 +210,7 @@ mise run deploy:dev
 
 Fargateタスクロールには以下の権限だけを付与する。
 
-- DynamoDB: `GetItem`、`Query`、`TransactWriteItems`
+- DynamoDB: `GetItem`、`Query`、`TransactWriteItems`、`PutItem`、`UpdateItem`、`BatchWriteItem`
 - Bedrock: `RetrieveAndGenerate`、`InvokeModel`
 
 ## 注意事項

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="infra/pdf配下のPDFを開発環境のRAG材料S3へアップロードする"
+#MISE description="infra/pdf配下の分類別PDFを開発環境のRAG材料S3へ同期する"
 
 set -euo pipefail
 
@@ -48,7 +48,7 @@ if [[ ! -d "$PDF_DIR" ]]; then
   exit 1
 fi
 
-if ! find "$PDF_DIR" -type f -name '*.pdf' -print -quit | grep -q .; then
+if ! find "$PDF_DIR" -type f \( -name '*.pdf' -o -name '*.PDF' \) -print -quit | grep -q .; then
   echo "アップロード対象のPDFがありません: ${PDF_DIR}" >&2
   exit 1
 fi
@@ -62,12 +62,14 @@ if [[ -z "$bucket_name" || "$bucket_name" == "None" ]]; then
   exit 1
 fi
 
-echo "RAG材料PDFをアップロードします: ${PDF_DIR} -> s3://${bucket_name}/${S3_PREFIX}"
+echo "RAG材料PDFを同期します: ${PDF_DIR} -> s3://${bucket_name}/${S3_PREFIX}"
 
 aws s3 sync "$PDF_DIR" "s3://${bucket_name}/${S3_PREFIX}" \
   --region "$region" \
+  --delete \
   --exclude '*' \
-  --include '*.pdf'
+  --include '*.pdf' \
+  --include '*.PDF'
 
 echo
 echo "アップロード済みPDF:"

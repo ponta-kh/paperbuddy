@@ -222,7 +222,14 @@ https://<DistributionDomainName>
 
 ### RAG材料PDFの配置
 
-RAG材料PDFは`infra/pdf/`配下に配置する。デプロイ完了後、次のタスクでRAG材料用S3バケットの`documents/`配下へアップロードし、Knowledge Base同期を開始する。
+RAG材料PDFは`infra/pdf/[分類]/`配下に配置する。デプロイ完了後、次のタスクでRAG材料用S3バケットの`documents/`配下へ同期し、Knowledge Base同期を開始する。
+
+```text
+infra/pdf/
+  IT/
+    RAG Survey.pdf
+    RAG Original.pdf
+```
 
 ```sh
 mise run rag:sync:dev
@@ -230,7 +237,7 @@ mise run rag:sync:dev
 
 このタスクは次を順に実行する。
 
-1. `infra/pdf/`配下の`*.pdf`をRAG材料用S3バケットの`documents/`配下へ同期する
+1. `infra/pdf/`配下の`*.pdf`を再帰的に走査し、相対パスを保ったままRAG材料用S3バケットの`documents/`配下へ同期する
 2. 同期後のS3オブジェクト一覧を表示する
 3. Bedrock Knowledge Baseのingestion jobを開始する
 4. ingestion jobの状態を確認し、`COMPLETE`まで待機する
@@ -247,8 +254,8 @@ Knowledge Base同期だけを実行する場合:
 mise run rag:generate:dev
 ```
 
-PDFを追加、更新した場合は、同じタスクを再実行する。
-ローカルから削除したPDFは安全のためS3から自動削除しない。S3上の不要なPDFを削除する場合は、対象と影響範囲を確認してから個別に削除する。
+PDFを追加、更新、削除、分類フォルダ移動した場合は、同じタスクを再実行する。
+ローカルから削除したPDFや分類フォルダ変更で移動したPDFは、S3の`documents/`配下からも削除される。RAG対象は`infra/pdf/`配下のPDFを正とする。
 
 Knowledge Base同期は、ライブラリ一覧用DynamoDBテーブルへPDFメタデータを登録しない。現在の実装では、RAG検索対象への取り込みとライブラリ一覧表示のデータ管理は独立している。
 
@@ -279,8 +286,10 @@ aws s3 cp \
 aws s3 sync \
   ./path/to/pdfs \
   "s3://${rag_source_bucket_name}/documents/" \
+  --delete \
   --exclude '*' \
-  --include '*.pdf'
+  --include '*.pdf' \
+  --include '*.PDF'
 ```
 
 アップロード結果を確認する。
