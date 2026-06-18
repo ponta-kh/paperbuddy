@@ -76,3 +76,6 @@ echo "アップロード済みPDF:"
 aws s3 ls "s3://${bucket_name}/${S3_PREFIX}" \
   --region "$region" \
   --recursive
+
+echo
+mise run rag:catalog:sync:dev

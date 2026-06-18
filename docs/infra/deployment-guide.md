@@ -239,13 +239,22 @@ mise run rag:sync:dev
 
 1. `infra/pdf/`配下の`*.pdf`を再帰的に走査し、相対パスを保ったままRAG材料用S3バケットの`documents/`配下へ同期する
 2. 同期後のS3オブジェクト一覧を表示する
-3. Bedrock Knowledge Baseのingestion jobを開始する
-4. ingestion jobの状態を確認し、`COMPLETE`まで待機する
+3. ライブラリ一覧用DynamoDBへPDF名、分類、アップロード日時、S3キーを登録する
+4. Bedrock Knowledge Baseのingestion jobを開始する
+5. ingestion jobの状態を確認し、`COMPLETE`まで待機する
 
 S3へのアップロードだけを実行する場合:
 
 ```sh
 mise run rag:upload:dev
+```
+
+このタスクもS3同期後にライブラリ一覧用DynamoDBを同期する。
+
+ライブラリ一覧用DynamoDBの同期だけを実行する場合:
+
+```sh
+mise run rag:catalog:sync:dev
 ```
 
 Knowledge Base同期だけを実行する場合:

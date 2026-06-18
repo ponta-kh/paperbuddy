@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のRAG材料S3をもとにライブラリカタログDynamoDBを同期する"
+#MISE dir="infra"
+
+set -euo pipefail
+
+pnpm exec ts-node scripts/sync-library-catalog-dev.ts
