@@ -172,6 +172,37 @@ mise run infra:deploy:dev
 
 RAG材料PDFのS3配置とKnowledge Base同期は自動実行されない。
 
+### フロントエンドだけの反映
+
+フロントエンド成果物だけを反映する場合は、CDK deployではなくS3同期とCloudFront invalidationを実行する。
+
+```sh
+mise run frontend:test
+mise run frontend:deploy:dev
+```
+
+`frontend:deploy:dev`は以下を実行する。
+
+1. `frontend:build`で`frontend/dist/`を生成する
+2. CloudFormation OutputからフロントエンドS3バケット、CloudFrontドメイン、Cognito設定を取得する
+3. `frontend/dist/`と`auth-config.json`をフロントエンドS3バケットへ同期する
+4. CloudFrontの`/*`を無効化する
+
+この手順ではECSサービス、バックエンドDockerイメージ、タスク定義は更新しない。
+
+### バックエンドだけの反映
+
+バックエンド変更だけをECSへ反映する場合は、フロントエンドビルドを伴わないバックエンド用デプロイタスクを実行する。
+
+```sh
+mise run backend:test
+mise run backend:deploy:dev
+```
+
+`backend:deploy:dev`はCDK deployを実行し、バックエンドDockerイメージのビルド、CDK管理ECRへのpush、ECSタスク定義とサービスの更新を行う。CloudFormation管理外でECSサービスだけを直接更新すると、次回のCDK deployで差分が戻る可能性があるため使用しない。
+
+この手順では`frontend:build`を実行しないため、フロントエンドソースの変更は反映されない。ただし`frontend/dist/`に差分が残っている場合は、フロントエンド成果物もCDK差分になり得るため、タスクは停止する。フロントエンドも含めて反映したい場合は`mise run infra:deploy:dev`を使用する。
+
 ### デプロイ結果の確認
 
 スタック状態を確認する。
@@ -381,6 +412,20 @@ mise run frontend:test
 mise run backend:test
 mise run infra:test
 mise run infra:deploy:dev
+```
+
+フロントエンドだけを変更した場合:
+
+```sh
+mise run frontend:test
+mise run frontend:deploy:dev
+```
+
+バックエンドだけを変更した場合:
+
+```sh
+mise run backend:test
+mise run backend:deploy:dev
 ```
 
 PDFだけを変更した場合、CDKデプロイは不要である。S3への同期とKnowledge Base同期のみ実行する。

@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のフロントエンド成果物だけをS3とCloudFrontへ反映する"
+#MISE depends=["frontend:build"]
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+stack_output() {
+  local stack_name="$1"
+  local region="$2"
+  local output_key="$3"
+
+  aws cloudformation describe-stacks \
+    --region "$region" \
+    --stack-name "$stack_name" \
+    --query "Stacks[0].Outputs[?OutputKey=='${output_key}'].OutputValue | [0]" \
+    --output text
+}
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "infra設定ファイルが見つかりません: ${ENV_FILE}" >&2
+  echo "infra/.env.example を infra/.env にコピーして値を設定してください。" >&2
+  exit 1
+fi
+
+stack_name="$(read_env_value STACK_NAME)"
+region="$(read_env_value AWS_REGION)"
+
+frontend_bucket_name="$(stack_output "$stack_name" "$region" FrontendBucketName)"
+distribution_domain_name="$(stack_output "$stack_name" "$region" DistributionDomainName)"
+user_pool_id="$(stack_output "$stack_name" "$region" UserPoolId)"
+user_pool_client_id="$(stack_output "$stack_name" "$region" UserPoolClientId)"
+
+distribution_id="$(
+  aws cloudfront list-distributions \
+    --query "DistributionList.Items[?DomainName=='${distribution_domain_name}'].Id | [0]" \
+    --output text
+)"
+
+if [[ -z "$frontend_bucket_name" || "$frontend_bucket_name" == "None" ]]; then
+  echo "CloudFormation OutputからFrontendBucketNameを取得できませんでした" >&2
+  exit 1
+fi
+
+if [[ -z "$distribution_id" || "$distribution_id" == "None" ]]; then
+  echo "CloudFront Distribution IDを取得できませんでした: ${distribution_domain_name}" >&2
+  exit 1
+fi
+
+deploy_dir="$(mktemp -d)"
+trap 'rm -rf "$deploy_dir"' EXIT
+
+cp -R frontend/dist/. "$deploy_dir"/
+cat >"${deploy_dir}/auth-config.json" <<JSON
+{
+  "userPoolId": "${user_pool_id}",
+  "userPoolClientId": "${user_pool_client_id}"
+}
+JSON
+
+aws s3 sync "$deploy_dir"/ "s3://${frontend_bucket_name}/" \
+  --region "$region" \
+  --delete
+
+aws cloudfront create-invalidation \
+  --distribution-id "$distribution_id" \
+  --paths "/*"
+
+echo "フロントエンドの反映を開始しました: https://${distribution_domain_name}"

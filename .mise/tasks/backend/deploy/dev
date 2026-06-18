@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のバックエンド変更をECSへ反映する"
+#MISE dir="infra"
+
+set -euo pipefail
+
+stack_name="$(
+  awk -F= '
+    $0 !~ /^[[:space:]]*#/ && $1 == "STACK_NAME" {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^["'\''"]|["'\''"]$/, "")
+      print
+      exit
+    }
+  ' .env
+)"
+
+if [[ -z "$stack_name" ]]; then
+  echo "infra設定のSTACK_NAMEが未設定です" >&2
+  exit 1
+fi
+
+if [[ -n "$(git -C .. status --short -- frontend/dist)" ]]; then
+  echo "frontend/distに未反映の差分があります。" >&2
+  echo "バックエンドだけを反映するため、frontend/distの差分を解消するか frontend:deploy:dev を使用してください。" >&2
+  exit 1
+fi
+
+pnpm cdk deploy "$stack_name"
