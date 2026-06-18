@@ -45,6 +45,10 @@ def _client_error(code: str, message: str = "bedrock error") -> ClientError:
     )
 
 
+def _input_text(prompt: str) -> str:
+    return f"以下の質問に、質問と同じ言語で回答してください。\n\n質問:\n{prompt}"
+
+
 @pytest.mark.asyncio
 async def test_start_chat_generates_answer() -> None:
     knowledge_base = StubKnowledgeBaseClient(
@@ -90,7 +94,7 @@ async def test_start_chat_generates_answer() -> None:
     assert source.uri == "s3://bucket/paper.pdf"
     assert source.metadata == {"page": 3, "title": "paper"}
     assert knowledge_base.request == {
-        "input": {"text": "question"},
+        "input": {"text": _input_text("question")},
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
@@ -98,6 +102,20 @@ async def test_start_chat_generates_answer() -> None:
                 "modelArn": "model-arn",
             },
         },
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_chat_requests_answer_in_same_language_as_question() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {"sessionId": "session-1", "output": {"text": "回答"}}
+    )
+
+    await _client(knowledge_base).start_chat("RAGとは何ですか？")
+
+    assert knowledge_base.request is not None
+    assert knowledge_base.request["input"] == {
+        "text": _input_text("RAGとは何ですか？"),
     }
 
 
@@ -246,7 +264,7 @@ async def test_continue_chat_uses_existing_session() -> None:
     assert result.session_id == "session-1"
     assert result.answer == "next answer"
     assert knowledge_base.request == {
-        "input": {"text": "next question"},
+        "input": {"text": _input_text("next question")},
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {

@@ -48,14 +48,6 @@ _AUTHENTICATION_ERROR_CODES = {
     "UnrecognizedClientException",
 }
 
-_PROMPT_TEMPLATE = (
-    "あなたは研究論文に基づいてユーザーの質問について回答するアシスタントです。\n"
-    "以下の検索結果を参考にして、必ずユーザーの質問と同じ言語で回答してください。\n"
-    "例えば、日本語で質問された場合は日本語で、英語で質問された場合は英語で回答してください。\n\n"
-    "$search_results$\n\n"
-    "質問: $query$"
-)
-
 
 @dataclass(frozen=True, slots=True)
 class _BedrockErrorHint:
@@ -136,20 +128,22 @@ class BedrockKnowledgeBaseChatClient:
         """RetrieveAndGenerate APIに渡す共通設定を組み立てる。
 
         start_chat・continue_chat で共通して使用する knowledgeBaseConfiguration を返す。
-        プロンプトテンプレートによる言語追従設定を含む。
         """
         return {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": self._knowledge_base_id,
                 "modelArn": self._model_arn,
-                "generationConfiguration": {
-                    "promptTemplate": {
-                        "textPromptTemplate": _PROMPT_TEMPLATE,
-                    },
-                },
             },
         }
+
+    @staticmethod
+    def _build_input_text(prompt: str) -> str:
+        """ユーザーの質問と同じ言語で回答するよう、最小限の指示を付与する。"""
+        return (
+            "以下の質問に、質問と同じ言語で回答してください。\n\n"
+            f"質問:\n{prompt}"
+        )
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
@@ -157,7 +151,7 @@ class BedrockKnowledgeBaseChatClient:
                 dict[str, Any],
                 await asyncio.to_thread(
                     self._knowledge_base_client.retrieve_and_generate,
-                    input={"text": prompt},
+                    input={"text": self._build_input_text(prompt)},
                     retrieveAndGenerateConfiguration=self._build_retrieve_and_generate_configuration(),
                 ),
             )
@@ -208,7 +202,7 @@ class BedrockKnowledgeBaseChatClient:
                 dict[str, Any],
                 await asyncio.to_thread(
                     self._knowledge_base_client.retrieve_and_generate,
-                    input={"text": prompt},
+                    input={"text": self._build_input_text(prompt)},
                     retrieveAndGenerateConfiguration=self._build_retrieve_and_generate_configuration(),
                     sessionId=session_id,
                 ),
