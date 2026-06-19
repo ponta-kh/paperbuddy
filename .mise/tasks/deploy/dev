@@ -94,7 +94,6 @@ echo "デプロイ対象: ${stack_name} (${region})"
 run_step "miseタスク定義を検証します" mise tasks validate
 run_step "AWS認証先を確認します" aws sts get-caller-identity
 run_step "Dockerの起動状態を確認します" docker info --format '{{.ServerVersion}}'
-run_step "Bedrock生成モデルの利用可否を確認します" mise run infra:bedrock:check:dev
 ensure_bootstrap "$region"
 run_step "Lintを実行します" mise run lint
 run_step "フロントエンドテストを実行します" mise run frontend:test

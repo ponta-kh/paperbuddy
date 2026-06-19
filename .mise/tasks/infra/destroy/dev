@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-#MISE description="開発環境のPaperBuddy本体AWSリソースを削除する"
+#MISE description="開発環境のPaperBuddy本体AWSリソースとCDK bootstrap資産を削除する"
 
 set -euo pipefail
 
 readonly ENV_FILE="infra/.env"
+readonly BOOTSTRAP_STACK_NAME="CDKToolkit"
 readonly STACK_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-stack.XXXXXX.json)"
 readonly STACK_RESOURCES_FILE="$(mktemp /tmp/paperbuddy-stack-resources.XXXXXX.json)"
+readonly BOOTSTRAP_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-bootstrap-stack.XXXXXX.json)"
 
 cleanup() {
-  rm -f "$STACK_SNAPSHOT_FILE" "$STACK_RESOURCES_FILE"
+  rm -f "$STACK_SNAPSHOT_FILE" "$STACK_RESOURCES_FILE" "$BOOTSTRAP_SNAPSHOT_FILE"
 }
 trap cleanup EXIT
 
@@ -40,8 +42,16 @@ output_value() {
   local key="$1"
 
   jq -r --arg key "$key" \
-    '.Stacks[0].Outputs[] | select(.OutputKey == $key) | .OutputValue' \
+    '.Stacks[0].Outputs[]? | select(.OutputKey == $key) | .OutputValue' \
     "$STACK_SNAPSHOT_FILE"
+}
+
+bootstrap_output_value() {
+  local key="$1"
+
+  jq -r --arg key "$key" \
+    '.Stacks[0].Outputs[]? | select(.OutputKey == $key) | .OutputValue' \
+    "$BOOTSTRAP_SNAPSHOT_FILE"
 }
 
 stack_resource_ids_by_type() {
@@ -69,6 +79,11 @@ empty_s3_bucket_completely() {
   local object_count
 
   echo "S3バケットを空にします: ${bucket_name}"
+  if ! aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
+    echo "S3バケットは存在しないためスキップします: ${bucket_name}"
+    return
+  fi
+
   aws s3 rm "s3://${bucket_name}" --recursive --region "$AWS_REGION"
 
   while true; do
@@ -103,6 +118,14 @@ delete_dynamodb_table() {
 
   [[ -z "$table_name" || "$table_name" == "null" ]] && return
 
+  if ! aws dynamodb describe-table \
+    --table-name "$table_name" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "DynamoDBテーブルは存在しないためスキップします: ${table_name}"
+    return
+  fi
+
   echo "DynamoDBテーブルを削除します: ${table_name}"
   aws dynamodb update-table \
     --table-name "$table_name" \
@@ -135,6 +158,11 @@ delete_s3_bucket() {
 
   [[ -z "$bucket_name" || "$bucket_name" == "null" ]] && return
 
+  if ! aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
+    echo "S3バケットは存在しないためスキップします: ${bucket_name}"
+    return
+  fi
+
   empty_s3_bucket_completely "$bucket_name"
   echo "S3バケットを削除します: ${bucket_name}"
   aws s3api delete-bucket \
@@ -152,6 +180,76 @@ delete_log_group() {
     --log-group-name "$log_group_name" \
     --region "$AWS_REGION" \
     || true
+}
+
+delete_ecr_repository_images() {
+  local repository_name="$1"
+  local image_ids
+  local image_count
+
+  [[ -z "$repository_name" || "$repository_name" == "null" ]] && return
+
+  if ! aws ecr describe-repositories \
+    --repository-names "$repository_name" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "ECRリポジトリは存在しないためスキップします: ${repository_name}"
+    return
+  fi
+
+  echo "ECRイメージを削除します: ${repository_name}"
+  while true; do
+    image_ids="$(
+      aws ecr list-images \
+        --repository-name "$repository_name" \
+        --region "$AWS_REGION" \
+        --query 'imageIds[0:100]' \
+        --output json
+    )"
+    image_count="$(jq 'length' <<< "$image_ids")"
+    [[ "$image_count" -eq 0 ]] && break
+
+    aws ecr batch-delete-image \
+      --repository-name "$repository_name" \
+      --region "$AWS_REGION" \
+      --image-ids "$image_ids" \
+      > /dev/null
+  done
+}
+
+delete_bootstrap_resources() {
+  local bootstrap_bucket_name
+  local bootstrap_repository_name
+
+  if ! aws cloudformation describe-stacks \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --region "$AWS_REGION" \
+    --output json \
+    > "$BOOTSTRAP_SNAPSHOT_FILE" 2>/dev/null; then
+    echo "CDK bootstrapスタックは存在しないためスキップします: ${BOOTSTRAP_STACK_NAME}"
+    return
+  fi
+
+  bootstrap_bucket_name="$(bootstrap_output_value BucketName)"
+  bootstrap_repository_name="$(bootstrap_output_value ImageRepositoryName)"
+
+  echo
+  echo "CDK bootstrap資産を削除します"
+  printf 'BOOTSTRAP_STACK_NAME=%s\n' "$BOOTSTRAP_STACK_NAME"
+  printf 'BOOTSTRAP_BUCKET_NAME=%s\n' "$bootstrap_bucket_name"
+  printf 'BOOTSTRAP_REPOSITORY_NAME=%s\n' "$bootstrap_repository_name"
+
+  delete_s3_bucket "$bootstrap_bucket_name"
+  delete_ecr_repository_images "$bootstrap_repository_name"
+
+  echo "CDK bootstrapスタックを削除します: ${BOOTSTRAP_STACK_NAME}"
+  aws cloudformation delete-stack \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --region "$AWS_REGION"
+
+  aws cloudformation wait stack-delete-complete \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --region "$AWS_REGION"
 }
 
 audit_deleted_resources() {
@@ -208,6 +306,39 @@ audit_deleted_resources() {
   echo "PaperBuddy本体リソースの削除を確認しました"
 }
 
+audit_bootstrap_deleted() {
+  local bootstrap_bucket_name="$1"
+  local bootstrap_repository_name="$2"
+
+  echo
+  echo "CDK bootstrap資産の削除結果を監査します"
+
+  if aws cloudformation describe-stacks \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "CDK bootstrapスタックがまだ存在します: ${BOOTSTRAP_STACK_NAME}" >&2
+    exit 1
+  fi
+
+  if [[ -n "$bootstrap_bucket_name" && "$bootstrap_bucket_name" != "null" ]] \
+    && aws s3api head-bucket --bucket "$bootstrap_bucket_name" >/dev/null 2>&1; then
+    echo "CDK bootstrap S3バケットがまだ存在します: ${bootstrap_bucket_name}" >&2
+    exit 1
+  fi
+
+  if [[ -n "$bootstrap_repository_name" && "$bootstrap_repository_name" != "null" ]] \
+    && aws ecr describe-repositories \
+      --repository-names "$bootstrap_repository_name" \
+      --region "$AWS_REGION" \
+      >/dev/null 2>&1; then
+    echo "CDK bootstrap ECRリポジトリがまだ存在します: ${bootstrap_repository_name}" >&2
+    exit 1
+  fi
+
+  echo "CDK bootstrap資産の削除を確認しました"
+}
+
 require_command aws
 require_command jq
 
@@ -224,37 +355,57 @@ aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" \
   --region "$AWS_REGION" \
   --output json \
-  > "$STACK_SNAPSHOT_FILE"
+  > "$STACK_SNAPSHOT_FILE" 2>/dev/null \
+  || printf '{"Stacks":[{"Outputs":[]}]}\n' > "$STACK_SNAPSHOT_FILE"
 
-aws cloudformation list-stack-resources \
+if aws cloudformation list-stack-resources \
   --stack-name "$STACK_NAME" \
   --region "$AWS_REGION" \
   --output json \
-  > "$STACK_RESOURCES_FILE"
+  > "$STACK_RESOURCES_FILE" 2>/dev/null; then
+  stack_exists="true"
+else
+  printf '{"StackResourceSummaries":[]}\n' > "$STACK_RESOURCES_FILE"
+  stack_exists="false"
+fi
 
 CHAT_TABLE_NAME="$(output_value ChatTableName)"
 LIBRARY_TABLE_NAME="$(output_value LibraryTableName)"
 FRONTEND_BUCKET_NAME="$(output_value FrontendBucketName)"
 RAG_SOURCE_BUCKET_NAME="$(output_value RagSourceBucketName)"
 USER_POOL_ID="$(output_value UserPoolId)"
+BOOTSTRAP_BUCKET_NAME=""
+BOOTSTRAP_REPOSITORY_NAME=""
+if aws cloudformation describe-stacks \
+  --stack-name "$BOOTSTRAP_STACK_NAME" \
+  --region "$AWS_REGION" \
+  --output json \
+  > "$BOOTSTRAP_SNAPSHOT_FILE" 2>/dev/null; then
+  BOOTSTRAP_BUCKET_NAME="$(bootstrap_output_value BucketName)"
+  BOOTSTRAP_REPOSITORY_NAME="$(bootstrap_output_value ImageRepositoryName)"
+fi
 LOG_GROUP_NAMES=()
 while IFS= read -r log_group_name; do
   [[ -z "$log_group_name" ]] && continue
   LOG_GROUP_NAMES+=("$log_group_name")
 done < <(stack_resource_ids_by_type "AWS::Logs::LogGroup")
 
-echo "以下のPaperBuddy本体AWSリソースを削除します。削除後は復元できません。"
+echo "以下のPaperBuddy本体AWSリソースとCDK bootstrap資産を削除します。削除後は復元できません。"
 echo "AWSアカウント:"
 aws sts get-caller-identity
 echo
 printf 'AWS_REGION=%s\n' "$AWS_REGION"
 printf 'STACK_NAME=%s\n' "$STACK_NAME"
+printf 'STACK_EXISTS=%s\n' "$stack_exists"
 printf 'CHAT_TABLE_NAME=%s\n' "$CHAT_TABLE_NAME"
 printf 'LIBRARY_TABLE_NAME=%s\n' "$LIBRARY_TABLE_NAME"
 printf 'FRONTEND_BUCKET_NAME=%s\n' "$FRONTEND_BUCKET_NAME"
 printf 'RAG_SOURCE_BUCKET_NAME=%s\n' "$RAG_SOURCE_BUCKET_NAME"
 printf 'USER_POOL_ID=%s\n' "$USER_POOL_ID"
 printf 'LOG_GROUP_NAMES=%s\n' "${LOG_GROUP_NAMES[*]:-}"
+printf 'BOOTSTRAP_STACK_NAME=%s\n' "$BOOTSTRAP_STACK_NAME"
+printf 'BOOTSTRAP_BUCKET_NAME=%s\n' "$BOOTSTRAP_BUCKET_NAME"
+printf 'BOOTSTRAP_REPOSITORY_NAME=%s\n' "$BOOTSTRAP_REPOSITORY_NAME"
 echo
 read -r -p "削除を続行するにはスタック名 ${STACK_NAME} を入力してください: " confirmation
 
@@ -263,30 +414,41 @@ if [[ "$confirmation" != "$STACK_NAME" ]]; then
   exit 1
 fi
 
-echo "CloudFormationスタックを削除します: ${STACK_NAME}"
-aws cloudformation delete-stack \
-  --stack-name "$STACK_NAME" \
-  --region "$AWS_REGION"
+if [[ "$stack_exists" == "true" ]]; then
+  echo "CloudFormationスタックを削除します: ${STACK_NAME}"
+  aws cloudformation delete-stack \
+    --stack-name "$STACK_NAME" \
+    --region "$AWS_REGION"
 
-aws cloudformation wait stack-delete-complete \
-  --stack-name "$STACK_NAME" \
-  --region "$AWS_REGION"
+  aws cloudformation wait stack-delete-complete \
+    --stack-name "$STACK_NAME" \
+    --region "$AWS_REGION"
+else
+  echo "CloudFormationスタックは存在しないためスキップします: ${STACK_NAME}"
+fi
 
 delete_dynamodb_table "$CHAT_TABLE_NAME"
 delete_dynamodb_table "$LIBRARY_TABLE_NAME"
 delete_s3_bucket "$FRONTEND_BUCKET_NAME"
 delete_s3_bucket "$RAG_SOURCE_BUCKET_NAME"
 
-echo "Cognito User Poolを削除します: ${USER_POOL_ID}"
-aws cognito-idp delete-user-pool \
-  --user-pool-id "$USER_POOL_ID" \
-  --region "$AWS_REGION"
+if [[ -n "$USER_POOL_ID" && "$USER_POOL_ID" != "null" ]]; then
+  echo "Cognito User Poolを削除します: ${USER_POOL_ID}"
+  aws cognito-idp delete-user-pool \
+    --user-pool-id "$USER_POOL_ID" \
+    --region "$AWS_REGION"
+fi
 
 for log_group_name in "${LOG_GROUP_NAMES[@]}"; do
   delete_log_group "$log_group_name"
 done
 
-audit_deleted_resources
+if [[ "$stack_exists" == "true" ]]; then
+  audit_deleted_resources
+fi
+
+delete_bootstrap_resources
+audit_bootstrap_deleted "$BOOTSTRAP_BUCKET_NAME" "$BOOTSTRAP_REPOSITORY_NAME"
 
 echo
-echo "CDK bootstrap資産は削除していません。必要に応じて docs/infra/deletion-guide.md のCDK bootstrapアセット削除手順を実行してください。"
+echo "PaperBuddy本体AWSリソースとCDK bootstrap資産を削除しました。"
