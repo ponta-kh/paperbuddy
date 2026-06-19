@@ -8,10 +8,12 @@ import pytest
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
     ChatGenerationConfigurationError,
+    ChatGenerationPermissionDeniedError,
     ChatGenerationRateLimitError,
     ChatGenerationUnavailableError,
     GeneratedChatCitation,
     GeneratedChatCitationSource,
+    InvalidChatGenerationResponseError,
     StartGeneratedChatResult,
 )
 from src.application.use_cases.chat.start_chat.start_chat import StartChatUseCase
@@ -226,6 +228,51 @@ async def test_start_chat_logs_configuration_error(
 
     record = caplog.records[0]
     assert getattr(record, "event") == "start_chat_generation_configuration_error"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_started_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("generation_error", "expected_event", "expected_level"),
+    [
+        (
+            ChatGenerationPermissionDeniedError,
+            "start_chat_generation_permission_denied",
+            logging.ERROR,
+        ),
+        (
+            InvalidChatGenerationResponseError,
+            "start_chat_generation_invalid_response",
+            logging.WARNING,
+        ),
+    ],
+)
+async def test_start_chat_logs_generation_error_variants(
+    generation_error: type[Exception],
+    expected_event: str,
+    expected_level: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    generation_client = AsyncMock(spec=ChatGenerationClientProtocol)
+    generation_client.start_chat.side_effect = generation_error
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+
+    with (
+        caplog.at_level(
+            expected_level,
+            logger="src.application.use_cases.chat.start_chat.start_chat",
+        ),
+        pytest.raises(generation_error),
+    ):
+        await _use_case(generation_client, repository).execute(
+            StartChatInput(user_id=USER_ID, prompt="秘密の質問", request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == expected_event
     assert getattr(record, "request_id") == str(REQUEST_ID)
     assert getattr(record, "user_id") == str(USER_ID)
     assert "秘密の質問" not in caplog.text

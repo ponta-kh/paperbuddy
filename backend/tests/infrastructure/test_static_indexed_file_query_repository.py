@@ -3,14 +3,16 @@ from uuid import UUID
 
 import pytest
 
-from src.application.ports.out.indexed_file_catalog_protocol import IndexedFile
-from src.infrastructure.library.static_indexed_file_catalog import (
-    StaticIndexedFileCatalog,
+from src.application.ports.out.library.indexed_file_query_repository_protocol import (
+    IndexedFile,
+)
+from src.infrastructure.repositories.library.static_indexed_file_query_repository import (
+    StaticIndexedFileQueryRepository,
 )
 
 
 @pytest.mark.asyncio
-async def test_static_indexed_file_catalog_returns_configured_files() -> None:
+async def test_static_indexed_file_query_repository_returns_configured_files() -> None:
     files = (
         IndexedFile(
             source_id=UUID("00000000-0000-0000-0000-000000000001"),
@@ -23,6 +25,6 @@ async def test_static_indexed_file_catalog_returns_configured_files() -> None:
         ),
     )
 
-    result = await StaticIndexedFileCatalog(files).list_indexed_files()
+    result = await StaticIndexedFileQueryRepository(files).list_indexed_files()
 
     assert result == files

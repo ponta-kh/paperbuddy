@@ -6,8 +6,8 @@ import pytest
 from botocore.exceptions import ClientError
 
 from src.application.exceptions import RepositoryAccessError, RepositoryNotFoundError
-from src.infrastructure.library.dynamodb_indexed_file_catalog import (
-    DynamoDbIndexedFileCatalog,
+from src.infrastructure.repositories.library.dynamodb_indexed_file_query_repository import (
+    DynamoDbIndexedFileQueryRepository,
 )
 
 
@@ -70,7 +70,7 @@ async def test_list_indexed_files_returns_all_items() -> None:
             ]
         },
     ]
-    repository = DynamoDbIndexedFileCatalog(client, table_name="library-table")
+    repository = DynamoDbIndexedFileQueryRepository(client, table_name="library-table")
 
     result = await repository.list_indexed_files()
 
@@ -87,7 +87,7 @@ async def test_list_indexed_files_returns_all_items() -> None:
 async def test_list_indexed_files_raises_not_found_when_empty() -> None:
     client = Mock()
     client.scan.return_value = {"Items": []}
-    repository = DynamoDbIndexedFileCatalog(client, table_name="library-table")
+    repository = DynamoDbIndexedFileQueryRepository(client, table_name="library-table")
 
     with pytest.raises(RepositoryNotFoundError):
         await repository.list_indexed_files()
@@ -97,7 +97,7 @@ async def test_list_indexed_files_raises_not_found_when_empty() -> None:
 async def test_list_indexed_files_converts_client_error() -> None:
     client = Mock()
     client.scan.side_effect = _client_error("InternalServerError")
-    repository = DynamoDbIndexedFileCatalog(client, table_name="library-table")
+    repository = DynamoDbIndexedFileQueryRepository(client, table_name="library-table")
 
     with pytest.raises(RepositoryAccessError):
         await repository.list_indexed_files()

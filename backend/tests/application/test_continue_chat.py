@@ -8,12 +8,15 @@ import pytest
 from src.application.exceptions import ChatContinuationExpiredError
 from src.application.ports.out.chat_generation_client_protocol import (
     ChatGenerationClientProtocol,
+    ChatGenerationConfigurationError,
+    ChatGenerationPermissionDeniedError,
     ChatGenerationRateLimitError,
     ChatGenerationSessionUnavailableError,
     ChatGenerationUnavailableError,
     ContinueGeneratedChatResult,
     GeneratedChatCitation,
     GeneratedChatCitationSource,
+    InvalidChatGenerationResponseError,
 )
 from src.application.use_cases.chat.continue_chat.continue_chat import (
     ContinueChatUseCase,
@@ -309,6 +312,147 @@ async def test_continue_chat_logs_rate_limit_error(
     assert getattr(record, "chat_id") == str(CHAT_ID)
     assert "秘密の質問" not in caplog.text
     repository.save_exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("generation_error", "expected_event", "expected_level"),
+    [
+        (
+            ChatGenerationPermissionDeniedError,
+            "continue_chat_generation_permission_denied",
+            logging.ERROR,
+        ),
+        (
+            ChatGenerationConfigurationError,
+            "continue_chat_generation_configuration_error",
+            logging.ERROR,
+        ),
+        (
+            InvalidChatGenerationResponseError,
+            "continue_chat_generation_invalid_response",
+            logging.WARNING,
+        ),
+        (
+            ChatGenerationUnavailableError,
+            "continue_chat_generation_unavailable",
+            logging.ERROR,
+        ),
+    ],
+)
+async def test_continue_chat_logs_generation_error_variants(
+    generation_error: type[Exception],
+    expected_event: str,
+    expected_level: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat.return_value = _chat(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+    client.continue_chat.side_effect = generation_error
+
+    with (
+        caplog.at_level(
+            expected_level,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(generation_error),
+    ):
+        await ContinueChatUseCase(
+            client,
+            repository,
+            now=lambda: datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+        ).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == expected_event
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
+    repository.save_exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_logs_repository_load_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat.side_effect = RuntimeError("DynamoDB failure")
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(RuntimeError, match="DynamoDB failure"),
+    ):
+        await ContinueChatUseCase(client, repository).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == "continue_chat_load_failed"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
+    client.continue_chat.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_logs_repository_save_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    times = iter(
+        (
+            datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 1, 1, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+    repository = AsyncMock(spec=ChatCommandRepositoryProtocol)
+    repository.get_chat.return_value = _chat(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    repository.save_exchange.side_effect = RuntimeError("DynamoDB failure")
+    client = AsyncMock(spec=ChatGenerationClientProtocol)
+    client.continue_chat.return_value = ContinueGeneratedChatResult(
+        session_id="session-1", answer="new answer"
+    )
+
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger="src.application.use_cases.chat.continue_chat.continue_chat",
+        ),
+        pytest.raises(RuntimeError, match="DynamoDB failure"),
+    ):
+        await ContinueChatUseCase(client, repository, now=lambda: next(times)).execute(
+            ContinueChatInput(
+                user_id=USER_ID,
+                chat_id=CHAT_ID,
+                prompt="秘密の質問",
+                request_id=REQUEST_ID,
+            )
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == "continue_chat_save_failed"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+    assert getattr(record, "chat_id") == str(CHAT_ID)
+    assert "秘密の質問" not in caplog.text
 
 
 @pytest.mark.asyncio

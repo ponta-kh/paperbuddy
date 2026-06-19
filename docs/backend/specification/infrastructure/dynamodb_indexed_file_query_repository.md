@@ -1,4 +1,4 @@
-# DynamoDbIndexedFileCatalog 外部接続仕様書
+# DynamoDbIndexedFileQueryRepository 外部接続仕様書
 
 ## 1. 概要
 
@@ -23,7 +23,7 @@
   - `category`
   - `status`
   - `s3_uploaded_at`
-  - `rag_indexed_at`
+  - `rag_indexed_at` は任意属性とし、存在しない場合は未設定として扱う
 
 ## 4. 取得方式
 

@@ -124,20 +124,46 @@ class BedrockKnowledgeBaseChatClient:
             citations=result.citations,
         )
 
+    def _build_retrieve_and_generate_configuration(self) -> dict[str, Any]:
+        """RetrieveAndGenerate APIに渡す共通設定を組み立てる。
+
+        start_chat・continue_chat で共通して使用する knowledgeBaseConfiguration を返す。
+        """
+        return {
+            "type": "KNOWLEDGE_BASE",
+            "knowledgeBaseConfiguration": {
+                "knowledgeBaseId": self._knowledge_base_id,
+                "modelArn": self._model_arn,
+            },
+        }
+
+    @staticmethod
+    def _build_input_text(prompt: str) -> str:
+        """ユーザーの質問と同じ言語で回答するよう、最小限の指示を付与する。"""
+        return (
+            "以下の質問に、質問と同じ言語で回答してください。\n"
+            "回答本文のみを出力し、Action、Response、検索クエリ、内部処理の説明は含めないでください。"
+            f"\n\n質問:\n{prompt}"
+        )
+
+    @staticmethod
+    def _answer_text(raw_answer: str) -> str:
+        """Bedrockが混ぜることがあるツール実行風の接頭辞を除去する。"""
+        response_marker = "Response:"
+        marker_index = raw_answer.rfind(response_marker)
+        if marker_index < 0:
+            return raw_answer.strip()
+
+        return raw_answer[marker_index + len(response_marker) :].strip()
+
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
             response = cast(
                 dict[str, Any],
                 await asyncio.to_thread(
                     self._knowledge_base_client.retrieve_and_generate,
-                    input={"text": prompt},
-                    retrieveAndGenerateConfiguration={
-                        "type": "KNOWLEDGE_BASE",
-                        "knowledgeBaseConfiguration": {
-                            "knowledgeBaseId": self._knowledge_base_id,
-                            "modelArn": self._model_arn,
-                        },
-                    },
+                    input={"text": self._build_input_text(prompt)},
+                    retrieveAndGenerateConfiguration=self._build_retrieve_and_generate_configuration(),
                 ),
             )
         except ClientError as error:
@@ -159,7 +185,7 @@ class BedrockKnowledgeBaseChatClient:
 
         try:
             session_id = response["sessionId"]
-            answer = response["output"]["text"]
+            answer = self._answer_text(response["output"]["text"])
             if not all(
                 isinstance(value, str) and value.strip()
                 for value in (session_id, answer)
@@ -187,14 +213,8 @@ class BedrockKnowledgeBaseChatClient:
                 dict[str, Any],
                 await asyncio.to_thread(
                     self._knowledge_base_client.retrieve_and_generate,
-                    input={"text": prompt},
-                    retrieveAndGenerateConfiguration={
-                        "type": "KNOWLEDGE_BASE",
-                        "knowledgeBaseConfiguration": {
-                            "knowledgeBaseId": self._knowledge_base_id,
-                            "modelArn": self._model_arn,
-                        },
-                    },
+                    input={"text": self._build_input_text(prompt)},
+                    retrieveAndGenerateConfiguration=self._build_retrieve_and_generate_configuration(),
                     sessionId=session_id,
                 ),
             )
@@ -217,7 +237,7 @@ class BedrockKnowledgeBaseChatClient:
 
         try:
             returned_session_id = response["sessionId"]
-            answer = response["output"]["text"]
+            answer = self._answer_text(response["output"]["text"])
             if (
                 returned_session_id != session_id
                 or not isinstance(answer, str)
@@ -379,7 +399,7 @@ class BedrockKnowledgeBaseChatClient:
                     "RetrieveAndGenerateには対象モデルを含むInference ProfileのIDまたはARNを指定してください。"
                 ),
                 remediation=(
-                    "BEDROCK_MODEL_ARNにInference Profile ID/ARNを設定するか、"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにInference Profile ID/ARNを設定するか、"
                     "オンデマンド対応モデルへ変更してください。"
                 ),
             )
@@ -391,7 +411,7 @@ class BedrockKnowledgeBaseChatClient:
                     "指定したモデルはプロバイダーによりLegacy扱いになっており、"
                     "現在のアカウントではRetrieveAndGenerateに利用できません。"
                 ),
-                remediation="BEDROCK_MODEL_ARNをActiveなモデルまたはInference Profileへ変更してください。",
+                remediation="BEDROCK_GENERATION_MODEL_IDENTIFIERをActiveなモデルまたはInference Profileへ変更してください。",
             )
         if "custom prompt templates must be provided" in normalized_message:
             return _BedrockErrorHint(
@@ -411,11 +431,11 @@ class BedrockKnowledgeBaseChatClient:
                 event="bedrock_knowledge_base_invalid_model_identifier",
                 message="Bedrock Knowledge Baseのモデル指定が不正です",
                 diagnosis=(
-                    "BEDROCK_MODEL_ARNにBedrockモデルまたはInference Profileではない値が指定されています。"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにBedrockモデルまたはInference Profileではない値が指定されています。"
                     "OpenSearch Serverless Collection ARNなどは指定できません。"
                 ),
                 remediation=(
-                    "BEDROCK_MODEL_ARNにはBedrock foundation model ARN、"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにはBedrock foundation model ARN、"
                     "model ID、Inference Profile ID/ARNのいずれかを設定してください。"
                 ),
             )
@@ -491,7 +511,8 @@ class BedrockKnowledgeBaseChatClient:
                     "error_code": error_code,
                     "diagnosis": "実行ロールまたはユーザーにBedrock呼び出し権限がありません。",
                     "remediation": (
-                        "bedrock:RetrieveAndGenerate と対象モデル/Inference Profileの"
+                        "bedrock:RetrieveAndGenerate、bedrock:Retrieve、"
+                        "bedrock:GetInferenceProfile、対象モデル/Inference Profileの"
                         "bedrock:InvokeModel 権限を確認してください。"
                     ),
                 },

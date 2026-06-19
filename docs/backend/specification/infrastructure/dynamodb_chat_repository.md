@@ -40,7 +40,7 @@
 - SDK・プロトコル: boto3 DynamoDB low-level client
 - 接続先: `AWS_REGION`とboto3標準認証情報プロバイダーチェーンで決定する
 - 認証方式: ローカルではAWS profile、ECSではタスクロールを使用する。AWSアクセスキーを環境変数やコードへ保存しない
-- 必要なIAM操作: テーブルに対する`dynamodb:GetItem`、`dynamodb:Query`、`dynamodb:TransactWriteItems`、`dynamodb:UpdateItem`、`dynamodb:BatchWriteItem`と、`gsi1`に対する`dynamodb:Query`
+- 必要なIAM操作: テーブルに対する`dynamodb:GetItem`、`dynamodb:Query`、`dynamodb:TransactWriteItems`、`dynamodb:PutItem`、`dynamodb:UpdateItem`、`dynamodb:BatchWriteItem`と、`gsi1`に対する`dynamodb:Query`
 
 テーブルは単一テーブル方式とし、以下のキーを持つ。
 

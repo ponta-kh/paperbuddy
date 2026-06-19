@@ -1,8 +1,10 @@
-from src.application.ports.out.indexed_file_catalog_protocol import IndexedFile
+from src.application.ports.out.library.indexed_file_query_repository_protocol import (
+    IndexedFile,
+)
 
 
-class StaticIndexedFileCatalog:
-    """ローカル動作確認用の固定インデックス済みファイルCatalog。"""
+class StaticIndexedFileQueryRepository:
+    """ローカル動作確認用の固定インデックス済みファイルQuery Repository。"""
 
     def __init__(self, indexed_files: tuple[IndexedFile, ...] = ()) -> None:
         self._indexed_files = indexed_files

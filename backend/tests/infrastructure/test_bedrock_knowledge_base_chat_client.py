@@ -34,7 +34,7 @@ def _client(knowledge_base: StubKnowledgeBaseClient) -> BedrockKnowledgeBaseChat
     return BedrockKnowledgeBaseChatClient(
         knowledge_base,
         knowledge_base_id="knowledge-base-id",
-        model_arn="model-arn",
+        model_arn="model-identifier",
     )
 
 
@@ -42,6 +42,14 @@ def _client_error(code: str, message: str = "bedrock error") -> ClientError:
     return ClientError(
         {"Error": {"Code": code, "Message": message}},
         "RetrieveAndGenerate",
+    )
+
+
+def _input_text(prompt: str) -> str:
+    return (
+        "以下の質問に、質問と同じ言語で回答してください。\n"
+        "回答本文のみを出力し、Action、Response、検索クエリ、内部処理の説明は含めないでください。"
+        f"\n\n質問:\n{prompt}"
     )
 
 
@@ -90,15 +98,70 @@ async def test_start_chat_generates_answer() -> None:
     assert source.uri == "s3://bucket/paper.pdf"
     assert source.metadata == {"page": 3, "title": "paper"}
     assert knowledge_base.request == {
-        "input": {"text": "question"},
+        "input": {"text": _input_text("question")},
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": "knowledge-base-id",
-                "modelArn": "model-arn",
+                "modelArn": "model-identifier",
             },
         },
     }
+
+
+@pytest.mark.asyncio
+async def test_start_chat_requests_answer_in_same_language_as_question() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {"sessionId": "session-1", "output": {"text": "回答"}}
+    )
+
+    await _client(knowledge_base).start_chat("RAGとは何ですか？")
+
+    assert knowledge_base.request is not None
+    assert knowledge_base.request["input"] == {
+        "text": _input_text("RAGとは何ですか？"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_chat_returns_response_body_without_tool_trace() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {
+            "sessionId": "session-1",
+            "output": {
+                "text": (
+                    'Action: GlobalDataSource.search(query="Transformerモデル")\n\n'
+                    "Response: Transformerモデルはエンコーダーとデコーダーで構成されています。"
+                )
+            },
+        }
+    )
+
+    result = await _client(knowledge_base).start_chat("Transformerモデルとは？")
+
+    assert (
+        result.answer
+        == "Transformerモデルはエンコーダーとデコーダーで構成されています。"
+    )
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_returns_response_body_without_tool_trace() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {
+            "sessionId": "session-1",
+            "output": {
+                "text": (
+                    'Action: GlobalDataSource.search(query="Transformerモデル")\n\n'
+                    "Response: デコーダーにはマスク付き自己注意層があります。"
+                )
+            },
+        }
+    )
+
+    result = await _client(knowledge_base).continue_chat("session-1", "デコーダーは？")
+
+    assert result.answer == "デコーダーにはマスク付き自己注意層があります。"
 
 
 @pytest.mark.asyncio
@@ -246,12 +309,12 @@ async def test_continue_chat_uses_existing_session() -> None:
     assert result.session_id == "session-1"
     assert result.answer == "next answer"
     assert knowledge_base.request == {
-        "input": {"text": "next question"},
+        "input": {"text": _input_text("next question")},
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": "knowledge-base-id",
-                "modelArn": "model-arn",
+                "modelArn": "model-identifier",
             },
         },
         "sessionId": "session-1",

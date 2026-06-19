@@ -9,7 +9,7 @@ import { connectBackendToAwsServices, createNetwork } from "./network";
 
 export interface InfraStackProps extends cdk.StackProps {
     readonly stageName: string;
-    readonly bedrockModelArn: string;
+    readonly bedrockGenerationModelIdentifier: string;
     readonly frontendAssetPath?: string;
     readonly backendAssetPath?: string;
 }
@@ -26,7 +26,7 @@ export class InfraStack extends cdk.Stack {
         const llm = createLlmResources(
             this,
             props.stageName,
-            props.bedrockModelArn,
+            props.bedrockGenerationModelIdentifier,
         );
         const network = createNetwork(this);
         const backend = createBackend(this, {

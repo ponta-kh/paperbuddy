@@ -33,6 +33,20 @@ _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
 
 
+def _dynamodb_compatible(value: Any) -> Any:
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, list | tuple):
+        return [_dynamodb_compatible(item) for item in value]
+    if isinstance(value, Mapping):
+        return {
+            key: _dynamodb_compatible(item)
+            for key, item in value.items()
+            if isinstance(key, str)
+        }
+    return value
+
+
 class _DynamoDbChatRepositoryOperations:
     def __init__(self, client: Any, *, table_name: str) -> None:
         self._client = client
@@ -445,7 +459,10 @@ class _DynamoDbChatRepositoryOperations:
 
     @staticmethod
     def _serialize(item: dict[str, Any]) -> dict[str, Any]:
-        return {key: _serializer.serialize(value) for key, value in item.items()}
+        return {
+            key: _serializer.serialize(_dynamodb_compatible(value))
+            for key, value in item.items()
+        }
 
     @staticmethod
     def _deserialize(item: dict[str, Any]) -> dict[str, Any]:

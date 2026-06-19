@@ -50,7 +50,7 @@ def _set_aws_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
     monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
-    monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
+    monkeypatch.setenv("BEDROCK_GENERATION_MODEL_IDENTIFIER", "model-identifier")
 
 
 def _set_local_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,7 +65,7 @@ def _set_local_bedrock_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_local_environment(monkeypatch)
     monkeypatch.setenv("CHAT_GENERATION_MODE", "aws")
     monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
-    monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
+    monkeypatch.setenv("BEDROCK_GENERATION_MODEL_IDENTIFIER", "model-identifier")
 
 
 def test_get_chat_repositories_use_dynamodb(
@@ -202,7 +202,7 @@ def test_rejects_unknown_chat_generation_mode(
 
 @pytest.mark.parametrize(
     "missing_name",
-    ["AWS_REGION", "BEDROCK_KNOWLEDGE_BASE_ID", "BEDROCK_MODEL_ARN"],
+    ["AWS_REGION", "BEDROCK_KNOWLEDGE_BASE_ID", "BEDROCK_GENERATION_MODEL_IDENTIFIER"],
 )
 def test_get_chat_generation_client_rejects_missing_required_environment(
     monkeypatch: pytest.MonkeyPatch,

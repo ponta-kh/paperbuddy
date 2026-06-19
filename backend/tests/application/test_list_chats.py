@@ -34,6 +34,19 @@ class StubChatQueryRepository:
         raise NotImplementedError
 
 
+class FailingChatQueryRepository:
+    async def list_chats_by_user_id(self, user_id: UUID) -> tuple[ChatSummary, ...]:
+        raise RuntimeError("DynamoDB failure")
+
+    async def list_messages_by_chat_id(
+        self,
+        *,
+        user_id: UUID,
+        chat_id: UUID,
+    ) -> tuple[ChatMessageRecord, ...]:
+        raise NotImplementedError
+
+
 @pytest.mark.asyncio
 async def test_list_chats_returns_repository_results() -> None:
     updated_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
@@ -84,5 +97,26 @@ async def test_list_chats_logs_not_found(
 
     record = caplog.records[0]
     assert getattr(record, "event") == "list_chats_not_found"
+    assert getattr(record, "request_id") == str(REQUEST_ID)
+    assert getattr(record, "user_id") == str(USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_list_chats_logs_repository_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with (
+        caplog.at_level(
+            logging.ERROR,
+            logger="src.application.use_cases.chat.list_chats.list_chats",
+        ),
+        pytest.raises(RuntimeError, match="DynamoDB failure"),
+    ):
+        await ListChatsUseCase(FailingChatQueryRepository()).execute(
+            ListChatsInput(user_id=USER_ID, request_id=REQUEST_ID)
+        )
+
+    record = caplog.records[0]
+    assert getattr(record, "event") == "list_chats_failed"
     assert getattr(record, "request_id") == str(REQUEST_ID)
     assert getattr(record, "user_id") == str(USER_ID)

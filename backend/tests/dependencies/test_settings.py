@@ -16,7 +16,7 @@ def test_loads_aws_mode_settings() -> None:
         dynamodb_chat_table_name="chat-table",
         dynamodb_library_table_name="library-table",
         bedrock_knowledge_base_id="knowledge-base-id",
-        bedrock_model_arn="model-arn",
+        bedrock_generation_model_identifier="model-identifier",
     )
 
     assert settings.chat_infrastructure_mode is ChatInfrastructureMode.AWS
@@ -50,7 +50,7 @@ def test_loads_local_infrastructure_with_aws_chat_generation() -> None:
         dynamodb_library_table_name="library-table",
         dynamodb_endpoint_url="http://dynamodb-local:8000",
         bedrock_knowledge_base_id="knowledge-base-id",
-        bedrock_model_arn="model-arn",
+        bedrock_generation_model_identifier="model-identifier",
     )
 
     assert settings.chat_infrastructure_mode is ChatInfrastructureMode.LOCAL
@@ -65,7 +65,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("DYNAMODB_ENDPOINT_URL", "http://dynamodb-local:8000")
     monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
-    monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
+    monkeypatch.setenv("BEDROCK_GENERATION_MODEL_IDENTIFIER", "model-identifier")
     monkeypatch.setenv("SIMULATED_LLM_DELAY_SECONDS", "1.5")
 
     settings = Settings()
@@ -79,6 +79,20 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     assert settings.simulated_llm_delay_seconds == 1.5
 
 
+def test_loads_legacy_bedrock_model_arn_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AWS_REGION", "ap-northeast-1")
+    monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
+    monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
+    monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
+    monkeypatch.setenv("BEDROCK_MODEL_ARN", "legacy-model-identifier")
+
+    settings = Settings()
+
+    assert settings.bedrock_generation_model_identifier == "legacy-model-identifier"
+
+
 @pytest.mark.parametrize(
     ("values", "message"),
     [
@@ -88,7 +102,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
                 "aws_region": "ap-northeast-1",
                 "dynamodb_chat_table_name": "chat-table",
                 "dynamodb_library_table_name": "library-table",
-                "bedrock_model_arn": "model-arn",
+                "bedrock_generation_model_identifier": "model-identifier",
             },
             "BEDROCK_KNOWLEDGE_BASE_ID",
         ),
@@ -100,7 +114,7 @@ def test_loads_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
                 "dynamodb_library_table_name": "library-table",
                 "bedrock_knowledge_base_id": "knowledge-base-id",
             },
-            "BEDROCK_MODEL_ARN",
+            "BEDROCK_GENERATION_MODEL_IDENTIFIER",
         ),
         (
             {

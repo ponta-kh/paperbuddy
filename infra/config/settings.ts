@@ -4,7 +4,7 @@ import * as path from "node:path";
 export interface InfraSettings {
     readonly stackName: string;
     readonly region: string;
-    readonly bedrockModelArn: string;
+    readonly bedrockGenerationModelIdentifier: string;
 }
 
 const ENV_FILE_PATH = path.join(__dirname, "../.env");
@@ -15,12 +15,15 @@ export function loadInfraSettings(): InfraSettings {
 
     const stackName = required(entries, "STACK_NAME");
     const region = required(entries, "AWS_REGION");
-    const bedrockModelArn = required(entries, "BEDROCK_MODEL_ARN");
+    const bedrockGenerationModelIdentifier = requiredAny(entries, [
+        "BEDROCK_GENERATION_MODEL_IDENTIFIER",
+        "BEDROCK_MODEL_ARN",
+    ]);
 
     return {
         stackName,
         region,
-        bedrockModelArn,
+        bedrockGenerationModelIdentifier,
     };
 }
 
@@ -58,6 +61,19 @@ function required(entries: Map<string, string>, key: string): string {
         throw new Error(`infra設定の${key}が未設定です`);
     }
     return value;
+}
+
+function requiredAny(
+    entries: Map<string, string>,
+    keys: readonly string[],
+): string {
+    for (const key of keys) {
+        const value = entries.get(key);
+        if (value) {
+            return value;
+        }
+    }
+    throw new Error(`infra設定の${keys.join(" または ")}が未設定です`);
 }
 
 function unquote(value: string): string {

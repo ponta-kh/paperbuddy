@@ -189,6 +189,68 @@ def test_chat_message_accepts_citations_for_llm_message() -> None:
     assert message.citations == CITATIONS
 
 
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("content", 1),
+        ("location_type", 1),
+        ("uri", 1),
+        ("metadata", (("page", 1),)),
+    ],
+)
+def test_chat_citation_source_rejects_invalid_field(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    values: dict[str, object] = {
+        "content": "source excerpt",
+        "location_type": "S3",
+        "uri": "s3://bucket/paper.pdf",
+        "metadata": _CITATION_METADATA,
+    }
+    values[field_name] = invalid_value
+
+    with pytest.raises(InvalidChatCitationError):
+        ChatCitationSource(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("text", 1),
+        ("span_start", "0"),
+        ("span_end", "6"),
+        ("sources", [CITATIONS[0].sources[0]]),
+    ],
+)
+def test_chat_citation_rejects_invalid_field(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    values: dict[str, object] = {
+        "text": "answer",
+        "span_start": 0,
+        "span_end": 6,
+        "sources": CITATIONS[0].sources,
+    }
+    values[field_name] = invalid_value
+
+    with pytest.raises(InvalidChatCitationError):
+        ChatCitation(**values)  # type: ignore[arg-type]
+
+
+def test_chat_message_rejects_invalid_citations_container() -> None:
+    with pytest.raises(InvalidChatCitationError):
+        ChatMessage(
+            CHAT_ID,
+            REQUEST_ID,
+            MessageSender.LLM,
+            "answer",
+            ANSWERED_AT,
+            citations=[CITATIONS[0]],  # type: ignore[arg-type]
+        )
+
+
 def _message_pair(
     chat_id: UUID,
     user_sent_at: datetime,

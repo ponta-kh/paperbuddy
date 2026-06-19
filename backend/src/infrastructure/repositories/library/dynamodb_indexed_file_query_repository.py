@@ -7,13 +7,15 @@ from boto3.dynamodb.types import TypeDeserializer
 from botocore.exceptions import ClientError
 
 from src.application.exceptions import RepositoryAccessError, RepositoryNotFoundError
-from src.application.ports.out.indexed_file_catalog_protocol import IndexedFile
+from src.application.ports.out.library.indexed_file_query_repository_protocol import (
+    IndexedFile,
+)
 
 _deserializer = TypeDeserializer()
 
 
-class DynamoDbIndexedFileCatalog:
-    """DynamoDBからインデックス済みファイル一覧を取得するCatalog実装。"""
+class DynamoDbIndexedFileQueryRepository:
+    """DynamoDBからインデックス済みファイル一覧を取得するQuery Repository実装。"""
 
     def __init__(self, client: Any, *, table_name: str) -> None:
         self._client = client
@@ -73,10 +75,10 @@ class DynamoDbIndexedFileCatalog:
             name=str(item["file_name"]),
             category=str(item["category"]),
             status=str(item["status"]),
-            s3_uploaded_at=DynamoDbIndexedFileCatalog._parse_datetime(
+            s3_uploaded_at=DynamoDbIndexedFileQueryRepository._parse_datetime(
                 item["s3_uploaded_at"]
             ),
-            rag_indexed_at=DynamoDbIndexedFileCatalog._parse_nullable_datetime(
+            rag_indexed_at=DynamoDbIndexedFileQueryRepository._parse_nullable_datetime(
                 item.get("rag_indexed_at")
             ),
         )
@@ -85,7 +87,7 @@ class DynamoDbIndexedFileCatalog:
     def _parse_nullable_datetime(value: Any) -> datetime | None:
         if value is None:
             return None
-        return DynamoDbIndexedFileCatalog._parse_datetime(value)
+        return DynamoDbIndexedFileQueryRepository._parse_datetime(value)
 
     @staticmethod
     def _parse_datetime(value: Any) -> datetime:

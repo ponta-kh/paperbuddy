@@ -50,7 +50,13 @@ RAG source PDF -> private S3 bucket
 
 開発環境のスタック名、リージョン、生成モデルARNは`infra/.env`で管理する。
 
-対象アカウント・リージョンでCDKを初めて使う場合は、最初にbootstrapする。
+対象アカウント・リージョンでCDKを初めて使う場合、推奨デプロイタスクがbootstrap済みかを確認し、未実行なら自動でbootstrapする。
+
+```sh
+mise run deploy:dev
+```
+
+bootstrapだけを個別に実行する場合は次を使う。
 
 ```sh
 mise run infra:bootstrap:dev
@@ -70,19 +76,23 @@ mise run infra:synth
 Knowledge Base、S3 Data Source、生成・埋め込みモデル、Vector StoreはCDKが管理する。デプロイ設定を環境変数で渡す必要はない。
 
 ```sh
-mise run infra:deploy:dev
+mise run deploy:dev
 ```
 
 このコマンドでは、次の処理が自動的に行われる。
 
-1. `frontend/`で`pnpm build`を実行し、`frontend/dist/`を生成する
-2. `docker/backend/Dockerfile`からバックエンドのDockerイメージをビルドする
-3. DockerイメージをCDK bootstrapが管理するECRアセットリポジトリへpushする
-4. ECS Fargateのタスク定義とサービスを、pushしたイメージを参照するよう更新する
-5. `frontend/dist/`をフロントエンド配信用S3バケットへ配置する
-6. CloudFrontのキャッシュを無効化する
-7. Bedrock Knowledge Base、S3 Data Source、OpenSearch Serverless Vector Storeを含むCloudFormationスタック全体を更新する
-8. Cognito User PoolとWeb App Clientを作成し、フロントエンド用の`auth-config.json`をS3へ配置する
+1. `infra/.env`、AWS認証先、Docker、Bedrockモデル利用可否を確認する
+2. CDK bootstrap済みか確認し、未実行ならbootstrapする
+3. Lint、各テスト、CDK synth、`git diff --check`を実行する
+4. `frontend/`で`pnpm build`を実行し、`frontend/dist/`を生成する
+5. `docker/backend/Dockerfile`からバックエンドのDockerイメージをビルドする
+6. DockerイメージをCDK bootstrapが管理するECRアセットリポジトリへpushする
+7. ECS Fargateのタスク定義とサービスを、pushしたイメージを参照するよう更新する
+8. `frontend/dist/`をフロントエンド配信用S3バケットへ配置する
+9. CloudFrontのキャッシュを無効化する
+10. Bedrock Knowledge Base、S3 Data Source、OpenSearch Serverless Vector Storeを含むCloudFormationスタック全体を更新する
+11. Cognito User PoolとWeb App Clientを作成し、フロントエンド用の`auth-config.json`をS3へ配置する
+12. スタック状態、CloudFormation Output、CloudFront経由の`/api/health`を確認する
 
 Knowledge Base IDはCDKが作成したリソースからECSタスク定義へ設定するため、デプロイ時の入力は不要である。埋め込みモデルにはTitan Text Embeddings V2を使用する。
 
@@ -105,7 +115,44 @@ aws cloudformation describe-stacks \
 
 RAG材料PDF用S3バケットはCDKデプロイ時に作成されるが、PDFファイルは自動配置されない。
 
-最初にCloudFormation Outputからバケット名を取得する。
+通常運用では、RAG材料PDFを`infra/pdf/[分類]/`配下へ配置し、次のタスクを実行する。
+
+```text
+infra/pdf/
+  IT/
+    RAG Survey.pdf
+    RAG Original.pdf
+```
+
+```sh
+mise run rag:sync:dev
+```
+
+このタスクは`infra/pdf/`配下の`*.pdf`を再帰的に走査し、相対パスを保ったままRAG材料用S3バケットの`documents/`配下へ同期する。例えば`infra/pdf/IT/RAG Survey.pdf`は`documents/IT/RAG Survey.pdf`として配置される。S3同期後、ライブラリ一覧用DynamoDBへPDF名、分類、アップロード日時、S3キーを登録し、Bedrock Knowledge Baseのingestion jobを開始して`COMPLETE`まで待機する。
+
+S3へのアップロードだけを実行する場合:
+
+```sh
+mise run rag:upload:dev
+```
+
+このタスクもS3同期後にライブラリ一覧用DynamoDBを同期する。
+
+ライブラリ一覧用DynamoDBの同期だけを実行する場合:
+
+```sh
+mise run rag:catalog:sync:dev
+```
+
+Knowledge Base同期だけを実行する場合:
+
+```sh
+mise run rag:generate:dev
+```
+
+ローカルから削除したPDFや分類フォルダ変更で移動したPDFは、`mise run rag:upload:dev`または`mise run rag:sync:dev`実行時にS3の`documents/`配下からも削除される。RAG対象は`infra/pdf/`配下のPDFを正とする。
+
+個別操作が必要な場合は、最初にCloudFormation Outputからバケット名を取得する。
 
 ```sh
 rag_source_bucket_name="$(
@@ -126,11 +173,13 @@ aws s3 cp ./path/to/document.pdf "s3://${rag_source_bucket_name}/documents/docum
 
 ```sh
 aws s3 sync ./path/to/pdfs "s3://${rag_source_bucket_name}/documents/" \
+  --delete \
   --exclude '*' \
-  --include '*.pdf'
+  --include '*.pdf' \
+  --include '*.PDF'
 ```
 
-PDF配置後、CloudFormation OutputからKnowledge Base IDとData Source IDを取得して同期処理を開始する。
+PDF配置後、個別に同期する場合はCloudFormation OutputからKnowledge Base IDとData Source IDを取得して同期処理を開始する。
 
 ```sh
 bedrock_knowledge_base_id="$(
@@ -151,14 +200,14 @@ aws bedrock-agent start-ingestion-job \
   --data-source-id "$bedrock_data_source_id"
 ```
 
-PDFを追加、更新、削除した場合は、同じ同期処理を再実行する。
+PDFを追加、更新した場合は、同じ同期処理を再実行する。
 
 ## 更新時のデプロイ
 
 バックエンド、フロントエンド、インフラ定義を変更した場合も同じコマンドを実行する。
 
 ```sh
-mise run infra:deploy:dev
+mise run deploy:dev
 ```
 
 - バックエンドに変更がある場合、Dockerイメージが再ビルド・再pushされ、ECSサービスが更新される
@@ -169,7 +218,7 @@ mise run infra:deploy:dev
 
 Fargateタスクロールには以下の権限だけを付与する。
 
-- DynamoDB: `GetItem`、`Query`、`TransactWriteItems`
+- DynamoDB: `GetItem`、`Query`、`TransactWriteItems`、`PutItem`、`UpdateItem`、`BatchWriteItem`
 - Bedrock: `RetrieveAndGenerate`、`InvokeModel`
 
 ## 注意事項
