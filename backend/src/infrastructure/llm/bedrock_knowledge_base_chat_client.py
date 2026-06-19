@@ -140,10 +140,7 @@ class BedrockKnowledgeBaseChatClient:
     @staticmethod
     def _build_input_text(prompt: str) -> str:
         """ユーザーの質問と同じ言語で回答するよう、最小限の指示を付与する。"""
-        return (
-            "以下の質問に、質問と同じ言語で回答してください。\n\n"
-            f"質問:\n{prompt}"
-        )
+        return f"以下の質問に、質問と同じ言語で回答してください。\n\n質問:\n{prompt}"
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
