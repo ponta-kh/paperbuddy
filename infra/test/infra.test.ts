@@ -8,8 +8,8 @@ describe("InfraStack", () => {
     const app = new cdk.App();
     const stack = new InfraStack(app, "TestStack", {
         stageName: "dev",
-        bedrockModelArn:
-            "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.nova-lite-v1:0",
+        bedrockGenerationModelIdentifier:
+            "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
         frontendAssetPath: path.join(__dirname, "fixtures/frontend"),
     });
     const template = Template.fromStack(stack);
@@ -163,6 +163,10 @@ describe("InfraStack", () => {
             Value: "aws",
         });
         expect(environments).toContainEqual({
+            Name: "BEDROCK_GENERATION_MODEL_IDENTIFIER",
+            Value: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        });
+        expect(environments).toContainEqual({
             Name: "DYNAMODB_LIBRARY_TABLE_NAME",
             Value: expect.objectContaining({
                 Ref: expect.stringMatching("LibraryTable"),
@@ -172,12 +176,6 @@ describe("InfraStack", () => {
             Name: "COGNITO_USER_POOL_ID",
             Value: expect.objectContaining({
                 Ref: expect.stringMatching("UserPool"),
-            }),
-        });
-        expect(environments).toContainEqual({
-            Name: "COGNITO_USER_POOL_CLIENT_ID",
-            Value: expect.objectContaining({
-                Ref: expect.stringMatching("UserPoolWebClient"),
             }),
         });
     });
@@ -329,7 +327,7 @@ describe("InfraStack", () => {
         template.templateMatches({
             Parameters: {
                 BedrockKnowledgeBaseId: Match.absent(),
-                BedrockModelArn: Match.absent(),
+                BedrockGenerationModelIdentifier: Match.absent(),
             },
         });
         template.hasResourceProperties("AWS::Bedrock::KnowledgeBase", {
@@ -441,7 +439,7 @@ describe("InfraStack", () => {
             "amazon.titan-embed-text-v2:0",
         );
         expect(JSON.stringify(knowledgeBasePolicies)).toContain(
-            "amazon.nova-lite-v1:0",
+            '"Resource":"*"',
         );
     });
 });

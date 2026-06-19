@@ -72,7 +72,8 @@ export function createBackend(
                         props.database.libraryTable.tableName,
                     BEDROCK_KNOWLEDGE_BASE_ID:
                         props.llm.knowledgeBase.attrKnowledgeBaseId,
-                    BEDROCK_MODEL_ARN: props.llm.modelArn,
+                    BEDROCK_GENERATION_MODEL_IDENTIFIER:
+                        props.llm.generationModelIdentifier,
                     COGNITO_USER_POOL_ID:
                         props.authentication.userPool.userPoolId,
                     COGNITO_USER_POOL_CLIENT_ID:

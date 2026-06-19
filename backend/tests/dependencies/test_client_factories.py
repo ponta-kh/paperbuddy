@@ -94,7 +94,7 @@ def _aws_settings() -> Settings:
         dynamodb_chat_table_name="chat-table",
         dynamodb_library_table_name="library-table",
         bedrock_knowledge_base_id="knowledge-base-id",
-        bedrock_model_arn="model-arn",
+        bedrock_generation_model_identifier="model-identifier",
     )
 
 
@@ -118,5 +118,5 @@ def _local_bedrock_settings() -> Settings:
         dynamodb_library_table_name="library-table",
         dynamodb_endpoint_url="http://dynamodb-local:8000",
         bedrock_knowledge_base_id="knowledge-base-id",
-        bedrock_model_arn="model-arn",
+        bedrock_generation_model_identifier="model-identifier",
     )

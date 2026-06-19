@@ -30,6 +30,19 @@ read_env_value() {
   printf '%s' "$value"
 }
 
+read_env_any() {
+  local key
+
+  for key in "$@"; do
+    if read_env_value "$key" >/dev/null 2>&1; then
+      return
+    fi
+  done
+
+  echo "infra設定の$*のいずれかが未設定です" >&2
+  exit 1
+}
+
 run_step() {
   local message="$1"
   shift
@@ -74,7 +87,7 @@ fi
 
 stack_name="$(read_env_value STACK_NAME)"
 region="$(read_env_value AWS_REGION)"
-read_env_value BEDROCK_MODEL_ARN >/dev/null
+read_env_any BEDROCK_GENERATION_MODEL_IDENTIFIER BEDROCK_MODEL_ARN
 
 echo "デプロイ対象: ${stack_name} (${region})"
 

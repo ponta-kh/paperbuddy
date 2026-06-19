@@ -388,7 +388,7 @@ class BedrockKnowledgeBaseChatClient:
                     "RetrieveAndGenerateには対象モデルを含むInference ProfileのIDまたはARNを指定してください。"
                 ),
                 remediation=(
-                    "BEDROCK_MODEL_ARNにInference Profile ID/ARNを設定するか、"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにInference Profile ID/ARNを設定するか、"
                     "オンデマンド対応モデルへ変更してください。"
                 ),
             )
@@ -400,7 +400,7 @@ class BedrockKnowledgeBaseChatClient:
                     "指定したモデルはプロバイダーによりLegacy扱いになっており、"
                     "現在のアカウントではRetrieveAndGenerateに利用できません。"
                 ),
-                remediation="BEDROCK_MODEL_ARNをActiveなモデルまたはInference Profileへ変更してください。",
+                remediation="BEDROCK_GENERATION_MODEL_IDENTIFIERをActiveなモデルまたはInference Profileへ変更してください。",
             )
         if "custom prompt templates must be provided" in normalized_message:
             return _BedrockErrorHint(
@@ -420,11 +420,11 @@ class BedrockKnowledgeBaseChatClient:
                 event="bedrock_knowledge_base_invalid_model_identifier",
                 message="Bedrock Knowledge Baseのモデル指定が不正です",
                 diagnosis=(
-                    "BEDROCK_MODEL_ARNにBedrockモデルまたはInference Profileではない値が指定されています。"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにBedrockモデルまたはInference Profileではない値が指定されています。"
                     "OpenSearch Serverless Collection ARNなどは指定できません。"
                 ),
                 remediation=(
-                    "BEDROCK_MODEL_ARNにはBedrock foundation model ARN、"
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIERにはBedrock foundation model ARN、"
                     "model ID、Inference Profile ID/ARNのいずれかを設定してください。"
                 ),
             )

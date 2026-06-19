@@ -33,12 +33,12 @@ def create_chat_generation_client(settings: Settings) -> ChatGenerationClientPro
         )
 
     assert settings.bedrock_knowledge_base_id is not None
-    assert settings.bedrock_model_arn is not None
+    assert settings.bedrock_generation_model_identifier is not None
     knowledge_base_client = boto3.client(
         "bedrock-agent-runtime", region_name=settings.aws_region
     )
     return BedrockKnowledgeBaseChatClient(
         knowledge_base_client,
         knowledge_base_id=settings.bedrock_knowledge_base_id,
-        model_arn=settings.bedrock_model_arn,
+        model_arn=settings.bedrock_generation_model_identifier,
     )

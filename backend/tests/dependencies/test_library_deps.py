@@ -29,7 +29,7 @@ def _set_aws_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DYNAMODB_CHAT_TABLE_NAME", "chat-table")
     monkeypatch.setenv("DYNAMODB_LIBRARY_TABLE_NAME", "library-table")
     monkeypatch.setenv("BEDROCK_KNOWLEDGE_BASE_ID", "knowledge-base-id")
-    monkeypatch.setenv("BEDROCK_MODEL_ARN", "model-arn")
+    monkeypatch.setenv("BEDROCK_GENERATION_MODEL_IDENTIFIER", "model-identifier")
 
 
 def _set_local_environment(monkeypatch: pytest.MonkeyPatch) -> None:

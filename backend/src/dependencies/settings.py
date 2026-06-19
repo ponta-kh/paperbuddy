@@ -1,7 +1,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
         validate_default=True,
     )
 
@@ -35,7 +36,15 @@ class Settings(BaseSettings):
     dynamodb_library_table_name: str = Field(default="", min_length=1)
     dynamodb_endpoint_url: str | None = None
     bedrock_knowledge_base_id: str | None = None
-    bedrock_model_arn: str | None = None
+    bedrock_generation_model_identifier: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "bedrock_generation_model_identifier",
+            "BEDROCK_GENERATION_MODEL_IDENTIFIER",
+            "BEDROCK_MODEL_ARN",
+            "bedrock_model_arn",
+        ),
+    )
     cognito_user_pool_id: str | None = None
     cognito_user_pool_client_id: str | None = None
     simulated_llm_delay_seconds: float = Field(default=2, ge=0)
@@ -74,7 +83,10 @@ class Settings(BaseSettings):
             name
             for name, value in (
                 ("BEDROCK_KNOWLEDGE_BASE_ID", self.bedrock_knowledge_base_id),
-                ("BEDROCK_MODEL_ARN", self.bedrock_model_arn),
+                (
+                    "BEDROCK_GENERATION_MODEL_IDENTIFIER",
+                    self.bedrock_generation_model_identifier,
+                ),
             )
             if not value
         ]

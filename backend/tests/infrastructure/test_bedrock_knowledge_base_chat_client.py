@@ -34,7 +34,7 @@ def _client(knowledge_base: StubKnowledgeBaseClient) -> BedrockKnowledgeBaseChat
     return BedrockKnowledgeBaseChatClient(
         knowledge_base,
         knowledge_base_id="knowledge-base-id",
-        model_arn="model-arn",
+        model_arn="model-identifier",
     )
 
 
@@ -99,7 +99,7 @@ async def test_start_chat_generates_answer() -> None:
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": "knowledge-base-id",
-                "modelArn": "model-arn",
+                "modelArn": "model-identifier",
             },
         },
     }
@@ -269,7 +269,7 @@ async def test_continue_chat_uses_existing_session() -> None:
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": "knowledge-base-id",
-                "modelArn": "model-arn",
+                "modelArn": "model-identifier",
             },
         },
         "sessionId": "session-1",
