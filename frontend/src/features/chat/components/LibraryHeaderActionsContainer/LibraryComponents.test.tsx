@@ -55,14 +55,17 @@ describe("LibraryFileList", () => {
             />,
         );
 
-        expect(screen.getByText("ID")).toBeInTheDocument();
-        expect(screen.getByText("S3 Key")).toBeInTheDocument();
-        expect(screen.getByText("papers/a.pdf")).toBeInTheDocument();
-        expect(screen.getByText("papers/b.pdf")).toBeInTheDocument();
+        expect(screen.getByText("PDF名称")).toBeInTheDocument();
+        expect(screen.getByText("分類")).toBeInTheDocument();
+        expect(screen.getByText("アップロード日")).toBeInTheDocument();
         expect(screen.getByText("paper-a.pdf")).toBeInTheDocument();
         expect(screen.getByText("paper-b.pdf")).toBeInTheDocument();
         expect(screen.getByText("LLM")).toBeInTheDocument();
-        expect(screen.getByText("processing")).toBeInTheDocument();
+        expect(screen.getByText("経済")).toBeInTheDocument();
+        expect(screen.queryByText("ID")).not.toBeInTheDocument();
+        expect(screen.queryByText("S3 Key")).not.toBeInTheDocument();
+        expect(screen.queryByText("papers/a.pdf")).not.toBeInTheDocument();
+        expect(screen.queryByText("processing")).not.toBeInTheDocument();
     });
 
     test("空一覧の場合は空状態を表示する", () => {
