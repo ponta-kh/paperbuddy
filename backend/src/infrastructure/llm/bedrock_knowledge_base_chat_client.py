@@ -498,7 +498,8 @@ class BedrockKnowledgeBaseChatClient:
                     "diagnosis": "実行ロールまたはユーザーにBedrock呼び出し権限がありません。",
                     "remediation": (
                         "bedrock:RetrieveAndGenerate、bedrock:Retrieve、"
-                        "対象モデル/Inference Profileのbedrock:InvokeModel 権限を確認してください。"
+                        "bedrock:GetInferenceProfile、対象モデル/Inference Profileの"
+                        "bedrock:InvokeModel 権限を確認してください。"
                     ),
                 },
             )

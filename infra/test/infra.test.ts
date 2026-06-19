@@ -315,7 +315,10 @@ describe("InfraStack", () => {
                         Effect: "Allow",
                     }),
                     Match.objectLike({
-                        Action: "bedrock:InvokeModel",
+                        Action: Match.arrayWith([
+                            "bedrock:GetInferenceProfile",
+                            "bedrock:InvokeModel",
+                        ]),
                         Effect: "Allow",
                     }),
                 ]),

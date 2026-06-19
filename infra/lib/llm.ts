@@ -110,7 +110,7 @@ export function grantBackendBedrockAccess(
     );
     taskRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
-            actions: ["bedrock:InvokeModel"],
+            actions: ["bedrock:GetInferenceProfile", "bedrock:InvokeModel"],
             resources: ["*"],
         }),
     );
