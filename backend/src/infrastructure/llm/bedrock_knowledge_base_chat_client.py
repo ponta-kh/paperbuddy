@@ -140,7 +140,21 @@ class BedrockKnowledgeBaseChatClient:
     @staticmethod
     def _build_input_text(prompt: str) -> str:
         """ユーザーの質問と同じ言語で回答するよう、最小限の指示を付与する。"""
-        return f"以下の質問に、質問と同じ言語で回答してください。\n\n質問:\n{prompt}"
+        return (
+            "以下の質問に、質問と同じ言語で回答してください。\n"
+            "回答本文のみを出力し、Action、Response、検索クエリ、内部処理の説明は含めないでください。"
+            f"\n\n質問:\n{prompt}"
+        )
+
+    @staticmethod
+    def _answer_text(raw_answer: str) -> str:
+        """Bedrockが混ぜることがあるツール実行風の接頭辞を除去する。"""
+        response_marker = "Response:"
+        marker_index = raw_answer.rfind(response_marker)
+        if marker_index < 0:
+            return raw_answer.strip()
+
+        return raw_answer[marker_index + len(response_marker) :].strip()
 
     async def _start_knowledge_base_chat(self, prompt: str) -> _KnowledgeBaseChatResult:
         try:
@@ -171,7 +185,7 @@ class BedrockKnowledgeBaseChatClient:
 
         try:
             session_id = response["sessionId"]
-            answer = response["output"]["text"]
+            answer = self._answer_text(response["output"]["text"])
             if not all(
                 isinstance(value, str) and value.strip()
                 for value in (session_id, answer)
@@ -223,7 +237,7 @@ class BedrockKnowledgeBaseChatClient:
 
         try:
             returned_session_id = response["sessionId"]
-            answer = response["output"]["text"]
+            answer = self._answer_text(response["output"]["text"])
             if (
                 returned_session_id != session_id
                 or not isinstance(answer, str)

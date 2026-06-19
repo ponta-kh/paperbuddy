@@ -46,7 +46,11 @@ def _client_error(code: str, message: str = "bedrock error") -> ClientError:
 
 
 def _input_text(prompt: str) -> str:
-    return f"以下の質問に、質問と同じ言語で回答してください。\n\n質問:\n{prompt}"
+    return (
+        "以下の質問に、質問と同じ言語で回答してください。\n"
+        "回答本文のみを出力し、Action、Response、検索クエリ、内部処理の説明は含めないでください。"
+        f"\n\n質問:\n{prompt}"
+    )
 
 
 @pytest.mark.asyncio
@@ -117,6 +121,47 @@ async def test_start_chat_requests_answer_in_same_language_as_question() -> None
     assert knowledge_base.request["input"] == {
         "text": _input_text("RAGとは何ですか？"),
     }
+
+
+@pytest.mark.asyncio
+async def test_start_chat_returns_response_body_without_tool_trace() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {
+            "sessionId": "session-1",
+            "output": {
+                "text": (
+                    'Action: GlobalDataSource.search(query="Transformerモデル")\n\n'
+                    "Response: Transformerモデルはエンコーダーとデコーダーで構成されています。"
+                )
+            },
+        }
+    )
+
+    result = await _client(knowledge_base).start_chat("Transformerモデルとは？")
+
+    assert (
+        result.answer
+        == "Transformerモデルはエンコーダーとデコーダーで構成されています。"
+    )
+
+
+@pytest.mark.asyncio
+async def test_continue_chat_returns_response_body_without_tool_trace() -> None:
+    knowledge_base = StubKnowledgeBaseClient(
+        {
+            "sessionId": "session-1",
+            "output": {
+                "text": (
+                    'Action: GlobalDataSource.search(query="Transformerモデル")\n\n'
+                    "Response: デコーダーにはマスク付き自己注意層があります。"
+                )
+            },
+        }
+    )
+
+    result = await _client(knowledge_base).continue_chat("session-1", "デコーダーは？")
+
+    assert result.answer == "デコーダーにはマスク付き自己注意層があります。"
 
 
 @pytest.mark.asyncio
