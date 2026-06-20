@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="開発環境の事前検証、bootstrap、デプロイ、ヘルスチェックを一括実行する"
+#MISE description="差分以降の開発環境デプロイ、事前検証、bootstrap、ヘルスチェックを一括実行する"
 
 set -euo pipefail
 

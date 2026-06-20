@@ -32,9 +32,26 @@ docker info
 対象アカウント・リージョン・Bedrock生成モデル: `infra/.env`
 埋め込みモデル: AWS CDK定義ファイル内（`amazon.titan-embed-text-v2:0`を固定設定）
 
-## 推奨デプロイ手順
+## 完全初回デプロイ手順
 
-開発環境の通常デプロイは、リポジトリルートで次の統合タスクを実行する。
+AWS環境を初めて作成し、RAG材料PDFのアップロードからKnowledge Base同期まで一括実行する場合は、リポジトリルートで次の完全初回デプロイタスクを実行する。
+
+```sh
+mise run deploy:initial:dev
+```
+
+このタスクは次を順に実行する。
+
+1. `deploy:dev`で事前検証、CDK bootstrap、AWSデプロイ、ヘルスチェックを実行する
+2. `rag:sync:dev`でRAG材料PDFをS3へ同期する
+3. ライブラリ一覧用DynamoDBへPDFメタデータを同期する
+4. Bedrock Knowledge Baseのingestion jobを開始し、`COMPLETE`まで待機する
+
+完全初回デプロイの前に、RAG材料PDFを`infra/pdf/[分類]/`配下へ配置しておく。
+
+## 差分デプロイ手順
+
+差分コミット以降の通常デプロイでは、RAG材料PDFのS3配置とKnowledge Base同期を含めない。
 
 ```sh
 mise run deploy:dev
@@ -48,8 +65,6 @@ mise run deploy:dev
 4. Lint、各テスト、CDK synth、`git diff --check`を実行する
 5. `infra:deploy:dev`でAWSへデプロイする
 6. スタック状態、CloudFormation Output、CloudFront経由の`/api/health`を確認する
-
-PDFのS3配置とKnowledge Base同期は、この統合タスクでは実行しない。
 
 ## 個別実行
 
@@ -128,7 +143,7 @@ curl --fail-with-body "https://${distribution_domain_name}/api/health"
 
 ## RAG材料PDFの同期
 
-RAG材料PDFは`infra/pdf/[分類]/`配下に配置する。デプロイ完了後、次のタスクでRAG材料用S3バケットの`documents/`配下へ同期し、Knowledge Base同期を開始する。
+RAG材料PDFは`infra/pdf/[分類]/`配下に配置する。完全初回デプロイでは`deploy:initial:dev`に含まれる。PDFだけを追加・更新・削除・分類フォルダ移動した場合は、次のタスクでRAG材料用S3バケットの`documents/`配下へ同期し、Knowledge Base同期を開始する。
 
 ```text
 infra/pdf/
@@ -191,10 +206,6 @@ aws cloudformation describe-stack-events \
   --max-items 30 \
   --output table
 ```
-
-## 差分デプロイ
-
-バックエンド、フロントエンド、インフラ定義を変更した場合は、通常どおり`mise run deploy:dev`を使用する。PDFだけを変更した場合、CDKデプロイは不要であるため`mise run rag:sync:dev`のみ実行する。
 
 ### デプロイ失敗時
 
