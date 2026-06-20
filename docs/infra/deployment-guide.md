@@ -2,12 +2,9 @@
 
 PaperBuddyの開発環境をAWSへ初回デプロイし、RAG材料PDFをKnowledge Baseへ取り込み、画面から動作確認するまでの手順を定義する。
 
-構成と各AWSリソースの詳細は[Application Deployment](application.md)、ネットワーク構成は[ネットワーク構成](network.md)を参照する。
-
-## デプロイ対象
+## この手順で作成する主なリソース
 
 `PaperBuddyDev`スタックとして、主に以下のリソースを東京リージョンへ作成する。
-
 - CloudFront、非公開フロントエンドS3バケット
 - 内部ALB、ECS Fargate
 - Cognito User Pool、Web App Client
@@ -17,18 +14,14 @@ PaperBuddyの開発環境をAWSへ初回デプロイし、RAG材料PDFをKnowled
 - RAG材料用非公開S3バケット
 - 隔離サブネットを持つVPCとVPC Endpoint
 
-CloudFrontを公開トラフィックの唯一の入口とする。ALBとS3は直接公開しない。
-
-## 着手判断
+## 準備事項
 
 この手順へ進む前に、以下を満たしていることを確認する。
-
 - AWS CLIで対象アカウントへログイン済みである
 - `infra/.env` が用意され、`STACK_NAME`、`AWS_REGION`、`BEDROCK_GENERATION_MODEL_IDENTIFIER` が正しい
 - Docker Desktopが起動できる
 - 対象リージョンでBedrockモデルアクセスが有効である
-
-確認コマンド:
+  `authorizationStatus`、`entitlementAvailability`、`regionAvailability`が利用可能な状態であることを確認する
 
 ```sh
 aws sts get-caller-identity
@@ -36,71 +29,29 @@ mise run infra:bedrock:check:dev
 docker info
 ```
 
-`infra/.env` の値が不明なまま、または別アカウントに対して進めることは避ける。
+対象アカウント・リージョン・Bedrock生成モデル: `infra/.env`
+埋め込みモデル: AWS CDK定義ファイル内（`amazon.titan-embed-text-v2:0`を固定設定）
 
-## 準備事項
+## 完全初回デプロイ手順
 
-### 必要なツール
-
-- AWS CLI
-- Docker Desktop
-- mise
-- pnpm
-- uv
-
-Docker Desktopを起動し、利用できることを確認する。
+AWS環境を初めて作成し、RAG材料PDFのアップロードからKnowledge Base同期まで一括実行する場合は、リポジトリルートで次の完全初回デプロイタスクを実行する。
 
 ```sh
-docker info
+mise run deploy:initial:dev
 ```
 
-miseタスクを確認する。
+このタスクは次を順に実行する。
 
-```sh
-mise tasks validate
-mise tasks ls --local
-```
+1. `deploy:dev`で事前検証、CDK bootstrap、AWSデプロイ、ヘルスチェックを実行する
+2. `rag:sync:dev`でRAG材料PDFをS3へ同期する
+3. ライブラリ一覧用DynamoDBへPDFメタデータを同期する
+4. Bedrock Knowledge Baseのingestion jobを開始し、`COMPLETE`まで待機する
 
-### CDK bootstrap
+完全初回デプロイの前に、RAG材料PDFを`infra/pdf/[分類]/`配下へ配置しておく。
 
-対象アカウント・東京リージョンでCDKを初めて使用する場合のみ実行する。
+## 差分デプロイ手順
 
-```sh
-mise run infra:bootstrap:dev
-```
-
-bootstrap済みか確認する場合:
-
-```sh
-aws cloudformation describe-stacks \
-  --stack-name CDKToolkit \
-  --query 'Stacks[0].StackStatus' \
-  --output text
-```
-
-### 設定ファイル
-
-`infra/.env.example` を `infra/.env` にコピーし、対象アカウント・リージョン・Bedrock生成モデルを設定する。生成モデルはClaudeを使用し、既定値はAPACのClaude 3.5 Sonnet v2 Inference Profile IDである。`BEDROCK_GENERATION_MODEL_IDENTIFIER` にはFoundation Model ARN/ID、またはInference Profile ARN/IDを指定できる。
-
-デプロイ実行者には、CloudFormationが各リソースを作成・更新するための権限が必要である。
-
-### Bedrockモデル確認
-
-開発環境の生成モデルは`infra/.env`で管理する。`infra:bedrock:check:dev`はFoundation Modelの場合は利用可否を、Inference Profileの場合はProfileの存在を確認する。指定したClaude Inference Profileが対象アカウント・リージョンで利用できない場合は、AWS Bedrockのモデル詳細ページで利用可能なClaudeのInference Profile IDを確認して差し替える。
-
-モデルの利用可否を確認する。
-
-```sh
-mise run infra:bedrock:check:dev
-```
-
-`authorizationStatus`、`entitlementAvailability`、`regionAvailability`が利用可能な状態であることを確認する。
-
-埋め込みモデルにはCDKで`amazon.titan-embed-text-v2:0`を固定設定している。
-
-## 推奨デプロイ手順
-
-開発環境の通常デプロイは、リポジトリルートで次の統合タスクを実行する。
+差分コミット以降の通常デプロイでは、RAG材料PDFのS3配置とKnowledge Base同期を含めない。
 
 ```sh
 mise run deploy:dev
@@ -109,53 +60,34 @@ mise run deploy:dev
 このタスクは次を順に実行する。
 
 1. `infra/.env`の必須値を確認する
-2. miseタスク定義、AWS認証先、Docker、Bedrockモデル利用可否を確認する
+2. miseタスク定義、AWS認証先、Dockerの起動状態を確認する
 3. CDK bootstrap済みか確認し、未実行の場合は`infra:bootstrap:dev`を実行する
 4. Lint、各テスト、CDK synth、`git diff --check`を実行する
 5. `infra:deploy:dev`でAWSへデプロイする
 6. スタック状態、CloudFormation Output、CloudFront経由の`/api/health`を確認する
 
-PDFのS3配置とKnowledge Base同期は、この統合タスクでは実行しない。
-
-## 個別検証手順
+## 個別実行
 
 問題切り分けや部分実行が必要な場合は、以下の個別コマンドを使用する。
 
-### デプロイ前検証
-
-リポジトリルートでLintとテストを実行する。
-
+### フォーマット、リント、テスト、コミット漏れ確認
 ```sh
+mise run format
 mise run lint
 mise run frontend:test
 mise run backend:test
 mise run infra:test
-```
-
-CloudFormationテンプレートを生成し、構成エラーがないことを確認する。
-
-```sh
 mise run infra:synth
-```
-
-未コミット差分を確認する。
-
-```sh
 git status --short
 git diff --check
 ```
 
-認証先とDockerを確認する。
-
+### bootstrap作成
 ```sh
-aws sts get-caller-identity
-docker info --format '{{.ServerVersion}}'
+mise run infra:bootstrap:dev
 ```
 
-## 個別デプロイ
-
-事前検証やbootstrapを個別に済ませている場合は、デプロイだけを実行できる。
-
+### デプロイだけを実行
 ```sh
 mise run infra:deploy:dev
 ```
@@ -163,7 +95,6 @@ mise run infra:deploy:dev
 確認を求められた場合は、作成されるリソースとIAM変更内容を確認して承認する。
 
 デプロイでは以下が自動実行される。
-
 1. フロントエンドをビルドする
 2. バックエンドDockerイメージをビルドしてCDK管理のECRへpushする
 3. CloudFormationでAWSリソースを作成・更新する
@@ -172,9 +103,9 @@ mise run infra:deploy:dev
 
 RAG材料PDFのS3配置とKnowledge Base同期は自動実行されない。
 
-### デプロイ結果の確認
+## デプロイ結果の確認
 
-スタック状態を確認する。
+`deploy:dev`は完了時にスタック状態、CloudFormation Output、CloudFront経由の`/api/health`を確認する。個別に確認する場合は次を使用する。
 
 ```sh
 aws cloudformation describe-stacks \
@@ -206,23 +137,13 @@ distribution_domain_name="$(
 curl --fail-with-body "https://${distribution_domain_name}/api/health"
 ```
 
-期待するレスポンス:
-
-```json
-{"status":"ok"}
-```
-
-ブラウザで以下へアクセスし、Cognitoのログイン・新規登録画面が表示されることを確認する。
-
-```text
-https://<DistributionDomainName>
-```
+`/api/health`は`{"status":"ok"}`を返す。ブラウザでCloudFrontドメインへアクセスし、Cognitoのログイン・新規登録画面が表示されることを確認する。
 
 初回利用者はメールアドレスで新規登録し、Cognitoから送信される確認コードで登録を完了する。
 
-### RAG材料PDFの配置
+## RAG材料PDFの同期
 
-RAG材料PDFは`infra/pdf/[分類]/`配下に配置する。デプロイ完了後、次のタスクでRAG材料用S3バケットの`documents/`配下へ同期し、Knowledge Base同期を開始する。
+RAG材料PDFは`infra/pdf/[分類]/`配下に配置する。完全初回デプロイでは`deploy:initial:dev`に含まれる。PDFだけを追加・更新・削除・分類フォルダ移動した場合は、次のタスクでRAG材料用S3バケットの`documents/`配下へ同期し、Knowledge Base同期を開始する。
 
 ```text
 infra/pdf/
@@ -266,92 +187,9 @@ mise run rag:generate:dev
 PDFを追加、更新、削除、分類フォルダ移動した場合は、同じタスクを再実行する。
 ローカルから削除したPDFや分類フォルダ変更で移動したPDFは、S3の`documents/`配下からも削除される。RAG対象は`infra/pdf/`配下のPDFを正とする。
 
-Knowledge Base同期は、ライブラリ一覧用DynamoDBテーブルへPDFメタデータを登録しない。現在の実装では、RAG検索対象への取り込みとライブラリ一覧表示のデータ管理は独立している。
+`rag:generate:dev`はライブラリ一覧用DynamoDBテーブルへPDFメタデータを登録しない。RAG検索対象への取り込みだけを行う場合に使用する。
 
-### RAG材料PDFの個別操作
-
-問題切り分けや手動操作が必要な場合は、CloudFormation Outputからバケット名を取得する。
-
-```sh
-rag_source_bucket_name="$(
-    aws cloudformation describe-stacks \
-        --stack-name PaperBuddyDev \
-        --query "Stacks[0].Outputs[?OutputKey=='RagSourceBucketName'].OutputValue | [0]" \
-        --output text
-)"
-```
-
-単一PDFをアップロードする場合:
-
-```sh
-aws s3 cp \
-  ./path/to/document.pdf \
-  "s3://${rag_source_bucket_name}/documents/document.pdf"
-```
-
-ディレクトリ内のPDFを同期する場合:
-
-```sh
-aws s3 sync \
-  ./path/to/pdfs \
-  "s3://${rag_source_bucket_name}/documents/" \
-  --delete \
-  --exclude '*' \
-  --include '*.pdf' \
-  --include '*.PDF'
-```
-
-アップロード結果を確認する。
-
-```sh
-aws s3 ls "s3://${rag_source_bucket_name}/documents/" --recursive
-```
-
-### Knowledge Base同期の個別操作
-
-CloudFormation OutputからKnowledge Base IDとData Source IDを取得する。
-
-```sh
-bedrock_knowledge_base_id="$(
-    aws cloudformation describe-stacks \
-        --stack-name PaperBuddyDev \
-        --query "Stacks[0].Outputs[?OutputKey=='BedrockKnowledgeBaseId'].OutputValue | [0]" \
-        --output text
-)"
-bedrock_data_source_id="$(
-    aws cloudformation describe-stacks \
-        --stack-name PaperBuddyDev \
-        --query "Stacks[0].Outputs[?OutputKey=='BedrockDataSourceId'].OutputValue | [0]" \
-        --output text
-)"
-```
-
-同期処理を開始する。
-
-```sh
-ingestion_job_id="$(
-    aws bedrock-agent start-ingestion-job \
-        --knowledge-base-id "$bedrock_knowledge_base_id" \
-        --data-source-id "$bedrock_data_source_id" \
-        --query 'ingestionJob.ingestionJobId' \
-        --output text
-)"
-```
-
-同期状態を確認する。
-
-```sh
-aws bedrock-agent get-ingestion-job \
-  --knowledge-base-id "$bedrock_knowledge_base_id" \
-  --data-source-id "$bedrock_data_source_id" \
-  --ingestion-job-id "$ingestion_job_id" \
-  --query 'ingestionJob.{Status:status,Statistics:statistics,FailureReasons:failureReasons}' \
-  --output json
-```
-
-`Status`が`COMPLETE`になることを確認する。`FAILED`の場合は`FailureReasons`を確認する。
-
-### アプリケーション動作確認
+## アプリケーション動作確認
 
 1. CloudFrontドメインへアクセスする
 2. Cognitoで新規登録またはログインする
@@ -369,22 +207,6 @@ aws cloudformation describe-stack-events \
   --output table
 ```
 
-ECSやロググループの物理名はCloudFormationまたはAWSコンソールから確認する。
-
-## 差分デプロイ
-
-バックエンド、フロントエンド、インフラ定義を変更した場合:
-
-```sh
-mise run lint
-mise run frontend:test
-mise run backend:test
-mise run infra:test
-mise run infra:deploy:dev
-```
-
-PDFだけを変更した場合、CDKデプロイは不要である。S3への同期とKnowledge Base同期のみ実行する。
-
 ### デプロイ失敗時
 
 CloudFormationイベントを確認する。
@@ -400,26 +222,7 @@ aws cloudformation describe-stack-events \
 
 - Docker Desktopが起動しているか
 - AWS認証の有効期限が切れていないか
-- `infra/.env`のリージョンとBedrockモデルARNが正しいか
+- `infra/.env`のリージョンとBedrock生成モデル識別子が正しいか
 - Bedrockモデルが対象アカウント・リージョンで利用可能か
 - OpenSearch ServerlessやVPC Endpointのクォータに余裕があるか
 - 作成しようとしている固定名リソースが既に存在しないか
-
-## 削除と料金
-
-PaperBuddyに起因する課金対象をすべて削除する場合は、[AWS完全削除手順](deletion-guide.md)に従う。
-
-この構成では、特に以下のリソースで継続的な料金が発生する。
-
-- OpenSearch Serverless
-- Interface VPC Endpoint
-- ECS Fargate
-- ALB
-- CloudFront
-- Bedrockモデル呼び出し
-
-初回デプロイ前に料金を確認すること。
-
-DynamoDBテーブルは削除保護を有効化している。DynamoDBテーブル、S3バケット、Cognito User Poolなど一部リソースには保持ポリシーを設定しているため、スタック削除後も残る場合がある。
-
-保持データや本番相当データを削除する場合は、対象と影響範囲を確認してから個別に実施する。

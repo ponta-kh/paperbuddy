@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="開発環境の完全初回デプロイ、RAG材料PDF同期、Knowledge Base同期を一括実行する"
+
+set -euo pipefail
+
+echo "完全初回デプロイを開始します"
+mise run deploy:dev
+
+echo
+echo "RAG材料PDFを同期し、Knowledge Base同期を開始します"
+mise run rag:sync:dev
+
+echo
+echo "完全初回デプロイが完了しました"
