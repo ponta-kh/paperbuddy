@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ListIndexedFilesUseCase:
-    """RAG検索対象として登録済みのファイル一覧を取得するユースケース。"""
+    """RAG検索対象として登録済みの論文一覧を取得するユースケース。"""
 
     def __init__(
         self, indexed_file_query_repository: IndexedFileQueryRepositoryProtocol
@@ -22,7 +22,7 @@ class ListIndexedFilesUseCase:
         self._indexed_file_query_repository = indexed_file_query_repository
 
     async def execute(self, query: ListIndexedFilesInput) -> ListIndexedFilesOutput:
-        """インデックス済みファイル一覧をカテゴリ名とファイル名の昇順で返す。
+        """インデックス済みファイル一覧をカテゴリ名と論文名の昇順で返す。
 
         Raises:
             RepositoryAccessError: ファイル一覧の取得に失敗した場合。

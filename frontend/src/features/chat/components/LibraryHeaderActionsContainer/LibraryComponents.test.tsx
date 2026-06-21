@@ -34,7 +34,7 @@ describe("LibraryFileList", () => {
                     {
                         id: "00000000-0000-0000-0000-000000000001",
                         s3Key: "papers/a.pdf",
-                        name: "paper-a.pdf",
+                        name: "paper-a",
                         category: "LLM",
                         status: "indexed",
                         s3UploadedAt: "2026-01-01T00:00:00Z",
@@ -43,7 +43,7 @@ describe("LibraryFileList", () => {
                     {
                         id: "00000000-0000-0000-0000-000000000002",
                         s3Key: "papers/b.pdf",
-                        name: "paper-b.pdf",
+                        name: "paper-b",
                         category: "経済",
                         status: "processing",
                         s3UploadedAt: "2026-01-03T00:00:00Z",
@@ -55,16 +55,17 @@ describe("LibraryFileList", () => {
             />,
         );
 
-        expect(screen.getByText("PDF名称")).toBeInTheDocument();
+        expect(screen.getByText("論文名")).toBeInTheDocument();
         expect(screen.getByText("分類")).toBeInTheDocument();
         expect(screen.getByText("アップロード日")).toBeInTheDocument();
-        expect(screen.getByText("paper-a.pdf")).toBeInTheDocument();
-        expect(screen.getByText("paper-b.pdf")).toBeInTheDocument();
+        expect(screen.getByText("paper-a")).toBeInTheDocument();
+        expect(screen.getByText("paper-b")).toBeInTheDocument();
         expect(screen.getByText("LLM")).toBeInTheDocument();
         expect(screen.getByText("経済")).toBeInTheDocument();
         expect(screen.queryByText("ID")).not.toBeInTheDocument();
         expect(screen.queryByText("S3 Key")).not.toBeInTheDocument();
         expect(screen.queryByText("papers/a.pdf")).not.toBeInTheDocument();
+        expect(screen.queryByText("paper-a.pdf")).not.toBeInTheDocument();
         expect(screen.queryByText("processing")).not.toBeInTheDocument();
     });
 

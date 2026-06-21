@@ -26,7 +26,7 @@ describe("library catalog sync", () => {
                     /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
                 ),
                 s3Key: "documents/Finance/Report.PDF",
-                fileName: "Report.PDF",
+                paperTitle: "Report",
                 category: "Finance",
                 status: "uploaded",
                 s3UploadedAt: "2026-01-02T03:04:05Z",
@@ -36,7 +36,7 @@ describe("library catalog sync", () => {
                     /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
                 ),
                 s3Key: "documents/IT/RAG Survey.pdf",
-                fileName: "RAG Survey.pdf",
+                paperTitle: "RAG Survey",
                 category: "IT",
                 status: "uploaded",
                 s3UploadedAt: "2026-01-01T00:00:00Z",
@@ -77,8 +77,8 @@ describe("library catalog sync", () => {
             S: "documents/IT/RAG Survey.pdf",
         });
         expect(requests[0].PutRequest?.Item.category).toEqual({ S: "IT" });
-        expect(requests[0].PutRequest?.Item.file_name).toEqual({
-            S: "RAG Survey.pdf",
+        expect(requests[0].PutRequest?.Item.paper_title).toEqual({
+            S: "RAG Survey",
         });
         expect(requests[0].PutRequest?.Item.rag_indexed_at).toBeUndefined();
         expect(requests[1]).toEqual({

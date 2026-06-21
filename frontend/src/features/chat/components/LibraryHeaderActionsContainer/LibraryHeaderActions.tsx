@@ -36,7 +36,7 @@ export function LibraryHeaderActions({
                 <LibraryButton onClick={() => onLibraryOpenChange(true)} />
             </div>
             <Sheet open={libraryOpen} onOpenChange={onLibraryOpenChange}>
-                <SheetContent className="w-full sm:max-w-md">
+                <SheetContent className="!w-full sm:!w-[720px] sm:!max-w-[720px]">
                     <SheetHeader>
                         <SheetTitle>ライブラリ</SheetTitle>
                         <SheetDescription>
