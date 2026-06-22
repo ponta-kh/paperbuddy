@@ -19,7 +19,7 @@
 - レコードには少なくとも次の属性を持つ
   - `source_id`
   - `s3_key`
-  - `file_name`
+  - `paper_title`
   - `category`
   - `status`
   - `s3_uploaded_at`
@@ -29,7 +29,7 @@
 
 - `Scan` で全件取得する
 - 1MBを超える場合はページネーションを継続する
-- 取得後にApplication層で `category`、`file_name` の昇順へ整列する
+- 取得後にApplication層で `category`、`paper_title` の昇順へ整列する
 
 ## 5. 変換ルール
 

@@ -47,7 +47,7 @@ class DynamoDbIndexedFileQueryRepository:
         scan_kwargs: dict[str, Any] = {
             "TableName": self._table_name,
             "ProjectionExpression": (
-                "source_id, s3_key, file_name, category, #status, "
+                "source_id, s3_key, paper_title, category, #status, "
                 "s3_uploaded_at, rag_indexed_at"
             ),
             "ExpressionAttributeNames": {"#status": "status"},
@@ -72,7 +72,7 @@ class DynamoDbIndexedFileQueryRepository:
         return IndexedFile(
             source_id=UUID(str(item["source_id"])),
             s3_key=str(item["s3_key"]),
-            name=str(item["file_name"]),
+            name=str(item["paper_title"]),
             category=str(item["category"]),
             status=str(item["status"]),
             s3_uploaded_at=DynamoDbIndexedFileQueryRepository._parse_datetime(

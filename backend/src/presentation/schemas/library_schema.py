@@ -9,7 +9,7 @@ class IndexedFileResponse(BaseModel):
 
     source_id: UUID = Field(description="データソース識別子")
     s3_key: str = Field(description="S3オブジェクトキー")
-    name: str = Field(description="RAGへ取り込み済みのファイル名")
+    name: str = Field(description="RAGへ取り込み済みの論文名")
     category: str = Field(description="書類分類")
     status: str = Field(description="取り込みステータス")
     s3_uploaded_at: datetime = Field(description="S3アップロード日時")

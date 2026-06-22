@@ -48,18 +48,18 @@ export function LibraryFileList({
 
     return (
         <div className="px-3 py-4">
-            <Table>
+            <Table className="table-fixed">
                 <TableHeader>
                     <TableRow>
-                        <TableHead>PDF名称</TableHead>
-                        <TableHead>分類</TableHead>
-                        <TableHead>アップロード日</TableHead>
+                        <TableHead className="w-[58%]">論文名</TableHead>
+                        <TableHead className="w-[18%]">分類</TableHead>
+                        <TableHead className="w-[24%]">アップロード日</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {files.map((file) => (
                         <TableRow key={file.id}>
-                            <TableCell className="max-w-80 truncate text-[#43584f]">
+                            <TableCell className="whitespace-normal break-words text-[#43584f]">
                                 {file.name}
                             </TableCell>
                             <TableCell className="text-[#43584f]">

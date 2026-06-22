@@ -19,7 +19,7 @@ def _item(
     *,
     source_id: str,
     s3_key: str,
-    file_name: str,
+    paper_title: str,
     category: str,
     status: str,
     s3_uploaded_at: str,
@@ -28,7 +28,7 @@ def _item(
     item: dict[str, dict[str, str]] = {
         "source_id": {"S": source_id},
         "s3_key": {"S": s3_key},
-        "file_name": {"S": file_name},
+        "paper_title": {"S": paper_title},
         "category": {"S": category},
         "status": {"S": status},
         "s3_uploaded_at": {"S": s3_uploaded_at},
@@ -47,7 +47,7 @@ async def test_list_indexed_files_returns_all_items() -> None:
                 _item(
                     source_id="00000000-0000-0000-0000-000000000002",
                     s3_key="papers/b.pdf",
-                    file_name="paper-b.pdf",
+                    paper_title="paper-b",
                     category="経済",
                     status="indexed",
                     s3_uploaded_at="2026-01-02T00:00:00Z",
@@ -61,7 +61,7 @@ async def test_list_indexed_files_returns_all_items() -> None:
                 _item(
                     source_id="00000000-0000-0000-0000-000000000001",
                     s3_key="papers/a.pdf",
-                    file_name="paper-a.pdf",
+                    paper_title="paper-a",
                     category="LLM",
                     status="processing",
                     s3_uploaded_at="2026-01-01T00:00:00Z",
