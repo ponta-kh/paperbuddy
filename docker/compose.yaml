@@ -27,6 +27,17 @@ services:
       - dynamodb-local
     restart: "no"
 
+  dynamodb-seed:
+    image: amazon/aws-cli:latest
+    entrypoint: ["/bin/sh", "/docker/dynamodb/seed.sh"]
+    volumes:
+      - ./dynamodb/seed.sh:/docker/dynamodb/seed.sh:ro
+    environment: *dynamodb-local-environment
+    depends_on:
+      dynamodb-init:
+        condition: service_completed_successfully
+    restart: "no"
+
   backend:
     build:
       context: ..
@@ -44,7 +55,7 @@ services:
       CHAT_INFRASTRUCTURE_MODE: local
       SIMULATED_LLM_DELAY_SECONDS: "2"
     depends_on:
-      dynamodb-init:
+      dynamodb-seed:
         condition: service_completed_successfully
     ports:
       - "8000:8000"

@@ -87,7 +87,7 @@ PaperBuddyが使用するDynamoDBテーブルのスキーマを定義する。
 | `pk` | String | パーティションキー |
 | `sk` | String | ソートキー |
 
-### PDFソース項目
+### 論文ソース項目
 
 | 項目 | 型 | 値 |
 |---|---|---|
@@ -95,7 +95,7 @@ PaperBuddyが使用するDynamoDBテーブルのスキーマを定義する。
 | `sk` | String | `SOURCE` |
 | `source_id` | String | S3キーから生成したUUID v5 |
 | `s3_key` | String | RAG材料PDFのS3キー。`documents/[分類]/[ファイル名]` |
-| `file_name` | String | PDFファイル名 |
+| `paper_title` | String | 論文名。拡張子`.pdf`は含めない |
 | `category` | String | `infra/pdf/[分類]/`の分類名 |
 | `status` | String | `uploaded` |
 | `s3_uploaded_at` | String | S3アップロード日時。UTCのISO 8601日時 |

@@ -12,7 +12,7 @@ export interface S3ObjectSummary {
 export interface LibraryCatalogItem {
     readonly sourceId: string;
     readonly s3Key: string;
-    readonly fileName: string;
+    readonly paperTitle: string;
     readonly category: string;
     readonly status: string;
     readonly s3UploadedAt: string;
@@ -53,7 +53,7 @@ export function buildCatalogItems(
             return {
                 sourceId: uuidV5(object.key, SOURCE_ID_NAMESPACE),
                 s3Key: object.key,
-                fileName,
+                paperTitle: removePdfExtension(fileName),
                 category,
                 status: CATALOG_STATUS,
                 s3UploadedAt: formatDynamoDbDateTime(object.lastModified),
@@ -74,7 +74,7 @@ export function buildCatalogWriteRequests(
                 sk: { S: "SOURCE" },
                 source_id: { S: item.sourceId },
                 s3_key: { S: item.s3Key },
-                file_name: { S: item.fileName },
+                paper_title: { S: item.paperTitle },
                 category: { S: item.category },
                 status: { S: item.status },
                 s3_uploaded_at: { S: item.s3UploadedAt },
@@ -162,6 +162,10 @@ export function chunkRequests<T>(items: readonly T[], size: number): T[][] {
 
 function isPdfKey(key: string): boolean {
     return key.startsWith(DATA_SOURCE_PREFIX) && /\.pdf$/i.test(key);
+}
+
+function removePdfExtension(fileName: string): string {
+    return fileName.replace(/\.pdf$/i, "");
 }
 
 function formatDynamoDbDateTime(value: string): string {
