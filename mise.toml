@@ -1,2 +1,2 @@
-[tools]
-node = "26.3.0"
+[settings]
+idiomatic_version_file_enable_tools = ["node"]

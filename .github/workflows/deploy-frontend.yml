@@ -1,0 +1,133 @@
+name: Deploy Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack-name:
+        description: "デプロイ対象のCloudFormationスタック名"
+        required: true
+        default: "PaperBuddyDev"
+      aws-region:
+        description: "デプロイ対象のAWSリージョン"
+        required: true
+        default: "ap-northeast-1"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-frontend-${{ inputs['stack-name'] }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: フロントエンドをデプロイ
+    runs-on: ubuntu-latest
+    steps:
+      - name: ソースコードを取得
+        uses: actions/checkout@v4
+
+      - name: pnpm をセットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.3.0
+          cache: pnpm
+
+      - name: 依存関係をインストール
+        run: pnpm install --frozen-lockfile
+
+      - name: フロントエンドをビルド
+        run: pnpm --filter frontend build
+
+      - name: AWS認証を設定
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs['aws-region'] }}
+
+      - name: フロントエンド成果物を配置
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stack_name="${{ inputs['stack-name'] }}"
+          region="${{ inputs['aws-region'] }}"
+
+          frontend_bucket_name="$(
+            aws cloudformation describe-stacks \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue | [0]" \
+              --output text
+          )"
+          distribution_domain_name="$(
+            aws cloudformation describe-stacks \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue | [0]" \
+              --output text
+          )"
+          user_pool_id="$(
+            aws cloudformation describe-stacks \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
+              --output text
+          )"
+          user_pool_client_id="$(
+            aws cloudformation describe-stacks \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue | [0]" \
+              --output text
+          )"
+          distribution_id="$(
+            aws cloudfront list-distributions \
+              --query "DistributionList.Items[?DomainName=='${distribution_domain_name}'].Id | [0]" \
+              --output text
+          )"
+
+          jq -n \
+            --arg userPoolId "$user_pool_id" \
+            --arg userPoolClientId "$user_pool_client_id" \
+            '{userPoolId: $userPoolId, userPoolClientId: $userPoolClientId}' \
+            > frontend/dist/auth-config.json
+
+          aws s3 sync frontend/dist "s3://${frontend_bucket_name}" --delete
+          aws cloudfront create-invalidation \
+            --distribution-id "$distribution_id" \
+            --paths "/*"
+
+          echo "デプロイ先: https://${distribution_domain_name}"
+
+  verify:
+    name: デプロイ結果を確認
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: AWS認証を設定
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs['aws-region'] }}
+
+      - name: CloudFront経由でヘルスチェック
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          distribution_domain_name="$(
+            aws cloudformation describe-stacks \
+              --region "${{ inputs['aws-region'] }}" \
+              --stack-name "${{ inputs['stack-name'] }}" \
+              --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue | [0]" \
+              --output text
+          )"
+
+          curl --fail-with-body "https://${distribution_domain_name}/api/health"
