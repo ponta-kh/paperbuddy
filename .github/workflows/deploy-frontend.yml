@@ -16,6 +16,9 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  PNPM_VERSION: "10"
+
 concurrency:
   group: deploy-frontend-${{ inputs['stack-name'] }}
   cancel-in-progress: false
@@ -31,12 +34,12 @@ jobs:
       - name: pnpm をセットアップ
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Node.js をセットアップ
         uses: actions/setup-node@v4
         with:
-          node-version: 26.3.0
+          node-version-file: .node-version
           cache: pnpm
 
       - name: 依存関係をインストール
