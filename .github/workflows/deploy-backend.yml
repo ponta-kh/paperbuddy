@@ -4,24 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       stack-name:
-        description: "デプロイ対象のCloudFormationスタック名"
+        description: "参照するCloudFormationスタック名"
         required: true
         default: "PaperBuddyDev"
       aws-region:
         description: "デプロイ対象のAWSリージョン"
         required: true
         default: "ap-northeast-1"
-      bedrock-generation-model-identifier:
-        description: "Bedrock生成モデル識別子"
-        required: true
-        default: "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 permissions:
   contents: read
   id-token: write
-
-env:
-  PNPM_VERSION: "10"
 
 concurrency:
   group: deploy-backend-${{ inputs['stack-name'] }}
@@ -35,33 +28,11 @@ jobs:
       - name: ソースコードを取得
         uses: actions/checkout@v4
 
-      - name: pnpm をセットアップ
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
+      - name: QEMUをセットアップ
+        uses: docker/setup-qemu-action@v3
 
-      - name: Node.js をセットアップ
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-
-      - name: 依存関係をインストール
-        run: pnpm install --frozen-lockfile
-
-      - name: CDK設定ファイルを作成
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cat > infra/.env <<'EOF'
-          STACK_NAME=${{ inputs['stack-name'] }}
-          AWS_REGION=${{ inputs['aws-region'] }}
-          BEDROCK_GENERATION_MODEL_IDENTIFIER=${{ inputs['bedrock-generation-model-identifier'] }}
-          EOF
-
-      - name: フロントエンドassetを準備
-        run: pnpm --filter frontend build
+      - name: Docker Buildxをセットアップ
+        uses: docker/setup-buildx-action@v3
 
       - name: AWS認証を設定
         uses: aws-actions/configure-aws-credentials@v4
@@ -69,9 +40,154 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ inputs['aws-region'] }}
 
-      - name: バックエンドをhotswapデプロイ
-        working-directory: infra
-        run: pnpm cdk deploy "${{ inputs['stack-name'] }}" --hotswap --require-approval never
+      - name: ECSデプロイ情報を取得
+        id: deploy_info
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stack_name="${{ inputs['stack-name'] }}"
+          region="${{ inputs['aws-region'] }}"
+
+          cluster_ref="$(
+            aws cloudformation list-stack-resources \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "StackResourceSummaries[?ResourceType=='AWS::ECS::Cluster'].PhysicalResourceId | [0]" \
+              --output text
+          )"
+          service_ref="$(
+            aws cloudformation list-stack-resources \
+              --region "$region" \
+              --stack-name "$stack_name" \
+              --query "StackResourceSummaries[?ResourceType=='AWS::ECS::Service'].PhysicalResourceId | [0]" \
+              --output text
+          )"
+
+          if [[ "$cluster_ref" == "None" || -z "$cluster_ref" ]]; then
+            echo "ECS Clusterが見つかりません: ${stack_name}" >&2
+            exit 1
+          fi
+          if [[ "$service_ref" == "None" || -z "$service_ref" ]]; then
+            echo "ECS Serviceが見つかりません: ${stack_name}" >&2
+            exit 1
+          fi
+
+          task_definition_arn="$(
+            aws ecs describe-services \
+              --region "$region" \
+              --cluster "$cluster_ref" \
+              --services "$service_ref" \
+              --query "services[0].taskDefinition" \
+              --output text
+          )"
+          container_name="$(
+            aws ecs describe-task-definition \
+              --region "$region" \
+              --task-definition "$task_definition_arn" \
+              --query "taskDefinition.containerDefinitions[0].name" \
+              --output text
+          )"
+          current_image="$(
+            aws ecs describe-task-definition \
+              --region "$region" \
+              --task-definition "$task_definition_arn" \
+              --query "taskDefinition.containerDefinitions[?name=='${container_name}'].image | [0]" \
+              --output text
+          )"
+
+          if [[ "$current_image" == *"@"* ]]; then
+            repository_uri="${current_image%@*}"
+          else
+            repository_uri="${current_image%:*}"
+          fi
+          image_uri="${repository_uri}:${GITHUB_SHA}"
+
+          echo "cluster_ref=${cluster_ref}" >> "$GITHUB_OUTPUT"
+          echo "service_ref=${service_ref}" >> "$GITHUB_OUTPUT"
+          echo "task_definition_arn=${task_definition_arn}" >> "$GITHUB_OUTPUT"
+          echo "container_name=${container_name}" >> "$GITHUB_OUTPUT"
+          echo "repository_uri=${repository_uri}" >> "$GITHUB_OUTPUT"
+          echo "image_uri=${image_uri}" >> "$GITHUB_OUTPUT"
+
+      - name: ECRへログイン
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          registry="${{ steps.deploy_info.outputs.repository_uri }}"
+          registry="${registry%%/*}"
+
+          aws ecr get-login-password \
+            --region "${{ inputs['aws-region'] }}" \
+            | docker login --username AWS --password-stdin "$registry"
+
+      - name: バックエンドイメージをビルドして送信
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.deploy_info.outputs.image_uri }}
+
+      - name: ECSタスク定義を更新
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          region="${{ inputs['aws-region'] }}"
+          container_name="${{ steps.deploy_info.outputs.container_name }}"
+          image_uri="${{ steps.deploy_info.outputs.image_uri }}"
+
+          aws ecs describe-task-definition \
+            --region "$region" \
+            --task-definition "${{ steps.deploy_info.outputs.task_definition_arn }}" \
+            > current-task-definition.json
+
+          jq \
+            --arg container_name "$container_name" \
+            --arg image_uri "$image_uri" \
+            '.taskDefinition
+              | del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy
+                )
+              | .containerDefinitions = (
+                  .containerDefinitions
+                  | map(
+                      if .name == $container_name
+                      then .image = $image_uri
+                      else .
+                      end
+                    )
+                )' \
+            current-task-definition.json \
+            > new-task-definition.json
+
+          new_task_definition_arn="$(
+            aws ecs register-task-definition \
+              --region "$region" \
+              --cli-input-json file://new-task-definition.json \
+              --query "taskDefinition.taskDefinitionArn" \
+              --output text
+          )"
+
+          aws ecs update-service \
+            --region "$region" \
+            --cluster "${{ steps.deploy_info.outputs.cluster_ref }}" \
+            --service "${{ steps.deploy_info.outputs.service_ref }}" \
+            --task-definition "$new_task_definition_arn"
+
+          aws ecs wait services-stable \
+            --region "$region" \
+            --cluster "${{ steps.deploy_info.outputs.cluster_ref }}" \
+            --services "${{ steps.deploy_info.outputs.service_ref }}"
 
   verify:
     name: デプロイ結果を確認
