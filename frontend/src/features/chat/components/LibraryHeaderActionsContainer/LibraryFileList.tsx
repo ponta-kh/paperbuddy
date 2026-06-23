@@ -53,7 +53,9 @@ export function LibraryFileList({
                     <TableRow>
                         <TableHead className="w-[58%]">論文名</TableHead>
                         <TableHead className="w-[18%]">分類</TableHead>
-                        <TableHead className="w-[24%]">アップロード日</TableHead>
+                        <TableHead className="w-[24%]">
+                            アップロード日
+                        </TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
