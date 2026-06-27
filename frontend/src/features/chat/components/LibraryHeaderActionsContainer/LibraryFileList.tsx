@@ -1,5 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
+import { SearchEmptyState } from "@/components/SearchEmptyState";
 import {
     Table,
     TableBody,
@@ -40,9 +41,10 @@ export function LibraryFileList({
 
     if (files.length === 0) {
         return (
-            <p className="px-4 py-6 text-sm text-[#74837d]">
-                RAGへ取り込み済みのファイルはありません。
-            </p>
+            <SearchEmptyState
+                message="RAGへ取り込み済みのファイルはありません。"
+                className="px-4 py-6 text-sm"
+            />
         );
     }
 

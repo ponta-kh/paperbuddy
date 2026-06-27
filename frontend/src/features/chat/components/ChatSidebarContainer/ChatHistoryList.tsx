@@ -1,4 +1,5 @@
 import { LoaderCircle, MessageSquareText } from "lucide-react";
+import { SearchEmptyState } from "@/components/SearchEmptyState";
 import { ScrollArea } from "@/components/shadcn/scroll-area";
 import type { ChatGroup } from "@/features/chat/utils/chat-data";
 import { cn } from "@/lib/utils";
@@ -38,9 +39,10 @@ export function ChatHistoryList({
                     </p>
                 )}
                 {!isLoading && !chatsError && chatCount === 0 && (
-                    <p className="px-3 py-2 text-xs leading-5 text-[#87948f]">
-                        まだチャット履歴がありません。
-                    </p>
+                    <SearchEmptyState
+                        message="まだチャット履歴がありません。"
+                        className="px-3 py-2 text-xs"
+                    />
                 )}
                 {!isLoading &&
                     !chatsError &&

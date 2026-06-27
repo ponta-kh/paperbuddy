@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
+import { ChatHistoryList } from "@/features/chat/components/ChatSidebarContainer/ChatHistoryList";
 import { IndexedPaperCount } from "@/features/chat/components/LibraryHeaderActionsContainer/IndexedPaperCount";
 import { LibraryButton } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryButton";
 import { LibraryFileList } from "@/features/chat/components/LibraryHeaderActionsContainer/LibraryFileList";
@@ -76,6 +77,23 @@ describe("LibraryFileList", () => {
 
         expect(
             screen.getByText("RAGへ取り込み済みのファイルはありません。"),
+        ).toBeInTheDocument();
+    });
+});
+
+describe("ChatHistoryList", () => {
+    test("空一覧の場合は共通の空状態を表示する", () => {
+        render(
+            <ChatHistoryList
+                chatGroups={[]}
+                chatsError={false}
+                isLoading={false}
+                onChatSelect={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.getByText("まだチャット履歴がありません。"),
         ).toBeInTheDocument();
     });
 });
