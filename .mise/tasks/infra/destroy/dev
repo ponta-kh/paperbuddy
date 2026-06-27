@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-#MISE description="開発環境のPaperBuddy本体AWSリソースとCDK bootstrap資産を削除する"
+#MISE description="開発環境のPaperBuddy本体AWSリソースを完全削除する"
 
 set -euo pipefail
 
 readonly ENV_FILE="infra/.env"
-readonly BOOTSTRAP_STACK_NAME="CDKToolkit"
+readonly STAGE_NAME="dev"
+readonly RESOURCE_NAME_PREFIX="paperbuddy-${STAGE_NAME}"
 readonly STACK_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-stack.XXXXXX.json)"
 readonly STACK_RESOURCES_FILE="$(mktemp /tmp/paperbuddy-stack-resources.XXXXXX.json)"
-readonly BOOTSTRAP_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-bootstrap-stack.XXXXXX.json)"
 
 cleanup() {
-  rm -f "$STACK_SNAPSHOT_FILE" "$STACK_RESOURCES_FILE" "$BOOTSTRAP_SNAPSHOT_FILE"
+  rm -f "$STACK_SNAPSHOT_FILE" "$STACK_RESOURCES_FILE"
 }
 trap cleanup EXIT
 
@@ -44,14 +44,6 @@ output_value() {
   jq -r --arg key "$key" \
     '.Stacks[0].Outputs[]? | select(.OutputKey == $key) | .OutputValue' \
     "$STACK_SNAPSHOT_FILE"
-}
-
-bootstrap_output_value() {
-  local key="$1"
-
-  jq -r --arg key "$key" \
-    '.Stacks[0].Outputs[]? | select(.OutputKey == $key) | .OutputValue' \
-    "$BOOTSTRAP_SNAPSHOT_FILE"
 }
 
 stack_resource_ids_by_type() {
@@ -182,77 +174,339 @@ delete_log_group() {
     || true
 }
 
-delete_ecr_repository_images() {
-  local repository_name="$1"
-  local image_ids
-  local image_count
+delete_log_groups_by_prefix() {
+  local prefix="$1"
+  local log_group_name
 
-  [[ -z "$repository_name" || "$repository_name" == "null" ]] && return
+  while IFS= read -r log_group_name; do
+    [[ -z "$log_group_name" || "$log_group_name" == "None" ]] && continue
+    delete_log_group "$log_group_name"
+  done < <(
+    aws logs describe-log-groups \
+      --log-group-name-prefix "$prefix" \
+      --region "$AWS_REGION" \
+      --query 'logGroups[].logGroupName' \
+      --output text \
+    | tr '\t' '\n'
+  )
+}
 
-  if ! aws ecr describe-repositories \
-    --repository-names "$repository_name" \
+delete_bedrock_knowledge_base() {
+  local knowledge_base_id="$1"
+  local data_source_id
+  local remaining_data_sources
+
+  [[ -z "$knowledge_base_id" || "$knowledge_base_id" == "null" ]] && return
+
+  if ! aws bedrock-agent get-knowledge-base \
+    --knowledge-base-id "$knowledge_base_id" \
     --region "$AWS_REGION" \
     >/dev/null 2>&1; then
-    echo "ECRリポジトリは存在しないためスキップします: ${repository_name}"
+    echo "Bedrock Knowledge Baseは存在しないためスキップします: ${knowledge_base_id}"
     return
   fi
 
-  echo "ECRイメージを削除します: ${repository_name}"
-  while true; do
-    image_ids="$(
-      aws ecr list-images \
-        --repository-name "$repository_name" \
-        --region "$AWS_REGION" \
-        --query 'imageIds[0:100]' \
-        --output json
-    )"
-    image_count="$(jq 'length' <<< "$image_ids")"
-    [[ "$image_count" -eq 0 ]] && break
-
-    aws ecr batch-delete-image \
-      --repository-name "$repository_name" \
+  while IFS= read -r data_source_id; do
+    [[ -z "$data_source_id" || "$data_source_id" == "None" ]] && continue
+    echo "Bedrock Data Sourceを削除します: ${data_source_id}"
+    aws bedrock-agent delete-data-source \
+      --knowledge-base-id "$knowledge_base_id" \
+      --data-source-id "$data_source_id" \
       --region "$AWS_REGION" \
-      --image-ids "$image_ids" \
-      > /dev/null
+      > /dev/null \
+      || true
+  done < <(
+    aws bedrock-agent list-data-sources \
+      --knowledge-base-id "$knowledge_base_id" \
+      --region "$AWS_REGION" \
+      --query 'dataSourceSummaries[].dataSourceId' \
+      --output text \
+    | tr '\t' '\n'
+  )
+
+  for _ in {1..60}; do
+    remaining_data_sources="$(
+      aws bedrock-agent list-data-sources \
+        --knowledge-base-id "$knowledge_base_id" \
+        --region "$AWS_REGION" \
+        --query 'length(dataSourceSummaries)' \
+        --output text 2>/dev/null || printf '0'
+    )"
+    [[ "$remaining_data_sources" == "0" ]] && break
+    sleep 5
+  done
+
+  echo "Bedrock Knowledge Baseを削除します: ${knowledge_base_id}"
+  aws bedrock-agent delete-knowledge-base \
+    --knowledge-base-id "$knowledge_base_id" \
+    --region "$AWS_REGION" \
+    > /dev/null \
+    || true
+}
+
+delete_bedrock_knowledge_bases_by_name() {
+  local knowledge_base_name="$1"
+  local knowledge_base_id
+
+  while IFS= read -r knowledge_base_id; do
+    [[ -z "$knowledge_base_id" || "$knowledge_base_id" == "None" ]] && continue
+    delete_bedrock_knowledge_base "$knowledge_base_id"
+  done < <(
+    aws bedrock-agent list-knowledge-bases \
+      --region "$AWS_REGION" \
+      --query "knowledgeBaseSummaries[?name=='${knowledge_base_name}'].knowledgeBaseId" \
+      --output text \
+    | tr '\t' '\n'
+  )
+}
+
+delete_aoss_collection() {
+  local collection_name="$1"
+  local collection_id
+
+  [[ -z "$collection_name" || "$collection_name" == "null" ]] && return
+
+  collection_id="$(
+    aws opensearchserverless list-collections \
+      --region "$AWS_REGION" \
+      --query "collectionSummaries[?name=='${collection_name}'].id | [0]" \
+      --output text
+  )"
+
+  if [[ -z "$collection_id" || "$collection_id" == "None" ]]; then
+    echo "OpenSearch Serverless Collectionは存在しないためスキップします: ${collection_name}"
+    return
+  fi
+
+  echo "OpenSearch Serverless Collectionを削除します: ${collection_name}"
+  aws opensearchserverless delete-collection \
+    --id "$collection_id" \
+    --region "$AWS_REGION" \
+    > /dev/null \
+    || true
+
+  for _ in {1..120}; do
+    collection_id="$(
+      aws opensearchserverless list-collections \
+        --region "$AWS_REGION" \
+        --query "collectionSummaries[?name=='${collection_name}'].id | [0]" \
+        --output text
+    )"
+    [[ -z "$collection_id" || "$collection_id" == "None" ]] && break
+    sleep 5
   done
 }
 
-delete_bootstrap_resources() {
-  local bootstrap_bucket_name
-  local bootstrap_repository_name
+delete_aoss_policy() {
+  local policy_type="$1"
+  local policy_name="$2"
 
-  if ! aws cloudformation describe-stacks \
-    --stack-name "$BOOTSTRAP_STACK_NAME" \
+  [[ -z "$policy_name" || "$policy_name" == "null" ]] && return
+
+  echo "OpenSearch Serverless ${policy_type} policyを削除します: ${policy_name}"
+  aws opensearchserverless delete-security-policy \
+    --type "$policy_type" \
+    --name "$policy_name" \
     --region "$AWS_REGION" \
-    --output json \
-    > "$BOOTSTRAP_SNAPSHOT_FILE" 2>/dev/null; then
-    echo "CDK bootstrapスタックは存在しないためスキップします: ${BOOTSTRAP_STACK_NAME}"
-    return
+    > /dev/null \
+    || true
+}
+
+delete_aoss_access_policy() {
+  local policy_name="$1"
+
+  [[ -z "$policy_name" || "$policy_name" == "null" ]] && return
+
+  echo "OpenSearch Serverless access policyを削除します: ${policy_name}"
+  aws opensearchserverless delete-access-policy \
+    --type data \
+    --name "$policy_name" \
+    --region "$AWS_REGION" \
+    > /dev/null \
+    || true
+}
+
+delete_tagged_stack_resources() {
+  local resource_arn
+  local resource_id
+  local log_group_name
+  local bucket_name
+  local collection_id
+
+  while IFS= read -r resource_arn; do
+    [[ -z "$resource_arn" || "$resource_arn" == "None" ]] && continue
+
+    case "$resource_arn" in
+      arn:aws:cognito-idp:*:*:userpool/*)
+        resource_id="${resource_arn##*/}"
+        if aws cognito-idp describe-user-pool \
+          --user-pool-id "$resource_id" \
+          --region "$AWS_REGION" \
+          >/dev/null 2>&1; then
+          echo "タグ付きCognito User Poolを削除します: ${resource_id}"
+          aws cognito-idp delete-user-pool \
+            --user-pool-id "$resource_id" \
+            --region "$AWS_REGION" \
+            || true
+        fi
+        ;;
+      arn:aws:logs:*:*:log-group:*)
+        log_group_name="${resource_arn#*:log-group:}"
+        log_group_name="${log_group_name%%:*}"
+        delete_log_group "$log_group_name"
+        ;;
+      arn:aws:dynamodb:*:*:table/*)
+        resource_id="${resource_arn##*/}"
+        delete_dynamodb_table "$resource_id"
+        ;;
+      arn:aws:s3:::*)
+        bucket_name="${resource_arn#arn:aws:s3:::}"
+        bucket_name="${bucket_name%%/*}"
+        delete_s3_bucket "$bucket_name"
+        ;;
+      arn:aws:aoss:*:*:collection/*)
+        collection_id="${resource_arn##*/}"
+        if aws opensearchserverless batch-get-collection \
+          --ids "$collection_id" \
+          --region "$AWS_REGION" \
+          --query 'collectionDetails[0].id' \
+          --output text >/dev/null 2>&1; then
+          echo "タグ付きOpenSearch Serverless Collectionを削除します: ${collection_id}"
+          aws opensearchserverless delete-collection \
+            --id "$collection_id" \
+            --region "$AWS_REGION" \
+            > /dev/null \
+            || true
+        fi
+        ;;
+      *)
+        echo "タグ付きリソースの自動削除対象外です: ${resource_arn}"
+        ;;
+    esac
+  done < <(
+    aws resourcegroupstaggingapi get-resources \
+      --region "$AWS_REGION" \
+      --tag-filters Key=aws:cloudformation:stack-name,Values="$STACK_NAME" \
+      --query 'ResourceTagMappingList[].ResourceARN' \
+      --output text 2>/dev/null \
+    | tr '\t' '\n'
+  )
+}
+
+remaining_resource_lines() {
+  local lines=()
+  local value
+
+  for value in "$CHAT_TABLE_NAME" "$LIBRARY_TABLE_NAME"; do
+    if [[ -n "$value" && "$value" != "null" ]] \
+      && aws dynamodb describe-table --table-name "$value" --region "$AWS_REGION" >/dev/null 2>&1; then
+      lines+=("DynamoDB: ${value}")
+    fi
+  done
+
+  for value in "$FRONTEND_BUCKET_NAME" "$RAG_SOURCE_BUCKET_NAME"; do
+    if [[ -n "$value" && "$value" != "null" ]] \
+      && aws s3api head-bucket --bucket "$value" >/dev/null 2>&1; then
+      lines+=("S3: ${value}")
+    fi
+  done
+
+  if [[ -n "$USER_POOL_ID" && "$USER_POOL_ID" != "null" ]] \
+    && aws cognito-idp describe-user-pool --user-pool-id "$USER_POOL_ID" --region "$AWS_REGION" >/dev/null 2>&1; then
+    lines+=("Cognito User Pool: ${USER_POOL_ID}")
   fi
 
-  bootstrap_bucket_name="$(bootstrap_output_value BucketName)"
-  bootstrap_repository_name="$(bootstrap_output_value ImageRepositoryName)"
+  if [[ -n "$BEDROCK_KNOWLEDGE_BASE_ID" && "$BEDROCK_KNOWLEDGE_BASE_ID" != "null" ]] \
+    && aws bedrock-agent get-knowledge-base --knowledge-base-id "$BEDROCK_KNOWLEDGE_BASE_ID" --region "$AWS_REGION" >/dev/null 2>&1; then
+    lines+=("Bedrock Knowledge Base: ${BEDROCK_KNOWLEDGE_BASE_ID}")
+  fi
 
-  echo
-  echo "CDK bootstrap資産を削除します"
-  printf 'BOOTSTRAP_STACK_NAME=%s\n' "$BOOTSTRAP_STACK_NAME"
-  printf 'BOOTSTRAP_BUCKET_NAME=%s\n' "$bootstrap_bucket_name"
-  printf 'BOOTSTRAP_REPOSITORY_NAME=%s\n' "$bootstrap_repository_name"
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("OpenSearch Serverless Collection: ${value}")
+  done < <(
+    aws opensearchserverless list-collections \
+      --region "$AWS_REGION" \
+      --query "collectionSummaries[?starts_with(name, '${RESOURCE_NAME_PREFIX}')].name" \
+      --output text \
+    | tr '\t' '\n'
+  )
 
-  delete_s3_bucket "$bootstrap_bucket_name"
-  delete_ecr_repository_images "$bootstrap_repository_name"
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("CloudWatch Logs: ${value}")
+  done < <(
+    aws logs describe-log-groups \
+      --log-group-name-prefix "/aws/ecs/containerinsights/${STACK_NAME}" \
+      --region "$AWS_REGION" \
+      --query 'logGroups[].logGroupName' \
+      --output text \
+    | tr '\t' '\n'
+  )
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("CloudWatch Logs: ${value}")
+  done < <(
+    aws logs describe-log-groups \
+      --log-group-name-prefix "/aws/lambda/${STACK_NAME}" \
+      --region "$AWS_REGION" \
+      --query 'logGroups[].logGroupName' \
+      --output text \
+    | tr '\t' '\n'
+  )
 
-  echo "CDK bootstrapスタックを削除します: ${BOOTSTRAP_STACK_NAME}"
-  aws cloudformation delete-stack \
-    --stack-name "$BOOTSTRAP_STACK_NAME" \
-    --region "$AWS_REGION"
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("ECS Cluster: ${value}")
+  done < <(
+    aws ecs list-clusters \
+      --region "$AWS_REGION" \
+      --query "clusterArns[?contains(@, '${STACK_NAME}') || contains(@, '${RESOURCE_NAME_PREFIX}')]" \
+      --output text \
+    | tr '\t' '\n'
+  )
 
-  aws cloudformation wait stack-delete-complete \
-    --stack-name "$BOOTSTRAP_STACK_NAME" \
-    --region "$AWS_REGION"
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("VPC: ${value}")
+  done < <(
+    aws ec2 describe-vpcs \
+      --region "$AWS_REGION" \
+      --filters "Name=tag:Name,Values=*${STACK_NAME}*,*${RESOURCE_NAME_PREFIX}*" \
+      --query 'Vpcs[].VpcId' \
+      --output text \
+    | tr '\t' '\n'
+  )
+
+  while IFS= read -r value; do
+    [[ -z "$value" || "$value" == "None" ]] && continue
+    lines+=("ELBv2 Load Balancer: ${value}")
+  done < <(
+    aws elbv2 describe-load-balancers \
+      --region "$AWS_REGION" \
+      --query "LoadBalancers[?contains(LoadBalancerName, '${STACK_NAME}') || contains(LoadBalancerName, '${RESOURCE_NAME_PREFIX}')].LoadBalancerName" \
+      --output text \
+    | tr '\t' '\n'
+  )
+
+  if remaining_tagged_resources="$(
+    aws resourcegroupstaggingapi get-resources \
+      --region "$AWS_REGION" \
+      --tag-filters Key=aws:cloudformation:stack-name,Values="$STACK_NAME" \
+      --query 'ResourceTagMappingList[].ResourceARN' \
+      --output text 2>/dev/null
+  )" && [[ -n "$remaining_tagged_resources" ]]; then
+    lines+=("タグ付きリソース: ${remaining_tagged_resources}")
+  fi
+
+  if [[ "${#lines[@]}" -gt 0 ]]; then
+    printf '%s\n' "${lines[@]}"
+  fi
 }
 
 audit_deleted_resources() {
+  local remaining_lines
+
   echo
   echo "削除結果を監査します"
 
@@ -264,79 +518,14 @@ audit_deleted_resources() {
     exit 1
   fi
 
-  for table_name in "$CHAT_TABLE_NAME" "$LIBRARY_TABLE_NAME"; do
-    if aws dynamodb describe-table \
-      --table-name "$table_name" \
-      --region "$AWS_REGION" \
-      >/dev/null 2>&1; then
-      echo "DynamoDBテーブルがまだ存在します: ${table_name}" >&2
-      exit 1
-    fi
-  done
-
-  for bucket_name in "$FRONTEND_BUCKET_NAME" "$RAG_SOURCE_BUCKET_NAME"; do
-    if aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
-      echo "S3バケットがまだ存在します: ${bucket_name}" >&2
-      exit 1
-    fi
-  done
-
-  if aws cognito-idp describe-user-pool \
-    --user-pool-id "$USER_POOL_ID" \
-    --region "$AWS_REGION" \
-    >/dev/null 2>&1; then
-    echo "Cognito User Poolがまだ存在します: ${USER_POOL_ID}" >&2
-    exit 1
-  fi
-
-  remaining_tagged_resources="$(
-    aws resourcegroupstaggingapi get-resources \
-      --region "$AWS_REGION" \
-      --tag-filters Key=aws:cloudformation:stack-name,Values="$STACK_NAME" \
-      --query 'ResourceTagMappingList[].ResourceARN' \
-      --output text
-  )"
-
-  if [[ -n "$remaining_tagged_resources" ]]; then
-    echo "PaperBuddyスタックタグが残るリソースがあります:" >&2
-    printf '%s\n' "$remaining_tagged_resources" >&2
+  remaining_lines="$(remaining_resource_lines)"
+  if [[ -n "$remaining_lines" ]]; then
+    echo "PaperBuddy関連リソースが残っています:" >&2
+    printf '%s\n' "$remaining_lines" >&2
     exit 1
   fi
 
   echo "PaperBuddy本体リソースの削除を確認しました"
-}
-
-audit_bootstrap_deleted() {
-  local bootstrap_bucket_name="$1"
-  local bootstrap_repository_name="$2"
-
-  echo
-  echo "CDK bootstrap資産の削除結果を監査します"
-
-  if aws cloudformation describe-stacks \
-    --stack-name "$BOOTSTRAP_STACK_NAME" \
-    --region "$AWS_REGION" \
-    >/dev/null 2>&1; then
-    echo "CDK bootstrapスタックがまだ存在します: ${BOOTSTRAP_STACK_NAME}" >&2
-    exit 1
-  fi
-
-  if [[ -n "$bootstrap_bucket_name" && "$bootstrap_bucket_name" != "null" ]] \
-    && aws s3api head-bucket --bucket "$bootstrap_bucket_name" >/dev/null 2>&1; then
-    echo "CDK bootstrap S3バケットがまだ存在します: ${bootstrap_bucket_name}" >&2
-    exit 1
-  fi
-
-  if [[ -n "$bootstrap_repository_name" && "$bootstrap_repository_name" != "null" ]] \
-    && aws ecr describe-repositories \
-      --repository-names "$bootstrap_repository_name" \
-      --region "$AWS_REGION" \
-      >/dev/null 2>&1; then
-    echo "CDK bootstrap ECRリポジトリがまだ存在します: ${bootstrap_repository_name}" >&2
-    exit 1
-  fi
-
-  echo "CDK bootstrap資産の削除を確認しました"
 }
 
 require_command aws
@@ -374,23 +563,19 @@ LIBRARY_TABLE_NAME="$(output_value LibraryTableName)"
 FRONTEND_BUCKET_NAME="$(output_value FrontendBucketName)"
 RAG_SOURCE_BUCKET_NAME="$(output_value RagSourceBucketName)"
 USER_POOL_ID="$(output_value UserPoolId)"
-BOOTSTRAP_BUCKET_NAME=""
-BOOTSTRAP_REPOSITORY_NAME=""
-if aws cloudformation describe-stacks \
-  --stack-name "$BOOTSTRAP_STACK_NAME" \
-  --region "$AWS_REGION" \
-  --output json \
-  > "$BOOTSTRAP_SNAPSHOT_FILE" 2>/dev/null; then
-  BOOTSTRAP_BUCKET_NAME="$(bootstrap_output_value BucketName)"
-  BOOTSTRAP_REPOSITORY_NAME="$(bootstrap_output_value ImageRepositoryName)"
-fi
+BEDROCK_KNOWLEDGE_BASE_ID="$(output_value BedrockKnowledgeBaseId)"
+BEDROCK_DATA_SOURCE_ID="$(output_value BedrockDataSourceId)"
+AOSS_COLLECTION_NAME="${RESOURCE_NAME_PREFIX}-kb"
+AOSS_ACCESS_POLICY_NAME="${RESOURCE_NAME_PREFIX}-kb-access"
+AOSS_ENCRYPTION_POLICY_NAME="${RESOURCE_NAME_PREFIX}-kb-encryption"
+AOSS_NETWORK_POLICY_NAME="${RESOURCE_NAME_PREFIX}-kb-network"
 LOG_GROUP_NAMES=()
 while IFS= read -r log_group_name; do
   [[ -z "$log_group_name" ]] && continue
   LOG_GROUP_NAMES+=("$log_group_name")
 done < <(stack_resource_ids_by_type "AWS::Logs::LogGroup")
 
-echo "以下のPaperBuddy本体AWSリソースとCDK bootstrap資産を削除します。削除後は復元できません。"
+echo "以下のPaperBuddy本体AWSリソースを削除します。削除後は復元できません。"
 echo "AWSアカウント:"
 aws sts get-caller-identity
 echo
@@ -402,10 +587,12 @@ printf 'LIBRARY_TABLE_NAME=%s\n' "$LIBRARY_TABLE_NAME"
 printf 'FRONTEND_BUCKET_NAME=%s\n' "$FRONTEND_BUCKET_NAME"
 printf 'RAG_SOURCE_BUCKET_NAME=%s\n' "$RAG_SOURCE_BUCKET_NAME"
 printf 'USER_POOL_ID=%s\n' "$USER_POOL_ID"
+printf 'BEDROCK_KNOWLEDGE_BASE_ID=%s\n' "$BEDROCK_KNOWLEDGE_BASE_ID"
+printf 'BEDROCK_DATA_SOURCE_ID=%s\n' "$BEDROCK_DATA_SOURCE_ID"
+printf 'AOSS_COLLECTION_NAME=%s\n' "$AOSS_COLLECTION_NAME"
 printf 'LOG_GROUP_NAMES=%s\n' "${LOG_GROUP_NAMES[*]:-}"
-printf 'BOOTSTRAP_STACK_NAME=%s\n' "$BOOTSTRAP_STACK_NAME"
-printf 'BOOTSTRAP_BUCKET_NAME=%s\n' "$BOOTSTRAP_BUCKET_NAME"
-printf 'BOOTSTRAP_REPOSITORY_NAME=%s\n' "$BOOTSTRAP_REPOSITORY_NAME"
+echo
+echo "CDK bootstrap資産は削除しません。必要な場合は別途 mise run infra:destroy:bootstrap:dev を実行してください。"
 echo
 read -r -p "削除を続行するにはスタック名 ${STACK_NAME} を入力してください: " confirmation
 
@@ -427,6 +614,12 @@ else
   echo "CloudFormationスタックは存在しないためスキップします: ${STACK_NAME}"
 fi
 
+delete_bedrock_knowledge_base "$BEDROCK_KNOWLEDGE_BASE_ID"
+delete_bedrock_knowledge_bases_by_name "$RESOURCE_NAME_PREFIX"
+delete_aoss_collection "$AOSS_COLLECTION_NAME"
+delete_aoss_access_policy "$AOSS_ACCESS_POLICY_NAME"
+delete_aoss_policy encryption "$AOSS_ENCRYPTION_POLICY_NAME"
+delete_aoss_policy network "$AOSS_NETWORK_POLICY_NAME"
 delete_dynamodb_table "$CHAT_TABLE_NAME"
 delete_dynamodb_table "$LIBRARY_TABLE_NAME"
 delete_s3_bucket "$FRONTEND_BUCKET_NAME"
@@ -436,19 +629,18 @@ if [[ -n "$USER_POOL_ID" && "$USER_POOL_ID" != "null" ]]; then
   echo "Cognito User Poolを削除します: ${USER_POOL_ID}"
   aws cognito-idp delete-user-pool \
     --user-pool-id "$USER_POOL_ID" \
-    --region "$AWS_REGION"
+    --region "$AWS_REGION" \
+    || true
 fi
 
-for log_group_name in "${LOG_GROUP_NAMES[@]}"; do
+for log_group_name in "${LOG_GROUP_NAMES[@]:-}"; do
   delete_log_group "$log_group_name"
 done
+delete_log_groups_by_prefix "/aws/ecs/containerinsights/${STACK_NAME}"
+delete_log_groups_by_prefix "/aws/lambda/${STACK_NAME}"
+delete_tagged_stack_resources
 
-if [[ "$stack_exists" == "true" ]]; then
-  audit_deleted_resources
-fi
-
-delete_bootstrap_resources
-audit_bootstrap_deleted "$BOOTSTRAP_BUCKET_NAME" "$BOOTSTRAP_REPOSITORY_NAME"
+audit_deleted_resources
 
 echo
-echo "PaperBuddy本体AWSリソースとCDK bootstrap資産を削除しました。"
+echo "PaperBuddy本体AWSリソースを削除しました。"

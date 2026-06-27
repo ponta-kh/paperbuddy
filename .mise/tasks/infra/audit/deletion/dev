@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のPaperBuddy削除漏れ候補を監査する"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly STAGE_NAME="dev"
+readonly RESOURCE_NAME_PREFIX="paperbuddy-${STAGE_NAME}"
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+require_command() {
+  local command_name="$1"
+
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "必要なコマンドが見つかりません: ${command_name}" >&2
+    exit 1
+  fi
+}
+
+print_section() {
+  local title="$1"
+  shift
+
+  echo
+  echo "==> ${title}"
+  "$@" || true
+}
+
+require_command aws
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "infra設定ファイルが見つかりません: ${ENV_FILE}" >&2
+  echo "infra/.env.example を infra/.env にコピーして値を設定してください。" >&2
+  exit 1
+fi
+
+STACK_NAME="$(read_env_value STACK_NAME)"
+AWS_REGION="$(read_env_value AWS_REGION)"
+
+echo "PaperBuddy削除漏れ候補を監査します"
+echo "AWSアカウント:"
+aws sts get-caller-identity
+printf 'AWS_REGION=%s\n' "$AWS_REGION"
+printf 'STACK_NAME=%s\n' "$STACK_NAME"
+printf 'RESOURCE_NAME_PREFIX=%s\n' "$RESOURCE_NAME_PREFIX"
+
+print_section "CloudFormationスタック" \
+  aws cloudformation describe-stacks \
+    --stack-name "$STACK_NAME" \
+    --region "$AWS_REGION" \
+    --query 'Stacks[].{StackName:StackName,Status:StackStatus}' \
+    --output table
+
+print_section "PaperBuddyタグ付きリソース" \
+  aws resourcegroupstaggingapi get-resources \
+    --region "$AWS_REGION" \
+    --tag-filters Key=aws:cloudformation:stack-name,Values="$STACK_NAME" \
+    --query 'ResourceTagMappingList[].ResourceARN' \
+    --output table
+
+print_section "OpenSearch Serverless Collection" \
+  aws opensearchserverless list-collections \
+    --region "$AWS_REGION" \
+    --query "collectionSummaries[?starts_with(name, '${RESOURCE_NAME_PREFIX}')].[name,status,id]" \
+    --output table
+
+print_section "Bedrock Knowledge Base" \
+  aws bedrock-agent list-knowledge-bases \
+    --region "$AWS_REGION" \
+    --query "knowledgeBaseSummaries[?starts_with(name, '${RESOURCE_NAME_PREFIX}')].[name,status,knowledgeBaseId]" \
+    --output table
+
+print_section "DynamoDBテーブル" \
+  aws dynamodb list-tables \
+    --region "$AWS_REGION" \
+    --query "TableNames[?starts_with(@, '${RESOURCE_NAME_PREFIX}')]" \
+    --output table
+
+print_section "S3バケット" \
+  aws s3api list-buckets \
+    --query "Buckets[?contains(Name, '${RESOURCE_NAME_PREFIX}')].[Name,CreationDate]" \
+    --output table
+
+print_section "CloudWatch Logsロググループ" \
+  aws logs describe-log-groups \
+    --region "$AWS_REGION" \
+    --query "logGroups[?contains(logGroupName, '${STACK_NAME}') || contains(logGroupName, '${RESOURCE_NAME_PREFIX}')].[logGroupName,storedBytes]" \
+    --output table
+
+print_section "ECSクラスター" \
+  aws ecs list-clusters \
+    --region "$AWS_REGION" \
+    --query "clusterArns[?contains(@, '${STACK_NAME}') || contains(@, '${RESOURCE_NAME_PREFIX}')]" \
+    --output table
+
+print_section "ELBv2ロードバランサー" \
+  aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${STACK_NAME}') || contains(LoadBalancerName, '${RESOURCE_NAME_PREFIX}')].[LoadBalancerName,State.Code,Type,Scheme]" \
+    --output table
+
+print_section "VPC" \
+  aws ec2 describe-vpcs \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:Name,Values=*${STACK_NAME}*,*${RESOURCE_NAME_PREFIX}*" \
+    --query 'Vpcs[].[VpcId,State,Tags]' \
+    --output table
+
+print_section "VPC Endpoint" \
+  aws ec2 describe-vpc-endpoints \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:aws:cloudformation:stack-name,Values=${STACK_NAME}" \
+    --query 'VpcEndpoints[].[VpcEndpointId,State,ServiceName]' \
+    --output table
+
+print_section "CloudFront Distribution" \
+  aws cloudfront list-distributions \
+    --query "DistributionList.Items[?contains(Comment, '${STACK_NAME}') || contains(Comment, '${RESOURCE_NAME_PREFIX}')].[Id,Status,DomainName]" \
+    --output table
+
+print_section "Cognito User Pool" \
+  aws cognito-idp list-user-pools \
+    --region "$AWS_REGION" \
+    --max-results 60 \
+    --query "UserPools[?starts_with(Name, '${RESOURCE_NAME_PREFIX}')].[Name,Id,Status]" \
+    --output table
+
+print_section "CDK bootstrapスタック" \
+  aws cloudformation describe-stacks \
+    --stack-name CDKToolkit \
+    --region "$AWS_REGION" \
+    --query 'Stacks[].{StackName:StackName,Status:StackStatus}' \
+    --output table
+
+print_section "CDK bootstrap S3/ECR" \
+  aws s3api list-buckets \
+    --query "Buckets[?starts_with(Name, 'cdk-')].[Name,CreationDate]" \
+    --output table
+
+print_section "CDK bootstrap ECR" \
+  aws ecr describe-repositories \
+    --region "$AWS_REGION" \
+    --query "repositories[?starts_with(repositoryName, 'cdk-')].[repositoryName,repositoryUri]" \
+    --output table

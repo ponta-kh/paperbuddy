@@ -19,12 +19,10 @@ PaperBuddyのAWSリソースを削除し、PaperBuddyに起因する継続課金
 - RAG材料用S3バケットとオブジェクトバージョン
 - Cognito User Pool
 - CloudWatch Logsロググループ
-- CDK bootstrap S3バケット
-- CDK bootstrap ECRリポジトリとDockerイメージ
-- `CDKToolkit`スタック
 
-CDK bootstrap資産も削除するため、このAWSアカウント・リージョンの`CDKToolkit`をPaperBuddy専用として扱える場合にだけ実行する。
-他プロジェクトとCDK bootstrapを共有している場合は、このタスクを実行しない。
+CDK bootstrap資産はPaperBuddy本体の削除手順には含めない。
+このAWSアカウント・リージョンの`CDKToolkit`をPaperBuddy専用として扱える場合にだけ、別手順で削除する。
+他プロジェクトとCDK bootstrapを共有している場合は、bootstrap削除タスクを実行しない。
 
 ## 削除可否の確認
 
@@ -65,7 +63,7 @@ DynamoDBのオンデマンドバックアップを作成する場合、バック
 mise run infra:destroy:dev
 ```
 
-このタスクは削除前にAWSアカウント、リージョン、スタック名、保持リソース名、CDK bootstrap資産名を表示し、続行確認としてスタック名の入力を求める。
+このタスクは削除前にAWSアカウント、リージョン、スタック名、保持リソース名、OpenSearch Serverless Collection名、Bedrock Knowledge Base IDを表示し、続行確認としてスタック名の入力を求める。
 表示された対象を確認し、削除してよい場合だけスタック名を入力する。
 
 削除を続行すると、以下を順に実行する。
@@ -73,17 +71,33 @@ mise run infra:destroy:dev
 1. `infra/.env`から`STACK_NAME`と`AWS_REGION`を読み込む
 2. CloudFormation Outputとスタックリソース一覧を一時ファイルへ保存する
 3. CloudFormationスタックを削除する
-4. 保持されたDynamoDBテーブルの削除保護を解除して削除する
-5. 保持されたS3バケットの通常オブジェクト、全バージョン、削除マーカーを削除してからバケットを削除する
-6. 保持されたCognito User Poolを削除する
-7. 保持されたCloudWatch Logsロググループを削除する
-8. PaperBuddy本体リソースが残っていないことを監査する
-9. CDK bootstrap S3バケット、ECRイメージ、`CDKToolkit`スタックを削除する
-10. CDK bootstrap資産が残っていないことを監査する
+4. Bedrock Knowledge BaseとData Sourceが残っている場合は削除する
+5. OpenSearch Serverless Collection、Access Policy、Security Policyが残っている場合は削除する
+6. 保持されたDynamoDBテーブルの削除保護を解除して削除する
+7. 保持されたS3バケットの通常オブジェクト、全バージョン、削除マーカーを削除してからバケットを削除する
+8. 保持されたCognito User Poolを削除する
+9. スタックリソースとPaperBuddy名プレフィックスに基づいてCloudWatch Logsロググループを削除する
+10. PaperBuddy本体リソースが残っていないことをサービス別に監査する
+
+CDK bootstrap資産も削除する場合は、本体削除後に次を実行する。
+他プロジェクトと共有していないことを確認できる場合だけ実行する。
+
+```sh
+mise run infra:destroy:bootstrap:dev
+```
+
+このタスクは、CDK bootstrap S3バケット、CDK bootstrap ECRリポジトリとDockerイメージ、`CDKToolkit`スタックを削除する。
 
 ## 削除後の確認
 
-タスクは削除結果を監査し、対象リソースが残っている場合は失敗する。追加で確認する場合は、スタックとPaperBuddyタグ付きリソースを確認する。
+タスクは削除結果を監査し、対象リソースが残っている場合は失敗する。追加で確認する場合は、削除漏れ監査タスクを実行する。
+
+```sh
+mise run infra:audit:deletion:dev
+```
+
+このタスクは、CloudFormationスタック、PaperBuddyタグ付きリソース、OpenSearch Serverless、Bedrock Knowledge Base、DynamoDB、S3、CloudWatch Logs、ECS、ELB、VPC、VPC Endpoint、CloudFront、Cognito、CDK bootstrap資産を一覧する。
+手動で確認する場合は、スタックとPaperBuddyタグ付きリソースを確認する。
 
 ```sh
 aws cloudformation describe-stacks \

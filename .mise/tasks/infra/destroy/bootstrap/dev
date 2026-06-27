@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+#MISE description="開発環境のCDK bootstrap資産だけを削除する"
+
+set -euo pipefail
+
+readonly ENV_FILE="infra/.env"
+readonly BOOTSTRAP_STACK_NAME="CDKToolkit"
+readonly BOOTSTRAP_SNAPSHOT_FILE="$(mktemp /tmp/paperbuddy-bootstrap-stack.XXXXXX.json)"
+
+cleanup() {
+  rm -f "$BOOTSTRAP_SNAPSHOT_FILE"
+}
+trap cleanup EXIT
+
+read_env_value() {
+  local key="$1"
+  local value
+
+  value="$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^["'\''"]|["'\''"]$/, "")
+        print
+        exit
+      }
+    ' "$ENV_FILE"
+  )"
+
+  if [[ -z "$value" ]]; then
+    echo "infra設定の${key}が未設定です" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+bootstrap_output_value() {
+  local key="$1"
+
+  jq -r --arg key "$key" \
+    '.Stacks[0].Outputs[]? | select(.OutputKey == $key) | .OutputValue' \
+    "$BOOTSTRAP_SNAPSHOT_FILE"
+}
+
+require_command() {
+  local command_name="$1"
+
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "必要なコマンドが見つかりません: ${command_name}" >&2
+    exit 1
+  fi
+}
+
+empty_s3_bucket_completely() {
+  local bucket_name="$1"
+  local delete_payload
+  local object_count
+
+  echo "S3バケットを空にします: ${bucket_name}"
+  if ! aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
+    echo "S3バケットは存在しないためスキップします: ${bucket_name}"
+    return
+  fi
+
+  aws s3 rm "s3://${bucket_name}" --recursive --region "$AWS_REGION"
+
+  while true; do
+    delete_payload="$(
+      aws s3api list-object-versions \
+        --bucket "$bucket_name" \
+        --region "$AWS_REGION" \
+        --max-items 1000 \
+        --output json \
+      | jq -c '{
+          Objects: (
+            [.Versions[]?, .DeleteMarkers[]?]
+            | map({Key: .Key, VersionId: .VersionId})
+          ),
+          Quiet: true
+        }'
+    )"
+
+    object_count="$(jq '.Objects | length' <<< "$delete_payload")"
+    [[ "$object_count" -eq 0 ]] && break
+
+    aws s3api delete-objects \
+      --bucket "$bucket_name" \
+      --region "$AWS_REGION" \
+      --delete "$delete_payload" \
+      > /dev/null
+  done
+}
+
+delete_s3_bucket() {
+  local bucket_name="$1"
+
+  [[ -z "$bucket_name" || "$bucket_name" == "null" ]] && return
+
+  if ! aws s3api head-bucket --bucket "$bucket_name" >/dev/null 2>&1; then
+    echo "S3バケットは存在しないためスキップします: ${bucket_name}"
+    return
+  fi
+
+  empty_s3_bucket_completely "$bucket_name"
+  echo "S3バケットを削除します: ${bucket_name}"
+  aws s3api delete-bucket \
+    --bucket "$bucket_name" \
+    --region "$AWS_REGION"
+}
+
+delete_ecr_repository_images() {
+  local repository_name="$1"
+  local image_ids
+  local image_count
+
+  [[ -z "$repository_name" || "$repository_name" == "null" ]] && return
+
+  if ! aws ecr describe-repositories \
+    --repository-names "$repository_name" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "ECRリポジトリは存在しないためスキップします: ${repository_name}"
+    return
+  fi
+
+  echo "ECRイメージを削除します: ${repository_name}"
+  while true; do
+    image_ids="$(
+      aws ecr list-images \
+        --repository-name "$repository_name" \
+        --region "$AWS_REGION" \
+        --query 'imageIds[0:100]' \
+        --output json
+    )"
+    image_count="$(jq 'length' <<< "$image_ids")"
+    [[ "$image_count" -eq 0 ]] && break
+
+    aws ecr batch-delete-image \
+      --repository-name "$repository_name" \
+      --region "$AWS_REGION" \
+      --image-ids "$image_ids" \
+      > /dev/null
+  done
+}
+
+audit_bootstrap_deleted() {
+  local bootstrap_bucket_name="$1"
+  local bootstrap_repository_name="$2"
+
+  echo
+  echo "CDK bootstrap資産の削除結果を監査します"
+
+  if aws cloudformation describe-stacks \
+    --stack-name "$BOOTSTRAP_STACK_NAME" \
+    --region "$AWS_REGION" \
+    >/dev/null 2>&1; then
+    echo "CDK bootstrapスタックがまだ存在します: ${BOOTSTRAP_STACK_NAME}" >&2
+    exit 1
+  fi
+
+  if [[ -n "$bootstrap_bucket_name" && "$bootstrap_bucket_name" != "null" ]] \
+    && aws s3api head-bucket --bucket "$bootstrap_bucket_name" >/dev/null 2>&1; then
+    echo "CDK bootstrap S3バケットがまだ存在します: ${bootstrap_bucket_name}" >&2
+    exit 1
+  fi
+
+  if [[ -n "$bootstrap_repository_name" && "$bootstrap_repository_name" != "null" ]] \
+    && aws ecr describe-repositories \
+      --repository-names "$bootstrap_repository_name" \
+      --region "$AWS_REGION" \
+      >/dev/null 2>&1; then
+    echo "CDK bootstrap ECRリポジトリがまだ存在します: ${bootstrap_repository_name}" >&2
+    exit 1
+  fi
+
+  echo "CDK bootstrap資産の削除を確認しました"
+}
+
+require_command aws
+require_command jq
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "infra設定ファイルが見つかりません: ${ENV_FILE}" >&2
+  echo "infra/.env.example を infra/.env にコピーして値を設定してください。" >&2
+  exit 1
+fi
+
+AWS_REGION="$(read_env_value AWS_REGION)"
+
+if ! aws cloudformation describe-stacks \
+  --stack-name "$BOOTSTRAP_STACK_NAME" \
+  --region "$AWS_REGION" \
+  --output json \
+  > "$BOOTSTRAP_SNAPSHOT_FILE" 2>/dev/null; then
+  echo "CDK bootstrapスタックは存在しないため削除不要です: ${BOOTSTRAP_STACK_NAME}"
+  exit 0
+fi
+
+BOOTSTRAP_BUCKET_NAME="$(bootstrap_output_value BucketName)"
+BOOTSTRAP_REPOSITORY_NAME="$(bootstrap_output_value ImageRepositoryName)"
+
+echo "CDK bootstrap資産を削除します。共有している場合は他プロジェクトのCDKデプロイが壊れます。"
+echo "AWSアカウント:"
+aws sts get-caller-identity
+echo
+printf 'AWS_REGION=%s\n' "$AWS_REGION"
+printf 'BOOTSTRAP_STACK_NAME=%s\n' "$BOOTSTRAP_STACK_NAME"
+printf 'BOOTSTRAP_BUCKET_NAME=%s\n' "$BOOTSTRAP_BUCKET_NAME"
+printf 'BOOTSTRAP_REPOSITORY_NAME=%s\n' "$BOOTSTRAP_REPOSITORY_NAME"
+echo
+read -r -p "削除を続行するには ${BOOTSTRAP_STACK_NAME} を入力してください: " confirmation
+
+if [[ "$confirmation" != "$BOOTSTRAP_STACK_NAME" ]]; then
+  echo "入力が一致しないため削除を中止しました" >&2
+  exit 1
+fi
+
+delete_s3_bucket "$BOOTSTRAP_BUCKET_NAME"
+delete_ecr_repository_images "$BOOTSTRAP_REPOSITORY_NAME"
+
+echo "CDK bootstrapスタックを削除します: ${BOOTSTRAP_STACK_NAME}"
+aws cloudformation delete-stack \
+  --stack-name "$BOOTSTRAP_STACK_NAME" \
+  --region "$AWS_REGION"
+
+aws cloudformation wait stack-delete-complete \
+  --stack-name "$BOOTSTRAP_STACK_NAME" \
+  --region "$AWS_REGION"
+
+audit_bootstrap_deleted "$BOOTSTRAP_BUCKET_NAME" "$BOOTSTRAP_REPOSITORY_NAME"
+
+echo
+echo "CDK bootstrap資産を削除しました。"
